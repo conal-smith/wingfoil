@@ -4,6 +4,7 @@ import { fixtureFetch, readBundle, readFrame, readRun } from "./bundles";
 import { validateManifest, validateWindSpots } from "../force5/src/weather";
 import type { Manifest, Spot } from "../force5/src/weather";
 import { clearTileCache, samplePoint } from "../force5/src/tiledField";
+import { CLOUD_FRAME_STEP, CLOUD_VARIABLE } from "../force5/src/rain";
 import {
   validateWaveManifest,
   validateWaveSpots,
@@ -327,8 +328,11 @@ describe.each(["icon-eu-weather"])("published %s weather bundle", (name) => {
               ),
               decimalsOf(summary),
             );
+          // The frames' cloud is to the nearest 5 % and the series' to the
+          // whole per cent, so they may differ by up to half a step.
+          const coarse = key === CLOUD_VARIABLE ? CLOUD_FRAME_STEP / 2 : 0;
           expect(Math.abs(point - summary)).toBeLessThanOrEqual(
-            step10 + 0.00501,
+            step10 + coarse + 0.00501,
           );
         }
       }

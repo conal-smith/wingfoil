@@ -6,7 +6,8 @@ Ireland/Atlantic 0.0625° grid, and published as a `kind: "weather"` bundle: a
 declared `variables` map, a precomputed series per riding location carrying
 every variable, and one map frame an hour carrying `precip`, which the chart's
 Rain layer draws (docs/TILING_DESIGN.md, "As built: the Rain layer"), and
-`clct`, the total cloud a Weather layer shades the sky with.
+`clct`, the total cloud a Weather layer shades the sky with, in per cent rounded
+to the nearest 5 (the series keep it to the whole per cent).
 Steps are hourly by default, so each hour's rain is its own and not a share of
 a three-hour total.
 
@@ -136,11 +137,15 @@ VARIABLES = {
 DIRECTORIES = {name: entry["directory"] for name, entry in VARIABLES.items() if entry["directory"]}
 DERIVED = tuple(name for name, entry in VARIABLES.items() if not entry["directory"])
 # What the map frames carry: the rain in the step, for the chart's Rain layer, and
-# the total cloud in whole per cent, for the sky of a Weather layer. Each array of
-# 56,817 cells is about 190–230 KB of JSON; compressed, rain is 5–10 KB on a mostly
-# dry hour and cloud, whose edges are everywhere, 25–40 KB (docs/LIVE_FORECAST_
-# PIPELINE.md). Every variable would be some 3 MB a frame that nothing draws.
+# the total cloud, for the sky of a Weather layer. Each array of 56,817 cells is
+# about 190–230 KB of JSON; compressed, rain is 5–10 KB on a mostly dry hour and
+# cloud, whose edges are everywhere, some 15–25 KB in steps of 5 %, half what whole
+# per cent costs (docs/LIVE_FORECAST_PIPELINE.md). Every variable would be some
+# 3 MB a frame that nothing draws.
 FRAME_VARIABLES = ("precip", "clct")
+# The frames' cloud is in per cent rounded to the nearest 5: still per cent, so a
+# reader needs no scale, and finer than a shade of grey on a map can show.
+CLOUD_FRAME_STEP = 5
 
 
 def validate_metadata(metadata, field, run, hour):
@@ -267,19 +272,29 @@ def parse_args(argv=None):
     return args
 
 
+def frame_cloud(clct):
+    """Whole per cent, as `convert` publishes it, to the nearest CLOUD_FRAME_STEP.
+
+    A whole number over 5 never sits halfway between two steps, so how ties round
+    never matters; 0 and 100 stay exactly clear and overcast.
+    """
+    step = CLOUD_FRAME_STEP
+    return [None if value is None else int(round(value / step)) * step for value in clct]
+
+
 def frame_payload(run, hour, valid, grid, interval, precip, clct):
     """One hour's map frame: the rain in the step and the total cloud at the hour.
 
     An hour with no interval has no amount anywhere, so its rain is nulls rather
     than a field of zeros, which would read as a dry hour that was forecast. Cloud
     is read at the hour itself, so initialization has it like any other hour, in
-    whole per cent as `convert` rounds it.
+    per cent to the nearest 5 (`frame_cloud`).
     """
     cells = grid["width"] * grid["height"]
     return {"model": MODEL, "run": run, "hour": hour, "validTime": valid, "grid": grid,
             "precipIntervalHours": interval,
             "precip": [None] * cells if precip is None else precip,
-            "clct": clct}
+            "clct": frame_cloud(clct)}
 
 
 def manifest_for(run, run_time, args, grid, frames, series):
@@ -322,7 +337,8 @@ def manifest_for(run, run_time, args, grid, frames, series):
             "clipped into their plausible range; a value outside it fails the run. precip is derived by "
             "differencing tot_prec, and pop from precip around each place (see rainChanceNote). "
             "Each frame carries precip and clct, on the whole crop, for the "
-            "map; spotSeries carries every variable at every published hour, "
+            f"map, clct there rounded to the nearest {CLOUD_FRAME_STEP} %; "
+            "spotSeries carries every variable at every published hour, "
             "bilinearly sampled except ww, which is read from the containing cell, and pop. "
             "No hour is interpolated: only native forecast steps are published."),
         "sourceUrl": BASE + "/",

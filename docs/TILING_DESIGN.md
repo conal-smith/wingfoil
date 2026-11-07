@@ -582,16 +582,16 @@ the run, the grid and the value bound; nothing in the format changed.
   which are put under the relief too (`rainLayer.ts` keeps it there). A new hour is a
   new image: about 65 ms to build on a laptop, then a PNG data URL.
 - **Cloud beside the rain (7 November 2026).** The same frames now carry `clct`, the
-  total cloud at the hour in whole per cent (`frameVariables: ["precip", "clct"]`),
-  for the sky of a Weather layer; at hour 0 it is a real field, unlike the rain.
-  Nothing draws it yet: `frameCloud` (force5/src/rain.ts) reads it, and says "none"
-  for a run published before it or a malformed array, while `validateRainFrame`
-  still checks the rain alone, so a bad cloud array never hides the rain. Cloud
-  compresses far worse than rain, which is mostly dry zeros: a frame went from
-  7–10 KB gzip to 39–49 KB (408–425 KB of JSON; measured on the real 00 UTC run of
-  7 November 2026), and the Rain layer reads that too. Still JSON: the publisher
-  stores it gzip-encoded, and steps of 5 % would halve the cloud's share if the
-  bytes ever matter more than the precision.
+  total cloud at the hour (`frameVariables: ["precip", "clct"]`), for the sky of a
+  Weather layer; at hour 0 it is a real field, unlike the rain. It is per cent
+  rounded to the nearest 5 (`CLOUD_FRAME_STEP`): still per cent, so a reader needs
+  no scale, and half the compressed bytes of whole per cent. Nothing draws it yet:
+  `frameCloud` (force5/src/rain.ts) reads it, and says "none" for a run published
+  before it or a malformed array, while `validateRainFrame` still checks the rain
+  alone, so a bad cloud array never hides the rain. Cloud compresses far worse than
+  rain, which is mostly dry zeros: a frame went from 7–10 KB gzip to 24–30 KB
+  (412–428 KB of JSON; measured on the real 00 UTC run of 7 November 2026). Still
+  JSON, which the publisher stores gzip-encoded.
 
 ## As built: the blend per square
 

@@ -21,8 +21,14 @@ export const RAIN_MODEL = "icon-eu-weather";
 export const RAIN_URL = "weather/icon-eu-weather.json";
 /** The variable the frames carry for the Rain layer. */
 export const RAIN_VARIABLE = "precip";
-/** The total cloud the same frames carry, in whole per cent, for the sky. */
+/** The total cloud the same frames carry, for the sky. */
 export const CLOUD_VARIABLE = "clct";
+/**
+ * The frames' cloud is per cent rounded to the nearest 5 (0, 5, ..., 100),
+ * not a count of steps: half the bytes of whole per cent once compressed, and
+ * finer than a map's shade of grey shows. The spot series keep whole per cent.
+ */
+export const CLOUD_FRAME_STEP = 5;
 /** Less than this in an hour is dry: ICON rounds to 0.1 mm, so this is none. */
 export const DRY_MM_PER_HOUR = 0.05;
 /** Where the map's drizzle starts to fade in, between a dry cell and a wet one. */
@@ -59,7 +65,8 @@ export interface RainFrame {
   /** Millimetres in the interval, per cell, rows north to south; null where none. */
   precip: (number | null)[];
   /**
-   * Total cloud at the hour, whole per cent per cell, rows north to south.
+   * Total cloud at the hour, per cent to the nearest 5 per cell, rows north
+   * to south.
    * Absent from runs published before the frames carried it: read it through
    * `frameCloud`, never directly.
    */
@@ -237,8 +244,10 @@ export const framesCarryCloud = (manifest: {
 
 /**
  * A frame's total cloud, per cell in per cent (0 clear, 100 overcast, null
- * unknown), or null when the frame carries none or carries it malformed: the
- * wrong length for the grid, or a value outside 0 to 100. A frame whose cloud
+ * unknown), published to the nearest 5 % (`CLOUD_FRAME_STEP`) and read as the
+ * per cent it is, so nothing here depends on the step. Null when the frame
+ * carries none or carries it malformed: the wrong length for the grid, or a
+ * value outside 0 to 100. A frame whose cloud
  * is bad still holds good rain, so `validateRainFrame` leaves the cloud alone
  * and this says "no cloud" rather than throwing.
  */

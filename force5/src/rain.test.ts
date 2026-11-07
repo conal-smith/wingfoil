@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLOUD_FRAME_STEP,
   CLOUD_VARIABLE,
   DRY_MM_PER_HOUR,
   RAIN_KEY_MM,
@@ -273,10 +274,12 @@ describe("the total cloud in a frame", () => {
   const grid = { width: 2, height: 2 };
   const frame = (clct: unknown) => ({ clct }) as Pick<RainFrame, "clct">;
 
-  it("reads whole per cent per cell, a clear 0 kept apart from an unknown null", () => {
-    expect(frameCloud(frame([0, 37, 100, null]), grid)).toEqual([
+  it("reads per cent per cell, a clear 0 kept apart from an unknown null", () => {
+    // Published in steps of 5 %, and read as the per cent it is, not a count.
+    expect(CLOUD_FRAME_STEP).toBe(5);
+    expect(frameCloud(frame([0, 35, 100, null]), grid)).toEqual([
       0,
-      37,
+      35,
       100,
       null,
     ]);

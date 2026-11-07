@@ -400,6 +400,9 @@ const WEATHER_VARIABLES = {
     // corner of every frame is genuinely clear sky, which is the case a reader
     // that treats 0 as "nothing loaded" rather than "none" gets wrong.
     spec: { base: 0, amp: 0, gx: 7, gy: 6, period: 21, phase: 0.05, floor: 0 },
+    // The frames carry it in per cent to the nearest 5, as the adapter does
+    // (CLOUD_FRAME_STEP); the series keep the whole per cent.
+    frameStep: 5,
   },
   clcl: {
     units: "%",
@@ -1007,6 +1010,12 @@ function weatherBundle(model, spots, runMs, grid) {
         // The step that has no interval has no amount either, everywhere.
         fields[name] = new Array(grid.width * grid.height).fill(null);
       else fields[name] = field(grid, planes[name], variable.decimals);
+      if (variable.frameStep)
+        fields[name] = fields[name].map((value) =>
+          value === null
+            ? null
+            : Math.round(value / variable.frameStep) * variable.frameStep,
+        );
       bounded(
         fields[name],
         100000,

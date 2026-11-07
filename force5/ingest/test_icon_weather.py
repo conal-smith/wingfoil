@@ -344,6 +344,7 @@ class BundleTests(unittest.TestCase):
         # cloud, for the sky of a Weather layer.
         self.assertEqual(manifest["frameVariables"], ["precip", "clct"])
         self.assertIn("precip and clct", manifest["processing"])
+        self.assertIn("clct there rounded to the nearest 5 %", manifest["processing"])
         # A weather frame's grid carries many units, so it declares none.
         self.assertNotIn("units", manifest["grid"])
         self.assertEqual([frame["hour"] for frame in manifest["frames"]], [0, 3, 6])
@@ -375,10 +376,10 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(set(second) - {"model", "run", "hour", "validTime", "grid",
                                         "precipIntervalHours"}, {"precip", "clct"})
 
-    def test_frame_cloud_is_whole_per_cent_as_converted_and_matches_the_series(self):
+    def test_frame_cloud_is_per_cent_to_the_nearest_five_and_the_series_whole_per_cent(self):
         # A real crop's cloud: DWD's float percentages, a hair over 100 at overcast.
         raw = {0: [0.0, 37.4, 99.6, 100.0004], 1: [12.5, 50.49, 87.51, 100.0],
-               2: [100.0] * 4, 3: [0.0] * 4}
+               2: [2.0, 3.0, 97.0, 98.0], 3: [0.0] * 4}
 
         def cloudy(path, field, run, hour, layout=None):
             values, layout, metadata = self.fake_decode(path, field, run, hour, layout)
@@ -387,17 +388,29 @@ class BundleTests(unittest.TestCase):
             return values, layout, metadata
         manifest = self.run_main(decode=cloudy, hours=3, step=1)
         frames = [self.frame(manifest, i)["clct"] for i in range(4)]
-        self.assertEqual(frames, [[0, 37, 100, 100], [12, 50, 88, 100], [100] * 4, [0] * 4])
-        # Stored compactly: whole numbers in the JSON, never 37.0.
+        # Whole per cent first (37, 12, 88), then the nearest step of 5; a sliver of
+        # cloud is clear and a sliver of sky overcast, and the ends stay exact.
+        self.assertEqual(frames, [[0, 35, 100, 100], [10, 50, 90, 100], [0, 5, 95, 100],
+                                  [0] * 4])
+        # Stored compactly: whole numbers in the JSON, never 35.0.
         text = (self.root / "public/weather" / manifest["base"]
                 / manifest["frames"][0]["url"]).read_text()
-        self.assertIn('"clct":[0,37,100,100]', text)
+        self.assertIn('"clct":[0,35,100,100]', text)
         # The series is unchanged by it: brandon's cloud is still sampled bilinearly
-        # from the same whole-per-cent field, between the frame's cells.
+        # from the whole-per-cent field, between the cells, and is not in steps of 5.
         series = manifest["spotSeries"]["brandon"]
-        self.assertEqual([step["values"]["clct"] for step in series], [21, 30, 100, 0])
+        self.assertEqual([step["values"]["clct"] for step in series], [21, 30, 17, 0])
         validate_bundle(self.root / "public", "icon-eu-weather", 12,
                         self.run_time + timedelta(hours=1))
+
+    def test_frame_cloud_rounds_every_whole_per_cent_to_its_nearest_step(self):
+        self.assertEqual(fetch_icon_weather.CLOUD_FRAME_STEP, 5)
+        rounded = fetch_icon_weather.frame_cloud(list(range(101)) + [None])
+        # Never a tie: 2 is down to 0, 3 up to 5, and so on to 97 and 98.
+        self.assertEqual(rounded[:6], [0, 0, 0, 5, 5, 5])
+        self.assertEqual(rounded[97:], [95, 100, 100, 100, None])
+        self.assertTrue(all(value % 5 == 0 and abs(value - whole) <= 2
+                            for whole, value in enumerate(rounded[:101])))
 
     def test_hourly_steps_give_each_hour_its_own_rain(self):
         totals = {0: 0.0, 1: 0.2, 2: 1.4, 3: 1.4}  # 0.2 mm, then 1.2 mm, then dry.

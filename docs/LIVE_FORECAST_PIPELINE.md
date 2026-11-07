@@ -383,18 +383,20 @@ parameter names, so a volume holding both ICON jobs for one run needs roughly 1.
 Each frame (`frames/<HHH>.json`) carries two arrays on the whole 321 × 177 crop
 (`frameVariables: ["precip", "clct"]`): `precip`, the rain in the hour ending at it,
 which the chart's Rain layer reads for the hour shown (docs/TILING_DESIGN.md, "As
-built: the Rain layer"), and `clct`, the total cloud at the hour in whole per cent,
-for the sky of a Weather layer. Rain alone was about 230 KB of JSON and **10–25 KB
-gzipped or brotli** (measured from the real 00 UTC run of 24 October 2026: 24 KB in
-an hour with rain over three quarters of the crop, 10 KB in one with a quarter).
-Cloud adds about 185–195 KB of JSON and 30–40 KB compressed, since cloud edges are
-everywhere and rain is mostly dry zeros: measured on eight hours of the real 00 UTC
-run of 7 November 2026, a frame went from 228 KB, 7–10 KB gzip and 5–8 KB brotli to
-**408–425 KB, 39–49 KB gzip** (how the bucket stores JSON) **and 31–42 KB brotli**.
-So 73 frames are some 3–3.6 MB a run in the bucket, and the Rain layer reads the
-cloud with the rain. Cloud in steps of 5 % would halve its compressed share, should
-that matter. Thirteen arrays a frame would be about 3 MB, so `spotSeries` carries
-every variable and the frames the two the map draws. `precip` is differenced from
+built: the Rain layer"), and `clct`, the total cloud at the hour, for the sky of a
+Weather layer. The frames' cloud is **per cent rounded to the nearest 5** (0, 5, …,
+100; `CLOUD_FRAME_STEP`), still per cent rather than a count of steps, so a reader
+needs no scale; the spot series keep whole per cent. Rain alone was about 230 KB of
+JSON and **10–25 KB gzipped or brotli** (measured from the real 00 UTC run of 24
+October 2026: 24 KB in an hour with rain over three quarters of the crop, 10 KB in
+one with a quarter). Cloud compresses far worse, since its edges are everywhere and
+rain is mostly dry zeros. Measured on eight hours of the real 00 UTC run of 7
+November 2026, a frame went from 228 KB of JSON, 7–10 KB gzip and 5–8 KB brotli to
+**412–428 KB, 24–30 KB gzip** (how the bucket stores JSON) **and 19–24 KB brotli**.
+In whole per cent the same frames were 39–49 KB gzip: the steps of 5 % halve the
+cloud's compressed share, at a precision finer than a map's shade of grey shows. So
+73 frames are some 2 MB a run in the bucket. Thirteen arrays a frame would be about
+3 MB, so `spotSeries` carries every variable and the frames the two the map draws. `precip` is differenced from
 DWD's `tot_prec` accumulation and is `null` at hour 0, where the frame is all nulls;
 `ww` is a WMO code that must never be interpolated or blended; `tg` over sea is a
 model SST **proxy** and must be labelled as one wherever it is shown.
