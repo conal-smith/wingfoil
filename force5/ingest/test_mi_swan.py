@@ -129,7 +129,8 @@ class FakeErddap:
             lines.append(f'variable,{name},,float,"time, latitude, longitude"')
         return "\n".join(lines) + "\n"
 
-    def grid(self, dataset, query):
+    def subset(self, dataset, query):
+        """The variables, times and axes a griddap query asks for."""
         specs = [BLOCK.match(part) for part in query.split(",")]
         if any(spec is None for spec in specs):
             raise ValueError(f"fake ERDDAP: unparsed query {query}")
@@ -141,21 +142,47 @@ class FakeErddap:
                              int(first[2]))
         latitudes = self.axis(dataset, "lat", float(first[4]), float(first[5]))
         longitudes = self.axis(dataset, "lon", float(first[6]), float(first[7]))
+        return names, moments, latitudes, longitudes
+
+    def cell(self, name, dataset, when, lat, lon, missing="NaN"):
+        hour = round((when - self.day).total_seconds() / 3600)
+        key = next(k for k, v in fetch_mi_swan.SOURCE_VARIABLES.items() if v == name)
+        value = source_value(name, dataset, hour, lat, lon)
+        if key in ("mwd", "pwd") and on_coast(dataset, lat, lon):
+            value = COAST_DIRECTION
+        return missing if dry(lat, lon) or (key, hour) in self.holes else str(value)
+
+    def grid(self, dataset, query):
+        names, moments, latitudes, longitudes = self.subset(dataset, query)
         lines = ["time,latitude,longitude," + ",".join(names),
                  "UTC,degrees_north,degrees_east," + ",".join("m" for _ in names)]
         for when in moments:
-            hour = round((when - self.day).total_seconds() / 3600)
             for lat in latitudes:
                 for lon in longitudes:
-                    cells = []
-                    for name in names:
-                        key = next(k for k, v in fetch_mi_swan.SOURCE_VARIABLES.items() if v == name)
-                        value = source_value(name, dataset, hour, lat, lon)
-                        if key in ("mwd", "pwd") and on_coast(dataset, lat, lon):
-                            value = COAST_DIRECTION
-                        cells.append("NaN" if dry(lat, lon) or (key, hour) in self.holes
-                                     else str(value))
+                    cells = [self.cell(name, dataset, when, lat, lon) for name in names]
                     lines.append(f"{fetch_mi_swan.stamp(when)},{lat},{lon}," + ",".join(cells))
+        return "\n".join(lines) + "\n"
+
+    def grid_ascii(self, dataset, query):
+        """The same cells in OPeNDAP ASCII: each axis once, the values row by row,
+        latitude ascending, a missing cell an empty field."""
+        names, moments, latitudes, longitudes = self.subset(dataset, query)
+        shape = f"[{len(moments)}][{len(latitudes)}][{len(longitudes)}]"
+        lines = ["Dataset {", "  GRID {", "    ARRAY:"]
+        lines += [f"      Float32 {name}{shape};" for name in names]
+        lines += ["  }", f"}} {dataset};", "-" * 45]
+        for name in names:
+            lines.append(f"{name}.{name}{shape}")
+            for t, when in enumerate(moments):
+                for y, lat in enumerate(latitudes):
+                    lines.append(f"[{t}][{y}], " + ", ".join(
+                        self.cell(name, dataset, when, lat, lon, missing="")
+                        for lon in longitudes))
+            lines.append("")
+            lines += [f"{name}.time[{len(moments)}]",
+                      ", ".join(f"{when.timestamp():.7E}" for when in moments), "",
+                      f"{name}.latitude[{len(latitudes)}]", ", ".join(map(str, latitudes)), "",
+                      f"{name}.longitude[{len(longitudes)}]", ", ".join(map(str, longitudes)), ""]
         return "\n".join(lines) + "\n"
 
     def get(self, url, timeout=None, headers=None):
@@ -166,6 +193,8 @@ class FakeErddap:
         query = url.split("?", 1)[1].replace("%20", " ")
         if query == "time[last]":
             return Response(f"time\nUTC\n{fetch_mi_swan.stamp(self.end)}\n")
+        if ".asc?" in url:
+            return Response(self.grid_ascii(dataset, query))
         return Response(self.grid(dataset, query))
 
 
@@ -386,24 +415,108 @@ class SwanTests(unittest.TestCase):
         # Only the spot squares, then the pointer.
         self.assertEqual(s3.writes, squares + ["weather/mi-swan.json"])
 
-    def test_frames_are_optional_and_published_north_to_south(self):
-        with patch("fetch_mi_swan.FRAME_BOX", (-10.0, 53.0, -9.9, 53.1)):
-            manifest = self.run_main("--hours", "48", "--step", "3", "--frames")
-        grid = manifest["grid"]
-        self.assertEqual((grid["width"], grid["height"]), (4, 4))
-        self.assertEqual((grid["north"], grid["south"]), (53.0875, 53.0125))
-        self.assertEqual(len(manifest["frames"]), 17)
-        self.assertEqual(manifest["frameVariables"], ["swh", "mwp", "mwd"])
-        frame = json.loads((self.root / "public/weather" / manifest["base"]
-                            / manifest["frames"][0]["url"]).read_text())
-        self.assertEqual(sorted(k for k in frame if isinstance(frame[k], list)),
-                         ["mwd", "mwp", "swh"])
-        self.assertEqual(len(frame["swh"]), 16)
-        # Row 0 is the northern edge, so its heights exceed the southern row's.
-        self.assertGreater(frame["swh"][0], frame["swh"][12])
+    def framed(self, *argv, erddap=None):
+        """A run with frames over a 4 x 4 cell crop that takes in Brandon's dry cell."""
+        with patch("fetch_mi_swan.FRAME_BOX", (-10.06, 52.23, -9.96, 52.33)):
+            return self.run_main("--hours", "48", *argv, erddap=erddap)
+
+    def frame(self, manifest, index):
+        return json.loads((self.root / "public/weather" / manifest["base"]
+                           / manifest["frames"][index]["url"]).read_text())
+
+    def test_frames_are_three_hourly_beside_hourly_series(self):
+        manifest = self.framed("--frames")
+        self.assertEqual((manifest["stepHours"], manifest["frameStepHours"]), (1, 3))
+        self.assertEqual(manifest["horizonHours"], 48)
+        self.assertEqual([frame["hour"] for frame in manifest["frames"]], list(range(0, 49, 3)))
+        self.assertEqual([step["hour"] for step in manifest["spotSeries"]["brandon"]],
+                         list(range(0, 49)))
+        # Each frame is one small request in ERDDAP's ASCII, never the per-cell CSV.
+        frames = [url for url in self.erddap.requests if ".asc?" in url]
+        self.assertEqual(len(frames), 17)
+        self.assertFalse(any("mean_wave_period" in url for url in frames))
         _, _, objects = validate_bundle(self.root / "public", "mi-swan", max_age_hours=36)
         # Every frame, and one file per spot square.
         self.assertEqual(len(objects), 17 + len(manifest["spots"]["squares"]))
+
+    def test_a_frame_carries_the_height_alone_at_a_tenth_of_a_metre_north_to_south(self):
+        manifest = self.framed("--frames")
+        grid = manifest["grid"]
+        self.assertEqual((grid["width"], grid["height"]), (4, 4))
+        self.assertEqual((grid["north"], grid["south"]), (52.3125, 52.2375))
+        self.assertEqual((manifest["frameVariables"], manifest["framePrecision"]),
+                         (["swh"], {"swh": 0.1}))
+        frame = self.frame(manifest, 1)
+        self.assertEqual((frame["model"], frame["run"], frame["hour"]),
+                         ("mi-swan", manifest["run"], 3))
+        self.assertEqual(sorted(k for k in frame if isinstance(frame[k], list)), ["swh"])
+        self.assertEqual(len(frame["swh"]), 16)
+        for value in frame["swh"]:
+            if value is not None:
+                self.assertAlmostEqual(value * 10, round(value * 10), places=9)
+        # Row 0 is the northern edge (52.3125° N), so its heights exceed the
+        # southern row's; each is the source's own value rounded to 0.1 m.
+        expected = source_value("significant_wave_height", SHELF, 3, 52.3125, -10.0375)
+        self.assertEqual(frame["swh"][0], round(expected, 1))
+        self.assertGreater(frame["swh"][0], frame["swh"][12])
+        # Brandon's dry cell (52.2875° N, 10.0125° W: row 1, column 1) is null, never zero.
+        self.assertIsNone(frame["swh"][1 * 4 + 1])
+        self.assertEqual(sum(value is None for value in frame["swh"]), 1)
+
+    def test_a_whole_metre_is_written_without_its_decimal(self):
+        self.assertEqual(json.dumps([fetch_mi_swan.compact(value, 1)
+                                     for value in (1.04, 0.96, 0.0, 2.35, None)]),
+                         "[1, 1, 0, 2.4, null]")
+
+    def test_frames_may_be_hourly_or_six_hourly_on_the_series_steps(self):
+        manifest = self.framed("--frames", "--frame-step", "6", "--step", "3")
+        self.assertEqual([frame["hour"] for frame in manifest["frames"]], list(range(0, 49, 6)))
+        validate_bundle(self.root / "public", "mi-swan", max_age_hours=36)
+        manifest = self.framed("--frames", "--frame-step", "1")
+        self.assertEqual(len(manifest["frames"]), 49)
+
+    def test_a_frame_step_off_the_series_or_the_horizon_is_refused(self):
+        for argv in (["--hours", "48", "--step", "3", "--frames", "--frame-step", "1"],
+                     ["--hours", "47", "--frames"],
+                     ["--hours", "48", "--frame-step", "3"]):
+            with self.subTest(argv=argv), self.assertRaises(SystemExit):
+                self.run_main(*argv)
+
+    def test_a_frame_with_cells_outside_the_crop_fails_the_run(self):
+        class Shifted(FakeErddap):
+            def grid_ascii(self, dataset, query):
+                return super().grid_ascii(dataset, query).replace("-10.0375", "-10.0625")
+        with self.assertRaises(ValueError):
+            self.framed("--frames", erddap=Shifted(self.day))
+
+    def test_a_frame_for_another_hour_fails_the_run(self):
+        class Late(FakeErddap):
+            def grid_ascii(self, dataset, query):
+                text = super().grid_ascii(dataset, query)
+                head, _, tail = text.partition(".time[1]\n")
+                when, _, rest = tail.partition("\n")
+                return f"{head}.time[1]\n{float(when) + 3600:.7E}\n{rest}"
+        with self.assertRaises(ValueError):
+            self.framed("--frames", erddap=Late(self.day))
+
+    def test_a_frame_of_the_wrong_shape_fails_the_run(self):
+        class Short(FakeErddap):
+            def grid_ascii(self, dataset, query):
+                return "\n".join(line for line in super().grid_ascii(dataset, query).splitlines()
+                                  if not line.startswith("[0][3],"))
+        with self.assertRaises(ValueError):
+            self.framed("--frames", erddap=Short(self.day))
+
+    def test_the_contract_refuses_frames_off_their_declared_step_or_precision(self):
+        self.framed("--frames")
+        pointer = self.root / "public/weather/mi-swan.json"
+        published = json.loads(pointer.read_text())
+        for change in ({"frameStepHours": 6}, {"frameStepHours": 2},
+                       {"framePrecision": {"swh": 0.5}}, {"framePrecision": {"mwd": 0.1}}):
+            with self.subTest(change=change):
+                pointer.write_text(json.dumps({**published, **change}))
+                with self.assertRaises(ValueError):
+                    validate_bundle(self.root / "public", "mi-swan", max_age_hours=36)
 
     def test_every_riding_location_gets_a_series_of_every_variable(self):
         manifest = self.run_main("--hours", "24", "--step", "3")

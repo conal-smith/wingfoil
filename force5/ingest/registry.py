@@ -139,8 +139,11 @@ MODELS = {
                         "kind": "observation", "maxAgeHours": 48},
     # One SWAN run a day, published around 09 UTC and occasionally a day late, read at
     # 10:15 (14:15 and 18:15 retry): about 34.5 h old when the next day's lands.
+    # `framesOnRequest`: the worker's --frames and --frame-step reach this adapter,
+    # whose wave-height map frames are off unless asked for (deploy/local/jobs.toml).
     "mi-swan": {"script": "fetch_mi_swan.py", "manifest": "weather/mi-swan.json",
-                "kind": "wave", "maxAgeHours": 36, "readsPublishedRun": True},
+                "kind": "wave", "maxAgeHours": 36, "readsPublishedRun": True,
+                "framesOnRequest": True},
     # Copernicus Marine's IBI waves (Météo-France MFWAM): one run a day, labelled by its
     # first forecast day R, whole only once its second half lands by 02:00 UTC on R+1.
     # Read at 02:30 (05:30 and 08:30 retry), the served run is about 26.5 h old when it

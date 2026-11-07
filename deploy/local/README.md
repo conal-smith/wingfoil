@@ -74,7 +74,7 @@ npm run deploy:run -- --models harmonie-eps
 npm run deploy:run -- --models arpege --step 3
 npm run deploy:run -- --models arome --step 3
 npm run deploy:run -- --models gfs-wave
-npm run deploy:run -- --models mi-swan
+npm run deploy:run -- --models mi-swan --frames --frame-step 3
 npm run deploy:run -- --models ibi-wave
 npm run deploy:run -- --models ecmwf-wave
 npm run deploy:run -- --models tides
@@ -151,7 +151,8 @@ already published download nothing):
 | `ecmwf-wave` | ~330 MB (85 steps, ten fields) | 2 | ~20 GB |
 | `gfs-weather` | ~21 MB (209 steps) | 4 | ~2.5 GB |
 | `ibi-wave` | ~80-450 MB (16 × 16-cell tiles; grows as the store's time chunk fills) | 1 | ~3-14 GB |
-| `gfs`, `gfs-wave`, `mi-swan`, observations, tides | 1-8 MB each | 4-24 | ~1 GB |
+| `mi-swan` | ~23 MB (the spot series ~5 MB, 49 wave-height frames ~18 MB) | 1 | ~0.7 GB |
+| `gfs`, `gfs-wave`, observations, tides | 1-8 MB each | 4-24 | ~1 GB |
 | **Total** | | | **~545 GB** |
 
 HARMONIE went from six runs a day to every hour in daylight in November 2026, and

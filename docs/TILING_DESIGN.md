@@ -502,7 +502,9 @@ measured:
   edge from 56° to 56.4° to sit on the lattice.
 - **Wave and weather frames are no longer published** (until the Rain layer
   brought ICON-EU weather's back, for `precip` alone: see "As built: the Rain
-  layer"). Nothing read them: the
+  layer"; and Irish Shelf SWAN's scheduled job asked for `--frames` again, for
+  `swh` alone every three hours, for the Waves layer: see "As built: wave-height
+  frames"). Nothing read them: the
   browser, the forecast server and the blend read spot series, and
   verification reads wind. GFS-Wave, ECMWF Wave and ICON-EU surface weather
   stopped writing them (ICON-EU's `--frame-variables` went with them) and
@@ -581,6 +583,26 @@ the run, the grid and the value bound; nothing in the format changed.
   the lights stay over it, and over the satellite picture and the coloured wind,
   which are put under the relief too (`rainLayer.ts` keeps it there). A new hour is a
   new image: about 65 ms to build on a laptop, then a PNG data URL.
+
+## As built: wave-height frames
+
+The second JSON frames a reader is built for (7 November 2026), for the map's
+Waves layer. Irish Shelf SWAN's job (`--frames --frame-step 3`) publishes one
+frame every three hours beside its hourly spot series, `frames/<HHH>.json` at
+hours 0, 3, …, 144, holding `swh` alone (`frameVariables: ["swh"]`) on the
+Ireland crop of the 0.025° shelf grid, 240 × 200 cells, rounded to 0.1 m
+(`framePrecision`), land null. The pointer is the rain run's shape with
+`frameStepHours: 3` beside `stepHours: 1` and the `horizonHours` both are read
+from; the validators hold the frames to that step and to their precision
+(docs/LIVE_FORECAST_PIPELINE.md has the details and the measured run).
+
+- **JSON, not tiles**, for the rain frames' reasons: a frame is about 200 KB of
+  JSON and a few KB compressed, and a run is 10 MB.
+- **Reading.** `force5/src/waveFrames.ts` validates the pointer and a frame and
+  picks the frame for an hour: the nearer of two, never a mean of them, as no
+  wave value is ever interpolated between hours (`WAVE_MATCH_HOURS`); none
+  outside the run. Its reader keeps the pointer five minutes and every frame of
+  the run it has read. Drawing is still to come.
 
 ## As built: the blend per square
 
