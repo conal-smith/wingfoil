@@ -4,7 +4,8 @@
 // (kept for five minutes, as the forecast manifests are) and the frames the
 // hour shown needs, then the hours either side of it; every frame read is
 // kept for the run, so going back through the hours reads nothing. A frame is
-// some 10–25 KB on the wire, an hour's rain over the whole ICON-EU crop.
+// some 40–50 KB on the wire: an hour's rain over the whole ICON-EU crop, which
+// is a few KB of it, and the total cloud the same frame carries for the sky.
 import {
   RAIN_URL,
   RAIN_VARIABLE,

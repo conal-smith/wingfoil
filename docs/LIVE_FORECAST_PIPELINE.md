@@ -380,14 +380,21 @@ hourly run downloads about 545 MB more, some 16 GB a month at one run a day. The
 lives in the same `.cache/grib/<run>/` directory as the wind importer under distinct
 parameter names, so a volume holding both ICON jobs for one run needs roughly 1.1 GB.
 
-Each frame (`frames/<HHH>.json`) carries `precip` alone (`frameVariables:
-["precip"]`), the rain in the hour ending at it, on the whole 321 × 177 crop: about
-230 KB of JSON, **10–25 KB gzipped or brotli** (measured from the real 00 UTC run of
-24 October 2026: 24 KB in an hour with rain over three quarters of the crop, 10 KB
-in one with a quarter), so 73 frames add 1–1.8 MB a run to the bucket. The chart's
-Rain layer reads the frame of the hour shown (docs/TILING_DESIGN.md, "As built: the
-Rain layer"). Thirteen arrays a frame would be about 3 MB, so `spotSeries` carries
-every variable and the frames the one the map draws. `precip` is differenced from
+Each frame (`frames/<HHH>.json`) carries two arrays on the whole 321 × 177 crop
+(`frameVariables: ["precip", "clct"]`): `precip`, the rain in the hour ending at it,
+which the chart's Rain layer reads for the hour shown (docs/TILING_DESIGN.md, "As
+built: the Rain layer"), and `clct`, the total cloud at the hour in whole per cent,
+for the sky of a Weather layer. Rain alone was about 230 KB of JSON and **10–25 KB
+gzipped or brotli** (measured from the real 00 UTC run of 24 October 2026: 24 KB in
+an hour with rain over three quarters of the crop, 10 KB in one with a quarter).
+Cloud adds about 185–195 KB of JSON and 30–40 KB compressed, since cloud edges are
+everywhere and rain is mostly dry zeros: measured on eight hours of the real 00 UTC
+run of 7 November 2026, a frame went from 228 KB, 7–10 KB gzip and 5–8 KB brotli to
+**408–425 KB, 39–49 KB gzip** (how the bucket stores JSON) **and 31–42 KB brotli**.
+So 73 frames are some 3–3.6 MB a run in the bucket, and the Rain layer reads the
+cloud with the rain. Cloud in steps of 5 % would halve its compressed share, should
+that matter. Thirteen arrays a frame would be about 3 MB, so `spotSeries` carries
+every variable and the frames the two the map draws. `precip` is differenced from
 DWD's `tot_prec` accumulation and is `null` at hour 0, where the frame is all nulls;
 `ww` is a WMO code that must never be interpolated or blended; `tg` over sea is a
 model SST **proxy** and must be labelled as one wherever it is shown.
@@ -1466,7 +1473,7 @@ weather/harmonie-eps.json, weather/harmonie-eps-RUN-48h-v1-HASH8/ HARMONIE EPS, 
 weather/mi-swan.json, weather/mi-swan-RUN-144h-v1-HASH8/    Irish Shelf SWAN: squares, frames only with --frames
 weather/ibi-wave.json, weather/ibi-wave-RUN-239h-v1-HASH8/  Copernicus Marine IBI waves: squares only
 weather/currents.json, weather/currents-RUN-72h-v1-HASH8/   ROMS surface currents: 73 JSON frames + squares
-weather/icon-eu-weather.json, weather/icon-eu-weather-RUN-72h-v1-HASH8/  surface weather: 73 rain frames + squares
+weather/icon-eu-weather.json, weather/icon-eu-weather-RUN-72h-v1-HASH8/  surface weather: 73 rain and cloud frames + squares
 weather/gfs-weather.json, weather/gfs-weather-RUN-384h-v1-HASH8/  GFS surface weather: squares only
 weather/gfs-wave.json, weather/gfs-wave-RUN-240h-v1-HASH8/  GFS-Wave: squares only
 weather/met-office-wave.json, weather/met-office-wave-RUN-60h-v1-HASH8/  Met Office NWS Wave: squares only

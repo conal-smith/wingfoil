@@ -279,10 +279,10 @@ describe.each(["icon-eu-weather"])("published %s weather bundle", (name) => {
     expect(g.dx).not.toBe(g.dy);
     const cells = g.width * g.height;
 
-    // The frames carry the rain alone, which the chart's Rain layer draws;
-    // the series carry every variable.
+    // The frames carry the rain, which the chart's Rain layer draws, and the
+    // total cloud, for the sky; the series carry every variable.
     const gridded = m.frameVariables!;
-    expect(gridded).toEqual(["precip"]);
+    expect(gridded).toEqual(["precip", "clct"]);
     const codes = new Set(
       Object.entries(m.variables)
         .filter(([, meta]) => meta.kind === "code")
