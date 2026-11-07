@@ -37,8 +37,9 @@ describe("the sample ICON-EU surface weather bundle", () => {
     expect(weatherHours(manifest)).toEqual([0, 1, 2, 3]);
     expect(manifest.runTime).toBe("2026-09-16T18:00:00Z");
     expect(manifest.variables.ww.kind).toBe("code");
-    // The frames carry the rain alone, for the chart's Rain layer.
-    expect(manifest.frameVariables).toEqual(["precip"]);
+    // The frames carry the rain, for the chart's Rain layer, and the total
+    // cloud, for the sky.
+    expect(manifest.frameVariables).toEqual(["precip", "clct"]);
   });
   it("names every variable the dock's rows read", () => {
     expect(weatherFields(manifest)).toEqual({
