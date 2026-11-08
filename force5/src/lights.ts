@@ -255,6 +255,10 @@ export function createLights(
   let laid = "";
   let dirty = true;
   let pillMode: PillMode = { kind: "cards" };
+  /** The open spot, as the page last said. */
+  let openNow: string | null = null;
+  /** A light pressed, drawn as the open one until the page has answered. */
+  let held: { id: string; was: string | null } | null = null;
   /** The map's own controls and the rider's mark, which no pill stands on. */
   const walls = (frame: DOMRect): PillBox[] =>
     [
@@ -952,6 +956,9 @@ export function createLights(
   map.on("resize", resized);
   return {
     update(states, selected, named, label, units) {
+      if (held && selected !== held.was) held = null;
+      openNow = selected;
+      const open = held?.id ?? selected;
       for (const spot of spots) {
         const entry = entries.get(spot.id);
         if (!entry) continue;
@@ -961,7 +968,7 @@ export function createLights(
           s && !s.pending && !s.dark && s.stars !== null ? s.stars : null;
         entry.favourite = named.has(spot.id);
         entry.score = s?.figure ?? null;
-        const on = spot.id === selected;
+        const on = spot.id === open;
         const w = s?.wedge;
         const key = s
           ? `${s.pending}|${s.stars}|${s.dark}|${s.mark}|${s.from === null ? "" : Math.round(s.from)}|${s.windKn === null ? "" : speedShort(s.windKn, units)}|${w ? `${Math.round(w.from)},${Math.round(w.to)},${Math.round(w.power * 20)},${w.state}` : ""}|${on}|${named.has(spot.id)}|${s.order ?? ""}|${pillKey(s.pill ?? null)}`
@@ -1028,6 +1035,7 @@ export function createLights(
     choose(id) {
       const chosen = entries.get(id);
       if (!chosen) return;
+      held = id === openNow ? null : { id, was: openNow };
       for (const entry of [...entries.values()].filter(
         (e) => e === chosen || e.el.classList.contains("sel"),
       )) {
