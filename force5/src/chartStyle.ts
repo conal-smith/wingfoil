@@ -149,6 +149,57 @@ export const COAST_INK: Record<
 };
 
 /**
+ * The inland water, quiet at country zoom. OpenMapTiles classes its water
+ * ("ocean" inside OSM's coastline; "lake", "pond", "river" and the like
+ * inside the land) and carries no area, so there is no size to filter on.
+ * The tiles thin it themselves, the further out the more: a zoom 6 tile holds
+ * few loughs under 3 km², a zoom 7 tile dozens. Below INLAND_QUIET_UNTIL the
+ * style does the rest: inland water is a faint wash with no line, and ponds
+ * and intermittent water are left out, so a small lake is a few faint pixels
+ * at most, and the islands in a lough, holes in its fill, go with its
+ * outline. The sea's coast is the one bright line. Closer in the wash comes
+ * up and the loughs take a faint shore of their own.
+ *
+ * Inland water is washed in the chart's water ink (`depth`), the rivers'
+ * colour, not the sea's paper: on the light chart paper and land are a shade
+ * apart, and a lough in paper with no line would not be there at all.
+ *
+ * An island in the sea is a hole in the sea's polygon: its outline is the
+ * coast's, and no style can tell it from the mainland's. That is left to the
+ * tiles, whose zoom 5 has no island under 8 km² round Ireland.
+ */
+export const INLAND_QUIET_UNTIL = 7.5;
+/** Where inland water is drawn in full: its wash, and its shore. */
+const INLAND_FULL = 9;
+/** The inland water's wash at country zoom, and in full. */
+export const LAKE_WASH = { faint: 0.14, full: 0.26 } as const;
+
+const SEA: FilterSpecification = ["==", ["get", "class"], "ocean"];
+const INLAND: FilterSpecification = ["!=", ["get", "class"], "ocean"];
+
+/** The water's fill opacity: the sea whole, inland water a wash. */
+export const WATER_OPACITY = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  INLAND_QUIET_UNTIL,
+  [
+    "case",
+    SEA,
+    1,
+    [
+      "any",
+      ["==", ["get", "class"], "pond"],
+      ["==", ["get", "intermittent"], 1],
+    ],
+    0,
+    LAKE_WASH.faint,
+  ],
+  INLAND_FULL,
+  ["case", SEA, 1, LAKE_WASH.full],
+] as ExpressionSpecification;
+
+/**
  * The chart's layers a switch on the layers' rail turns on and off: the
  * Depths, every layer drawn from the depth archive (its tints, contours,
  * their figures, the soundings and the land's relief).
@@ -243,13 +294,23 @@ export function chartStyle(
         paint: { "background-color": c.land },
       },
       // The sea from OpenStreetMap's coast, as deep water: paper, nearly. The
-      // survey's shallows are laid over it, darkest nearest the shore.
+      // survey's shallows are laid over it, darkest nearest the shore. Inland
+      // water a wash of the water's ink, faint at country zoom
+      // (INLAND_QUIET_UNTIL).
       {
         id: "water",
         type: "fill",
         source: "omt",
         "source-layer": "water",
-        paint: { "fill-color": c.tints[c.tints.length - 1] },
+        paint: {
+          "fill-color": [
+            "case",
+            SEA,
+            c.tints[c.tints.length - 1],
+            c.depth,
+          ] as ExpressionSpecification,
+          "fill-opacity": WATER_OPACITY,
+        },
       },
       {
         id: "bands",
@@ -341,12 +402,29 @@ export function chartStyle(
         minzoom: 13,
         paint: { "fill-color": c.ink, "fill-opacity": 0.12 },
       },
-      // The coast in ink: the outline of OpenStreetMap's sea.
+      // The loughs' shore, faint and only close in: the coast stays the one
+      // bright line (INLAND_QUIET_UNTIL).
+      {
+        id: "lake-shore",
+        type: "line",
+        source: "omt",
+        "source-layer": "water",
+        minzoom: INLAND_QUIET_UNTIL,
+        filter: INLAND,
+        paint: {
+          "line-color": c.depth,
+          "line-opacity": zoomed(INLAND_QUIET_UNTIL, 0, INLAND_FULL, 0.5),
+          "line-width": zoomed(INLAND_QUIET_UNTIL, 0.4, 14, 1),
+        },
+      },
+      // The coast in ink: the outline of OpenStreetMap's sea, and nothing
+      // inland.
       {
         id: "coast",
         type: "line",
         source: "omt",
         "source-layer": "water",
+        filter: SEA,
         paint: { "line-color": c.ink, ...COAST_INK.chart },
       },
       {
