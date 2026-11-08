@@ -12,14 +12,16 @@
  * halo. A frame is then one picture or three per light, placed. A light the
  * rider is pointing at, has open or has the keys on stays a button.
  *
- * On the plain map a light is a pill (./lights.ts): its picture is the pill's
- * box, its arrow and its figures, from the pill's own computed styles, in
- * place of the ring and the arrow beside it.
+ * On the plain map a light is a pill or a bead (./lights.ts): a pill's
+ * picture is its box, its notch, its arrow, its sky and its figures, a bead's
+ * its dot and halo, from their own computed styles, in place of the ring and
+ * the arrow beside it. A pill moved off its spot is drawn off it as much.
  *
  * The pictures are drawn to the device's pixels, on the same pixel grid as
  * the buttons at rest, so where the camera starts and ends they are the
  * buttons' pixels.
  */
+import { PILL_ARROW } from "./pillContent";
 
 /** A picture, and where it stands from the light's centre, in CSS pixels. */
 interface Sprite {
@@ -155,8 +157,87 @@ function text(
 
 const ringCache = new Map<string, Sprite>();
 const pillCache = new Map<string, Sprite>();
-/** The pill's arrow (lights.ts PILL_ARROW), in its 12-unit box. */
-const PILL_ARROW = "M0 4.6V-4.4M-2.7 -1.6L0 -4.8L2.7 -1.6";
+const beadCache = new Map<string, Sprite>();
+
+/** A filled or stroked SVG shape's paint, as its computed style has it. */
+const painted = (paint: string) =>
+  !!paint && paint !== "none" && paint !== "transparent";
+
+/** An SVG glyph's paths and circles, as styled, in its own units. */
+function drawGlyph(g: OffscreenCanvasRenderingContext2D, svg: SVGElement) {
+  for (const part of svg.querySelectorAll<SVGElement>("path, circle")) {
+    const cs = getComputedStyle(part);
+    const shape = new Path2D();
+    if (part.localName === "circle")
+      shape.arc(
+        Number(part.getAttribute("cx")),
+        Number(part.getAttribute("cy")),
+        Number(part.getAttribute("r")),
+        0,
+        2 * Math.PI,
+      );
+    else shape.addPath(new Path2D(part.getAttribute("d") ?? ""));
+    g.save();
+    g.globalAlpha = Number(cs.opacity || 1);
+    if (painted(cs.fill)) {
+      g.fillStyle = cs.fill;
+      g.fill(shape);
+    }
+    if (painted(cs.stroke)) {
+      strokeAs(g, cs);
+      g.stroke(shape);
+    }
+    g.restore();
+  }
+}
+
+/**
+ * A pill's notch (src/map.css `.lt-pill[data-n]::after`): a small square
+ * turned on its corner, centred on the edge facing the spot, its outer half
+ * standing past it with the pill's edge round it.
+ */
+function drawNotch(
+  g: OffscreenCanvasRenderingContext2D,
+  side: string,
+  along: number,
+  box: { x: number; y: number; w: number; h: number },
+  fill: string,
+  edge: string,
+  bw: number,
+) {
+  const at =
+    side === "b"
+      ? { x: box.x + along, y: box.y + box.h, turn: 0 }
+      : side === "t"
+        ? { x: box.x + along, y: box.y, turn: Math.PI }
+        : side === "l"
+          ? { x: box.x, y: box.y + along, turn: Math.PI / 2 }
+          : { x: box.x + box.w, y: box.y + along, turn: -Math.PI / 2 };
+  const r = NOTCH / Math.SQRT2;
+  g.save();
+  g.translate(at.x, at.y);
+  g.rotate(at.turn);
+  g.beginPath();
+  g.moveTo(-r, 0);
+  g.lineTo(0, -r);
+  g.lineTo(r, 0);
+  g.lineTo(0, r);
+  g.closePath();
+  g.fillStyle = fill;
+  g.fill();
+  if (bw) {
+    g.beginPath();
+    g.moveTo(-r + bw / 2, bw / 2);
+    g.lineTo(0, r - bw / 2);
+    g.lineTo(r - bw / 2, bw / 2);
+    g.strokeStyle = edge;
+    g.lineWidth = bw;
+    g.stroke();
+  }
+  g.restore();
+}
+/** The notch's side, in CSS pixels (src/map.css). */
+const NOTCH = 7;
 
 /** A picture of a light's pill as it is styled now, from the light's centre `at`. */
 function pillSprite(
@@ -166,14 +247,17 @@ function pillSprite(
 ): Sprite {
   const cs = getComputedStyle(pill);
   const box = pill.getBoundingClientRect();
-  const svg = pill.querySelector("svg");
+  const svg = pill.querySelector<SVGElement>("svg.lt-pa");
   const turn = svg?.querySelector("g");
   const shown = !!svg && !!turn && getComputedStyle(turn).display !== "none";
   const path = svg?.querySelector("path");
   const pathCs = path ? getComputedStyle(path) : null;
-  const parts = [...pill.querySelectorAll<HTMLElement>("b, sup")].filter(
+  const sky = pill.querySelector<SVGElement>("svg.lt-sky");
+  const parts = [...pill.querySelectorAll<HTMLElement>("b, sup, .lt-u")].filter(
     (p) => p.textContent,
   );
+  const notch = pill.dataset.n ?? "";
+  const along = notch ? px(pill.style.getPropertyValue("--n")) : 0;
   const key = [
     dpr,
     Math.round(box.width * 4),
@@ -188,11 +272,14 @@ function pillSprite(
       ? `${turn!.getAttribute("transform")}|${pathCs!.stroke}|${getComputedStyle(svg!).backgroundColor}`
       : "",
     ...parts.map((p) => `${p.textContent}|${getComputedStyle(p).color}`),
+    sky ? `${sky.innerHTML}|${getComputedStyle(sky).color}` : "",
+    notch ? `${notch}${along}` : "",
   ].join("|");
   const cached = pillCache.get(key);
   // The same pill elsewhere: placed from this light's centre.
   if (cached) return cached;
-  const pad = 2;
+  // Room for the notch past the pill's edge.
+  const pad = notch ? NOTCH : 2;
   const left = box.left - pad;
   const top = box.top - pad;
   const sprite_ = sprite(
@@ -218,6 +305,30 @@ function pillSprite(
         g.setLineDash(cs.borderTopStyle === "dashed" ? [3 * bw, 2 * bw] : []);
         g.stroke();
         g.setLineDash([]);
+      }
+      if (notch)
+        drawNotch(
+          g,
+          notch,
+          along,
+          {
+            x: box.left - at.x,
+            y: box.top - at.y,
+            w: box.width,
+            h: box.height,
+          },
+          cs.backgroundColor,
+          cs.borderTopColor,
+          cs.borderTopStyle === "none" ? 0 : bw,
+        );
+      if (sky) {
+        const r = sky.getBoundingClientRect();
+        const k = r.width / 24;
+        g.save();
+        g.translate(r.left - at.x, r.top - at.y);
+        g.scale(k, k);
+        drawGlyph(g, sky);
+        g.restore();
       }
       if (shown && pathCs) {
         const r = svg!.getBoundingClientRect();
@@ -249,6 +360,55 @@ function pillSprite(
   // Keyed by what it shows, not where: a sprite's offsets are from the
   // light's centre, which for a pill is its own centre too.
   pillCache.set(key, sprite_);
+  return sprite_;
+}
+
+/**
+ * A picture of a bead (src/map.css `.lt-bead-dot`): its dot, and the halo its
+ * shadow rings it with, from its centre `at`.
+ */
+function beadSprite(
+  bead: HTMLElement,
+  at: { x: number; y: number },
+  dpr: number,
+): Sprite {
+  const cs = getComputedStyle(bead);
+  const box = bead.getBoundingClientRect();
+  // "rgba(…) 0px 0px 0px 1.2px": the halo's colour and its spread.
+  const halo =
+    /^((?:[a-z-]+\([^)]*\))|#[0-9a-f]+|[a-z]+)\s+(?:-?[\d.]+px\s+){3}([\d.]+)px/i.exec(
+      cs.boxShadow,
+    );
+  const r = box.width / 2;
+  const spread = halo ? Number(halo[2]) : 0;
+  const cx = box.left + r - at.x;
+  const cy = box.top + r - at.y;
+  const key = [dpr, r, cx, cy, cs.backgroundColor, halo?.[1], spread].join("|");
+  const cached = beadCache.get(key);
+  if (cached) return cached;
+  const reach = r + spread + 1;
+  const sprite_ = sprite(
+    2 * reach,
+    2 * reach,
+    reach - cx,
+    reach - cy,
+    dpr,
+    (g) => {
+      if (halo && spread) {
+        // A ring: a shadow is never drawn under its own box.
+        g.beginPath();
+        g.arc(cx, cy, r + spread, 0, 2 * Math.PI);
+        g.arc(cx, cy, r, 0, 2 * Math.PI, true);
+        g.fillStyle = halo[1];
+        g.fill();
+      }
+      g.beginPath();
+      g.arc(cx, cy, r, 0, 2 * Math.PI);
+      g.fillStyle = cs.backgroundColor;
+      g.fill();
+    },
+  );
+  beadCache.set(key, sprite_);
   return sprite_;
 }
 
@@ -289,8 +449,12 @@ export function lookOf(
       ? labelSprite(lab, at, dpr)
       : null;
   const pill = el.querySelector<HTMLElement>(":scope > .lt-pill");
-  if (pill && getComputedStyle(pill).display !== "none")
+  const pillCs = pill ? getComputedStyle(pill) : null;
+  if (pill && pillCs!.display !== "none" && pillCs!.visibility !== "hidden")
     return { ring: pillSprite(pill, at, dpr), arrow: null, label };
+  const bead = el.querySelector<HTMLElement>(":scope > .lt-bead-dot");
+  if (bead && getComputedStyle(bead).display !== "none")
+    return { ring: beadSprite(bead, at, dpr), arrow: null, label: null };
   const svg = el.querySelector(":scope > svg") as SVGElement;
   const matrix = getComputedStyle(svg).transform;
   const scale =
@@ -401,6 +565,9 @@ export function lookOf(
 export interface Drawn {
   x: number;
   y: number;
+  /** How far its picture stands off that place, whatever the zoom: a pill moved clear. */
+  dx?: number;
+  dy?: number;
   look: Look;
 }
 
@@ -419,9 +586,9 @@ export function drawLights(
   const w = canvas.width / dpr;
   const h = canvas.height / dpr;
   const place = (s: Sprite) => g.drawImage(s.canvas, s.x, s.y, s.w, s.h);
-  for (const { x, y, look } of lights) {
-    const X = k * x + tx;
-    const Y = k * y + ty;
+  for (const { x, y, dx = 0, dy = 0, look } of lights) {
+    const X = k * x + tx + dx;
+    const Y = k * y + ty + dy;
     if (X < -300 || Y < -60 || X > w + 300 || Y > h + 60) continue;
     g.setTransform(dpr, 0, 0, dpr, X * dpr, Y * dpr);
     if (look.arrow) place(look.arrow);

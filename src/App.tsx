@@ -54,6 +54,8 @@ import { foilArchiveUrl, useFoilDepth } from "./useFoilDepth";
 import { useCurrents } from "./useCurrents";
 import { useRain } from "./useRain";
 import type { LightState } from "../force5/src/lights";
+import { pillContent, type PillReading } from "../force5/src/pillContent";
+import type { Readings } from "./finder/useReadings";
 import { speedWords } from "../force5/src/units";
 import { rideWedge } from "../force5/src/rideWedge";
 import { parseWindLayers, type WindLayers } from "../force5/src/windLayer";
@@ -119,7 +121,6 @@ import {
   clock,
   dayShort,
   nearestColumn,
-  onDay,
   openingColumn,
   stripColumns,
 } from "./strip";
@@ -268,8 +269,29 @@ interface Picked {
 const degrees = (lat: number, lon: number) =>
   `${Math.abs(lat).toFixed(2)}° ${lat < 0 ? "S" : "N"}, ${Math.abs(lon).toFixed(2)}° ${lon < 0 ? "W" : "E"}`;
 const PHONE = "(max-width: 720px)";
-/** Beside the list a light's name shows under the pointer, not for a star. */
+/** Beside the list no spot's name stands on the map: its card says it. */
 const NO_NAMES: ReadonlySet<string> = new Set();
+/** No readings yet for the places listed. */
+const NO_READINGS: ReadonlyMap<string, Readings> = new Map();
+
+/** A place's reading at a column, for its pill: its rated hour and what the finder read. */
+function pillReading(
+  hour: PlaceHour | undefined,
+  read: Readings | undefined,
+  at: number,
+): PillReading {
+  return {
+    from: hour?.from ?? null,
+    windKn: hour?.windKn ?? null,
+    gustKn: hour?.gustKn ?? null,
+    dark: !!hour && !hour.daylight,
+    sky: read?.sky[at]?.icon ?? null,
+    air: read?.air[at] ?? null,
+    rain: read?.rain[at] ?? null,
+    sea: read?.sea[at] ?? null,
+    inland: !!read?.inland,
+  };
+}
 /** Room for the chart beside the spot finder's list, as the home page has it. */
 const SPLIT = "(min-width: 1100px)";
 /**
@@ -1222,10 +1244,18 @@ export default function App() {
     [strip, finderShown, selected],
   );
   const lightAt = page === "chart" ? selected : panelAt;
+  /**
+   * Beside the list: the places whose cards the rider can see, in the list's
+   * order (src/finder/SpotFinder.tsx), each a pill on the map; and what the
+   * listed places read, the sky, the air and the sea, for the pills to say.
+   */
+  const [cardsSeen, setCardsSeen] = useState<readonly string[]>([]);
+  const [finderReadings, setFinderReadings] = useState(NO_READINGS);
   const lights = useMemo(() => {
     const out = new Map<string, LightState>();
-    // Beside the list, a spot it has no card for is a muted dot.
-    const listed = page === "chart" ? null : new Set(finderWant);
+    // Beside the list, a card in view is a pill and every other spot a bead.
+    const seen =
+      page === "chart" ? null : new Map(cardsSeen.map((id, i) => [id, i]));
     // The riding wedge is the open spot's alone: on every light at once it
     // buried the chart, and it is a reading of one place, not an overview.
     // Under the loupe it goes: the rose is the same thing, bigger.
@@ -1253,7 +1283,15 @@ export default function App() {
                 spot.facing ?? null,
               )
             : null,
-        unlisted: !!listed && !listed.has(spot.id),
+        ...(seen && {
+          order: seen.get(spot.id) ?? null,
+          // A bead says the same once lit: what is known of it.
+          pill: pillContent(
+            fieldShown,
+            pillReading(hour, finderReadings.get(spot.id), lightAt),
+            prefs.units,
+          ),
+        }),
       });
     }
     return out;
@@ -1263,7 +1301,10 @@ export default function App() {
     version,
     lightAt,
     page,
-    finderWant,
+    cardsSeen,
+    finderReadings,
+    fieldShown,
+    prefs.units,
     rider,
     picked,
     point?.id,
@@ -1964,7 +2005,10 @@ export default function App() {
   useEffect(() => () => window.clearTimeout(hoverTimer.current), []);
   const cardOf = (id: string) =>
     document.querySelector<HTMLElement>(`[data-spot-card="${CSS.escape(id)}"]`);
-  /** A light under the pointer beside the list: its card is outlined. */
+  /**
+   * A pill or a bead under the pointer (or the keys) beside the list: its
+   * pill turns light, and its card, where the list has one, is outlined.
+   */
   const hoverLight = (spot: Spot | null) => {
     if (pageRef.current !== "finder") return;
     document
@@ -1974,17 +2018,18 @@ export default function App() {
     if (spot) cardOf(spot.id)?.setAttribute("data-lit", "");
     controls.current?.light(spot?.id ?? null);
   };
-  /** A light pressed beside the list: the list scrolls to its card. */
-  const showCard = (spot: Spot) => {
-    const card = cardOf(spot.id);
-    if (!card) return;
+  /**
+   * A light pressed beside the list. A pill is a card in view already: it
+   * opens its spot. A bead brings its card into view where the list has one,
+   * and opens its spot where it has none.
+   */
+  const pressBesideList = (spot: Spot, bead: boolean) => {
+    const card = bead ? cardOf(spot.id) : null;
+    if (!card) return window.location.assign(lightLink(spot));
     card.scrollIntoView({
-      block: "center",
+      block: "nearest",
       behavior: reducedMotion ? "auto" : "smooth",
     });
-    card.classList.remove("is-flash");
-    void card.offsetWidth;
-    card.classList.add("is-flash");
   };
   // The wind's particles hold still while the list scrolls beside them, so
   // the page's frames are the list's, and run again once it stops.
@@ -2495,10 +2540,6 @@ export default function App() {
       />
     </div>
   );
-  /** The hour the lights beside the list show, as the cards say it. */
-  const lightWhen = lightColumn
-    ? `at ${clock(lightColumn.time)} ${onDay(lightColumn.time, clockNow)}`
-    : null;
   const lightLink = (spot: Spot) => spotHref(spot.id, lightColumn?.validTime);
   const leaveTour = () => {
     tourSeen();
@@ -2633,6 +2674,8 @@ export default function App() {
                   beside={split}
                   view={panelView}
                   onHover={hoverCard}
+                  onInView={setCardsSeen}
+                  onReadings={setFinderReadings}
                   onShown={setFinderShown}
                   picked={finderPicked}
                   onPick={setFinderPicked}
@@ -2666,6 +2709,7 @@ export default function App() {
                     className="zbox chart-box"
                     role="group"
                     aria-label="Zoom"
+                    data-map-wall
                   >
                     <Button
                       variant="quiet"
@@ -2690,7 +2734,7 @@ export default function App() {
                   </div>
                   {mapDock(true)}
                   {"geolocation" in navigator && (
-                    <div className="zbox chart-box panel-locate">
+                    <div className="zbox chart-box panel-locate" data-map-wall>
                       <Button
                         variant="quiet"
                         size="sm"
@@ -2735,9 +2779,9 @@ export default function App() {
               )}
               {/* After the boxes: the keys reach the menu, the search and the
                 controls before the lights. One map, made once and never
-                taken down: beside the list it shows the list's places as
-                pills and the rest as muted dots, at the cards' hour, with no
-                loupe and no scrub bar. */}
+                taken down: beside the list it shows the cards in view as
+                pills and every other spot as a bead, at the cards' hour, with
+                no loupe and no scrub bar. */}
               {mapWanted && (
                 <Suspense fallback={null}>
                   <WindMap
@@ -2746,8 +2790,6 @@ export default function App() {
                     lights={lights}
                     named={onChart ? named : NO_NAMES}
                     lightLabel={lightLabel}
-                    lightWhen={lightWhen}
-                    lightLink={lightLink}
                     selectedId={onChart && !picked ? (point?.id ?? null) : null}
                     focus={
                       onChart && focusAt
@@ -2787,12 +2829,10 @@ export default function App() {
                     // so a fitted spot never lands under either.
                     bottomInset={Math.max(barShown ? dockHeight : 0, dockRoom)}
                     phone={phone}
-                    onSelect={(spot) =>
+                    onSelect={(spot, bead) =>
                       pageRef.current === "chart"
                         ? openLight(spot)
-                        : lights.get(spot.id)?.unlisted
-                          ? window.location.assign(lightLink(spot))
-                          : showCard(spot)
+                        : pressBesideList(spot, bead)
                     }
                     onHoverSpot={hoverLight}
                     onOpenPage={(place) =>

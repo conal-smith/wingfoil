@@ -1,6 +1,6 @@
 /**
  * A small card laid over the map beside a mark on it: a reading's
- * (./readingPills.ts) or a muted dot's (./lights.ts). One card for its layer,
+ * (./readingPills.ts), on the full chart. One card for its layer,
  * moved to whichever mark it is about. It opens under the pointer or the keys
  * and goes as they leave; a tap pins it, until a tap elsewhere or Escape.
  * What it says is the caller's (`fill`); this is the shell: where it stands,

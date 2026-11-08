@@ -7,6 +7,9 @@
  * Under the pointer, or tapped, a pill opens a small card: the station's name
  * and network, the wind, gust and direction, when it was measured, and the
  * network's credit. One card for the layer, laid over the map beside the pill.
+ * Not on the finder's map beside the list (`is-plain`), where no card opens
+ * over the map: there a reading says itself to a screen reader, and a spot's
+ * pill standing on it takes the place (./lights.ts).
  *
  * MapLibre's own markers: two dozen of them, not the hundred and more lights
  * (./lights.ts), whose cost through a move made them buttons of their own.
@@ -131,6 +134,7 @@ export function createReadingPills(map: maplibregl.Map): ReadingPills {
     );
   });
   const show = (pill: Pill, tap: boolean) => {
+    if (map.getContainer().classList.contains("is-plain")) return;
     if (pill.reading) card.show(pill, tap);
   };
 

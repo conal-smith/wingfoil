@@ -88,11 +88,12 @@ the ramp by hand is how the legend and the map drifted apart before.
 
 On the map, **shape carries kind and colour carries the reading.** A spot
 marker says riding spot, operator, club or area by its shape (round, squared,
-dashed); colour on a marker only ever means wind, or on the Spot finder's map
-a rider's stars. There a spot is a round-ended pill, its wind and gust in it,
-filled in its stars' colour (dashed at none, a red arrow offshore); a weather
-station or buoy is a squarer, smaller pill in the buoy's gold, its wind as it
-was measured. A forecast is never gold, and a reading never wears the stars.
+dashed); colour on a marker only ever means wind. On the Spot finder's map a
+spot whose card is in view is a round-ended pill, neutral (dark, with light
+words, in either theme) and saying what the map shows, its arrow alone red
+offshore; every other spot is a bead, a small off-white dot (2026-11-08). A
+weather station or buoy is a squarer, smaller tag in the buoy's gold, its wind
+as it was measured. A forecast is never gold.
 
 ## What structure is made of
 
@@ -547,7 +548,8 @@ at the hour the cards show, with the rider's place as a blue dot; it is
 fitted to the list as the page opens and when the list changes, and at no
 other time. A card under the pointer marks its spot on the chart, moving the
 chart only if the spot is near the edge or off it; a spot under the pointer
-outlines its card, and a press on one scrolls the list to its card. The full
+outlines its card, and a press on a bead scrolls the list to its card (a pill
+opens its spot, 2026-11-08). The full
 chart is the same map in a bigger box, never made twice (src/App.tsx). Its
 address is `/?map`, pushed, so Back is the list again; a spot's link
 (`/?spot=keel`) opens it on that spot with its dock. The top bar's Chart and
@@ -816,20 +818,17 @@ page's day cards and hour table, and the spot finder's stars, already count
 the daylight alone. The "Now" cards over the week still say the light now,
 and the app keeps its own settings.
 
-**2026-11-03 — Spots as pills beside the list, and the wind as measured.**
+**2026-11-03 — The wind as measured, on the map.**
 The owner: the readings of the weather stations and buoys should be shown,
-on the map too, and the spots on the Spot finder's small map should be pills
-with the wind, not circles. Beside the list each spot is a pill with its
-wind and gust at the cards' hour, filled in its stars' colours (dashed at
-none, a red arrow offshore), its name beside it from the regional zoom in;
-the full chart keeps its rings. The Live wind layer draws each Met Éireann
-station and Marine Institute buoy as a smaller, squarer pill in the buoy's
-gold (`buoy`, its figures in `buoy-ink`) at the wind it last measured, faded
-past three hours and gone past twelve, with a card under the pointer or a
+on the map too. The Live wind layer draws each Met Éireann station and Marine
+Institute buoy as a smaller, squarer pill in the buoy's gold (`buoy`, its
+figures in `buoy-ink`) at the wind it last measured, faded past three hours
+and gone past twelve. On the full chart a card opens under the pointer or a
 tap: the station, its network, the wind, gust and direction, when it was
-measured and whose data it is. It is always on beside the list; on the full
-chart it is a switch under Wind in Layers, off until asked for, so the
-forecast is the chart's first word there.
+measured and whose data it is. It is always on beside the list, where it is a
+gold-edged tag with no card (2026-11-08); on the full chart it is a switch
+under Wind in Layers, off until asked for, so the forecast is the chart's
+first word there. The full chart keeps its rings for the spots.
 
 **2026-11-03 — The measured wind beside the forecast, on every timeline.**
 The owner: the current conditions should be on the timelines too, and at
@@ -926,8 +925,7 @@ hour for the waves, each blend drawn beside them.
 From the national zoom a spot with no stars at the hour is a small dot, red
 where it is offshore; a rated spot is a ring large enough to read its figure,
 with no arrow; and a mark that would stand on a better one steps down to a dot
-in its own colour (`thinLights`, force5/src/lightHit.ts). Beside the list a pill
-steps down the same way. Every spot stays on the chart. The scrub bar stays the
+in its own colour (`thinLights`, force5/src/lightHit.ts). Every spot stays on the chart. The scrub bar stays the
 data alone, as 2026-11-02 has it, but it is opaque, its wind is a solid fill on
 a scale, and its bands are named in a column of their own. With no spot chosen
 it has one lane, how many spots have stars at each hour.
@@ -1040,12 +1038,8 @@ the heart off is as it was. A card under the pointer no longer pans the map with
 the heart off, because its spot is already in view and a pan would change the
 list under the pointer; with the heart on it still does.
 
-Every spot now stands on the finder's map. A listed spot is a pill; any other is
-a small muted dot, with no stars' colour and no offshore red, that never thins a
-pill or moves a name. Under the pointer or the keys a dot opens a card with the
-wind where the wind blows, the gust, the compass word, and the stars or the
-offshore word at the cards' hour; a calm spot reads "Calm". A press opens the
-spot's page; on a touch screen a tap pins the card, which holds the link.
+Every spot now stands on the finder's map: how, and what a hover shows, is
+2026-11-08's.
 
 This replaces, in 2026-10-26, the chart showing only the listed spots and being
 fitted when the list changes, and on a wide screen the 12 spots nearest where
@@ -1138,3 +1132,43 @@ dock standing over it with the chips and the legend alone. The chart's rail
 loses Coloured wind, Tidal depth and Rain, and their exclusion of each other
 (2026-11-06) with them; it keeps the particles, live wind, currents, the
 depths, the satellite and the loupe.
+
+**2026-11-08 — Pills for the cards in view, beads for the rest, linked on
+hover.** The owner chose the design. On the map beside the list a pill is a
+card the rider can see: every card at least half in the list's view has its
+pill on the map, always, and none is left off because a neighbour is close,
+reads the same or would touch it. The pills are read again 150 ms after a
+scroll of the list comes to rest, never in the middle of one, and whenever the
+cards change. A pill stands centred on its spot, with no dot under it and no
+line to it. Where spots are close, each pill moves the least it must to stand
+clear of the others, of the map's controls and of the dock, the sea side first,
+at most about 40 px from its spot, and keeps a small notch on the edge facing
+its spot, pointing at it (force5/src/pillPlace.ts); the first card's pill moves
+least. Pills are neutral, dark with light words in either theme, never filled
+in the stars' colours, and say what the dock's field shows
+(force5/src/pillContent.ts): with no field on, the wind's arrow, the wind with
+its unit and the sky ("↗ 13 kn" and a cloud); with Wind, the arrow, the wind
+and the gust; with Waves, the sea's arrow, its height and its period, and none
+at a spot the sea's waves do not reach; with Weather, the sky beside the air's
+temperature and the rain while it rains. The arrow alone may be red, offshore.
+
+Every other spot is a bead: a dot of 4 to 5 px, off-white at low strength on
+the dark map (dark on the white one) with a thin dark halo, the same whatever
+the map shows, with a 44 px reach where the nearest bead is the one meant. A
+bead a pill stands on gives it the place, and so does a station's reading.
+No spot's name stands on the map beside the list; the map's own place names
+stay.
+
+Under the pointer or the keys a pill turns light, light with dark words and
+icons in either theme, and its card is outlined; a card under the pointer
+turns its pill light. A bead under the pointer turns into its light pill and
+outlines its card where the list has one. A bead pressed scrolls the list to
+its card, or opens its spot where the list has none; a pill pressed opens its
+spot. No card opens over the map beside the list, a station's reading's
+included, and nothing there is ringed but the keys' focus.
+
+This replaces, in 2026-11-03, the pills in the stars' colours with the spots'
+names beside them; in 2026-11-06, the pill beside the list stepping down to a
+dot; in 2026-11-07, every listed spot as a pill, the muted dot and its card
+over the map; and in 2026-10-26, a press on any spot beside the list scrolling
+to its card. The full chart keeps its rings and its cards for now.

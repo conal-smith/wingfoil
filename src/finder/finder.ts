@@ -39,7 +39,7 @@ export const NEAREST_COUNT = 12;
 
 /**
  * The most cards Nearby lists while it follows the map: the best of the spots
- * in view, whose rest stand on the map as muted dots. A view of the whole of
+ * in view, whose rest stand on the map as beads. A view of the whole of
  * Ireland is 149 spots, and each card is a loupe and a day's hours.
  */
 export const MAX_CARDS = 30;

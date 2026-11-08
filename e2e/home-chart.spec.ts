@@ -32,9 +32,21 @@ const cards = (page: Page) => page.locator("[data-spot-card]");
 const panel = (page: Page) =>
   page.getByRole("region", { name: "The chart, at the spots on the list" });
 const lights = (page: Page) => page.locator(".spot-marker");
-/** The spots on the list, as pills; every other spot is a muted dot. */
-const pills = (page: Page) => page.locator(".spot-marker:not(.lt-dot)");
-const dots = (page: Page) => page.locator(".spot-marker.lt-dot");
+/** The cards the rider can see, as pills on the map; every other spot is a bead. */
+const pills = (page: Page) => page.locator(".spot-marker.lt-pilled");
+const beads = (page: Page) => page.locator(".spot-marker.lt-bead");
+/** How many cards are at least half in the list's view: a pill each. */
+const seen = (page: Page) =>
+  page.locator("[data-finder-list]").evaluate((list) => {
+    const view = list.getBoundingClientRect();
+    return [...list.querySelectorAll("[data-spot-card]")].filter((card) => {
+      const r = card.getBoundingClientRect();
+      return (
+        Math.min(r.bottom, view.bottom) - Math.max(r.top, view.top) >=
+        r.height / 2
+      );
+    }).length;
+  });
 /** The top bar over the list and the chart alike (ui/TopBar.tsx). */
 const bar = (page: Page) => page.locator("[data-top-bar]");
 /** The bar's button to the list, on the full chart. */
@@ -133,9 +145,9 @@ test.describe("on a wide screen", () => {
       "aria-label",
       /: \d\d:\d\d /,
     );
-    // And every other spot, a muted dot.
+    // And every other spot, a bead.
     await expect(lights(page)).toHaveCount(149);
-    await expect(dots(page)).toHaveCount(146);
+    await expect(beads(page)).toHaveCount(146);
     // Every listed spot's light is inside the panel.
     for (const light of await pills(page).all()) {
       const l = (await light.boundingBox())!;
@@ -144,17 +156,13 @@ test.describe("on a wide screen", () => {
       expect(l.y).toBeGreaterThan(box.y);
       expect(l.y + l.height).toBeLessThan(box.y + box.height);
     }
-    // A light pressed scrolls the list to its card, and opens no forecast:
-    // beside the list the time is the cards', and the chart has no scrub bar.
-    await page.locator('.spot-marker[data-spot-id="keel"]').click();
-    await expect(
-      cards(page).filter({ hasText: "Keel Beach" }),
-    ).toBeInViewport();
-    await page.waitForTimeout(500);
-    await expect(scrubBar(page)).toHaveCount(0);
-    await expect(page).toHaveURL(/\/$/);
-    // No loupe and no range ring beside the list.
+    // No loupe and no range ring beside the list, and no scrub bar: beside
+    // the list the time is the cards'.
     await expect(page.locator(".map-focus > *")).toHaveCount(0);
+    await expect(scrubBar(page)).toHaveCount(0);
+    // A pill is a card in view already: pressed, it opens its spot's page.
+    await page.locator('.spot-marker[data-spot-id="keel"]').click();
+    await expect(page).toHaveURL(/\/spot\/keel/);
     expect(errors).toEqual([]);
   });
 
@@ -360,11 +368,10 @@ test.describe("on a wide screen", () => {
     await expect(cards(page).filter({ hasText: "Dollymount" })).toHaveCount(1, {
       timeout: 30000,
     });
-    const listed = await cards(page).count();
-    await expect(pills(page)).toHaveCount(listed);
+    await expect.poll(() => pills(page).count()).toBe(await seen(page));
     await expect(
       page.locator('.spot-marker[data-spot-id="brandon"]'),
-    ).toHaveClass(/\blt-dot\b/);
+    ).toHaveClass(/\blt-bead\b/);
     await expect(page.getByRole("img", { name: "You are here" })).toBeVisible();
   });
 });
@@ -414,9 +421,10 @@ test.describe("a first visit, with no favourites", () => {
       })
       .toBeLessThan(box.width / 3);
     await expect.poll(() => cards(page).count()).toBeLessThan(30);
-    const listed = await cards(page).count();
-    await expect(pills(page)).toHaveCount(listed, { timeout: 30000 });
-    await expect.poll(() => pillsInside(page)).toBe(listed);
+    // A pill for each card the rider can see, each on the map.
+    const shown = await seen(page);
+    await expect(pills(page)).toHaveCount(shown, { timeout: 30000 });
+    await expect.poll(() => pillsInside(page)).toBe(shown);
   });
 
   test("location not known: the chart opens fitted to the spots nearest the middle of Ireland, once, and the list then is what it shows", async ({
@@ -431,9 +439,7 @@ test.describe("a first visit, with no favourites", () => {
     );
     // The list comes to what the fit shows, and it holds: no second fit.
     await expect
-      .poll(
-        async () => (await cards(page).count()) === (await pillsInside(page)),
-      )
+      .poll(async () => (await seen(page)) === (await pillsInside(page)))
       .toBe(true);
     const settled = await headIds(page);
     const camera = await page.evaluate(
@@ -506,27 +512,51 @@ async function drag(
   await rest(page);
 }
 
-/** A muted dot clear of every other mark, inside the chart: its id and place. */
-const freeDot = (page: Page) =>
-  page.evaluate(() => {
+/**
+ * A bead clear of every other mark, inside the chart: its id and place. With
+ * `listed`, one whose card is on the list (out of view, so not a pill); with
+ * false, one the list has no card for.
+ */
+const freeBead = (page: Page, listed: boolean) =>
+  page.evaluate((listed) => {
     const box = document.querySelector(".map-panel")!.getBoundingClientRect();
     for (const el of document.querySelectorAll<HTMLElement>(
-      ".spot-marker.lt-dot",
+      ".spot-marker.lt-bead:not(.lt-under)",
     )) {
+      const id = el.dataset.spotId!;
+      const card = document.querySelector(`[data-spot-card="${id}"]`);
+      if (!!card !== listed) continue;
+      // Listed, its card out of the list's view altogether.
+      const list = document
+        .querySelector("[data-finder-list]")!
+        .getBoundingClientRect();
+      const c = card?.getBoundingClientRect();
+      if (c && c.bottom > list.top && c.top < list.bottom) continue;
       const r = el.getBoundingClientRect();
       const x = r.x + r.width / 2;
       const y = r.y + r.height / 2;
+      // No other spot within a few pixels: two that close tie for nearest.
+      const twin = [
+        ...document.querySelectorAll<HTMLElement>(".spot-marker"),
+      ].some((other) => {
+        if (other === el) return false;
+        const o = other.getBoundingClientRect();
+        return Math.hypot(o.x + o.width / 2 - x, o.y + o.height / 2 - y) < 5;
+      });
       if (
+        !twin &&
         x > box.left + 130 &&
         x < box.right - 130 &&
         y > box.top + 150 &&
         y < box.bottom - 80 &&
-        document.elementFromPoint(x, y)?.closest(".spot-marker") === el
+        // A bead under the point: the nearest is the one meant, and that
+        // is this one.
+        document.elementFromPoint(x, y)?.closest(".spot-marker.lt-bead")
       )
-        return { id: el.dataset.spotId!, x, y };
+        return { id, x, y };
     }
-    throw new Error("no muted dot to reach");
-  });
+    throw new Error("no bead to reach");
+  }, listed);
 
 /** The heart off on the whole of the chart, every spot in view, the first visit's. */
 async function wholeChart(page: Page) {
@@ -551,9 +581,7 @@ test.describe("with the heart off, the list follows the map beside it", () => {
     await expect(lights(page)).toHaveCount(149, { timeout: 30000 });
     await rest(page);
     await expect
-      .poll(
-        async () => (await cards(page).count()) === (await pillsInside(page)),
-      )
+      .poll(async () => (await seen(page)) === (await pillsInside(page)))
       .toBe(true);
     const before = await headIds(page);
     expect(before.length).toBeGreaterThan(0);
@@ -566,11 +594,9 @@ test.describe("with the heart off, the list follows the map beside it", () => {
     await expect.poll(() => headIds(page)).not.toEqual(before);
     // Each card a pill in view.
     await expect
-      .poll(
-        async () => (await cards(page).count()) === (await pillsInside(page)),
-      )
+      .poll(async () => (await seen(page)) === (await pillsInside(page)))
       .toBe(true);
-    expect(await pills(page).count()).toBe(await cards(page).count());
+    expect(await pills(page).count()).toBe(await seen(page));
     // No distances, and nothing asked of the browser.
     await expect(cards(page).filter({ hasText: / km · / })).toHaveCount(0);
   });
@@ -585,9 +611,7 @@ test.describe("with the heart off, the list follows the map beside it", () => {
     const box = (await panel(page).boundingBox())!;
     await drag(page, -box.width / 2, 0);
     await expect
-      .poll(
-        async () => (await cards(page).count()) === (await pillsInside(page)),
-      )
+      .poll(async () => (await seen(page)) === (await pillsInside(page)))
       .toBe(true);
     const before = await headIds(page);
     await mapButton(page).click();
@@ -607,7 +631,13 @@ test.describe("with the heart off, the list follows the map beside it", () => {
     const before = await headIds(page);
     await drag(page, -300, 0);
     expect(await headIds(page)).toEqual(before);
-    await expect(pills(page)).toHaveCount(3);
+    // A pill for each favourite whose spot is still in view.
+    await expect(cards(page)).toHaveCount(3);
+    await expect
+      .poll(
+        async () => (await pills(page).count()) === (await pillsInside(page)),
+      )
+      .toBe(true);
     // Off, the list is what the map shows; the favourites now off to one
     // side, pressed on again, the map is fitted to them.
     await heart(page).click();
@@ -620,7 +650,7 @@ test.describe("with the heart off, the list follows the map beside it", () => {
     await expect.poll(() => pillsInside(page)).toBe(3);
   });
 
-  test("over the cap: 30 cards led by each county's best, a quiet line with the true count, and the rest as dots", async ({
+  test("over the cap: 30 cards led by each county's best, a quiet line with the true count, a pill for each card in view and beads for the rest", async ({
     page,
   }) => {
     await wholeChart(page);
@@ -628,8 +658,11 @@ test.describe("with the heart off, the list follows the map beside it", () => {
     await expect(page.locator("[data-finder-more]")).toHaveText(
       "149 spots in view, the best 30 here. Zoom in for the rest.",
     );
-    await expect(pills(page)).toHaveCount(30);
-    await expect(dots(page)).toHaveCount(119);
+    const shown = await seen(page);
+    expect(shown).toBeGreaterThan(2);
+    expect(shown).toBeLessThan(30);
+    await expect(pills(page)).toHaveCount(shown);
+    await expect(beads(page)).toHaveCount(149 - shown);
     // The whole country is far wider than 180 km: the list leads with the
     // best spot in each county, so its first cards are each another county's.
     await expect(page.locator(".spot-marker.pending")).toHaveCount(0, {
@@ -675,9 +708,7 @@ test.describe("with the heart off, the list follows the map beside it", () => {
     await expect(lights(page)).toHaveCount(149, { timeout: 30000 });
     await rest(page);
     await expect
-      .poll(
-        async () => (await cards(page).count()) === (await pillsInside(page)),
-      )
+      .poll(async () => (await seen(page)) === (await pillsInside(page)))
       .toBe(true);
     const before = await headIds(page);
     expect(before.length).toBeGreaterThan(3);
@@ -694,97 +725,113 @@ test.describe("with the heart off, the list follows the map beside it", () => {
     expect(await headIds(page)).toEqual(before);
   });
 
-  test("a dot under the pointer opens a card with the wind, and lights nothing; the keys open it too", async ({
+  test("a bead under the pointer is its light pill and outlines its card; no card opens over the map; the keys do the same", async ({
     page,
   }) => {
     await wholeChart(page);
     await expect(page.locator(".spot-marker.pending")).toHaveCount(0, {
       timeout: 30000,
     });
-    const card = page.locator(".lt-card");
-    await expect(card).toBeHidden();
-    const dot = await freeDot(page);
-    await page.mouse.move(dot.x, dot.y);
-    await expect(card).toBeVisible();
-    await expect(card.locator(".map-card-name")).not.toBeEmpty();
-    await expect(card.locator(".map-card-net")).toHaveText(/^Co\. /);
-    await expect(card.locator(".map-card-speed")).toHaveText(/^(\d+|Calm)$/);
-    await expect(card.locator(".map-card-when")).toHaveText(
-      /^(\d stars?|Dark|Offshore).* at \d\d:\d\d (today|tomorrow|on \w+)$/,
+    // A bead whose card is on the list, out of the list's view.
+    const bead = await freeBead(page, true);
+    const light = page.locator(`.spot-marker[data-spot-id="${bead.id}"]`);
+    await page.mouse.move(bead.x, bead.y);
+    await expect(light).toHaveClass(/\blit\b/);
+    await expect(light.locator(".lt-pill")).toBeVisible();
+    await expect(light.locator(".lt-kn")).toHaveText(/^\d+$/);
+    await expect(page.locator(`[data-spot-card="${bead.id}"]`)).toHaveAttribute(
+      "data-lit",
+      "",
     );
-    // No pill popped, nothing faded, no card outlined.
-    await expect(page.locator(".spot-marker.lit")).toHaveCount(0);
-    await expect(page.locator(".map-lights.has-lit")).toHaveCount(0);
-    await expect(page.locator("[data-spot-card][data-lit]")).toHaveCount(0);
-    // No link under a mouse: the dot is pressed.
-    await expect(card.locator("a")).toHaveCount(0);
+    await expect(page.locator("[data-spot-card][data-lit]")).toHaveCount(1);
+    // No card over the map, and nothing else faded.
+    await expect(page.locator(".map-card:not([hidden])")).toHaveCount(0);
+    await expect(page.locator(".spot-marker:not(.lit)").first()).toHaveCSS(
+      "opacity",
+      "1",
+    );
     await page.mouse.move(5, 5);
-    await expect(card).toBeHidden();
-    // The keys: the card, and Escape shuts it.
-    const light = page.locator(`.spot-marker[data-spot-id="${dot.id}"]`);
+    await expect(light).not.toHaveClass(/\blit\b/);
+    await expect(light.locator(".lt-pill")).toBeHidden();
+    await expect(page.locator("[data-spot-card][data-lit]")).toHaveCount(0);
+    // One the list has no card for: its light pill, no card outlined.
+    const other = await freeBead(page, false);
+    await page.mouse.move(other.x, other.y);
+    await expect(
+      page.locator(`.spot-marker[data-spot-id="${other.id}"]`),
+    ).toHaveClass(/\blit\b/);
+    await expect(page.locator("[data-spot-card][data-lit]")).toHaveCount(0);
+    await page.mouse.move(5, 5);
+    // The keys: the same light pill and outline.
     await light.focus();
-    await expect(card).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(card).toBeHidden();
+    await expect(light).toHaveClass(/\blit\b/);
+    await expect(page.locator(`[data-spot-card="${bead.id}"]`)).toHaveAttribute(
+      "data-lit",
+      "",
+    );
+    await expect(page.locator(".map-card:not([hidden])")).toHaveCount(0);
   });
 
-  test("a dot pressed opens its spot's page, and so does Enter", async ({
+  test("a bead pressed brings its card into view, or opens its spot's page where the list has none, and so does Enter", async ({
     page,
   }) => {
     await wholeChart(page);
-    const dot = await freeDot(page);
-    await page.mouse.click(dot.x, dot.y);
-    await expect(page).toHaveURL(new RegExp(`/spot/${dot.id}`));
+    await expect(page.locator(".spot-marker.pending")).toHaveCount(0, {
+      timeout: 30000,
+    });
+    const listed = await freeBead(page, true);
+    await expect(
+      page.locator(`[data-spot-card="${listed.id}"]`),
+    ).not.toBeInViewport();
+    await page.mouse.click(listed.x, listed.y);
+    await expect(
+      page.locator(`[data-spot-card="${listed.id}"]`),
+    ).toBeInViewport();
+    await expect(page).toHaveURL(/\/$/);
+    const bead = await freeBead(page, false);
+    await page.mouse.click(bead.x, bead.y);
+    await expect(page).toHaveURL(new RegExp(`/spot/${bead.id}`));
     await page.goBack();
     await expect(cards(page).first()).toBeVisible({ timeout: 30000 });
     await expect(lights(page)).toHaveCount(149, { timeout: 30000 });
-    const again = page.locator(".spot-marker.lt-dot").first();
-    const id = await again.getAttribute("data-spot-id");
-    await again.focus();
+    await expect(beads(page).first()).toBeAttached({ timeout: 30000 });
+    const again = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>(".spot-marker.lt-bead")]
+        .map((el) => el.dataset.spotId!)
+        .find((id) => !document.querySelector(`[data-spot-card="${id}"]`))!,
+    );
+    await page.locator(`.spot-marker[data-spot-id="${again}"]`).focus();
     await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(new RegExp(`/spot/${id}`));
+    await expect(page).toHaveURL(new RegExp(`/spot/${again}`));
   });
 
-  test("a pill pressed with the heart off brings its card into view", async ({
+  test("a pill pressed with the heart off opens its spot's page", async ({
     page,
   }) => {
     await wholeChart(page);
-    const last = await page
-      .locator("[data-spot-card]")
-      .last()
-      .getAttribute("data-spot-card");
+    const first = await pills(page).first().getAttribute("data-spot-id");
     await expect(page).toHaveURL(/\/$/);
     await page
-      .locator(`.spot-marker[data-spot-id="${last}"]`)
+      .locator(`.spot-marker[data-spot-id="${first}"]`)
       .dispatchEvent("click", { detail: 1 });
-    await expect(page.locator(`[data-spot-card="${last}"]`)).toBeInViewport();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(new RegExp(`/spot/${first}`));
   });
 });
 
-test.describe("a dot under a finger, beside the list", () => {
+test.describe("a bead under a finger, beside the list", () => {
   test.use({ viewport: { width: 1280, height: 800 }, hasTouch: true });
 
-  test("a tap pins its card, which holds the link; a tap elsewhere lets it go", async ({
+  test("a tap brings its card into view, with no card over the map", async ({
     page,
   }) => {
     await wholeChart(page);
-    const card = page.locator(".lt-card");
-    const dot = await freeDot(page);
-    await page.touchscreen.tap(dot.x, dot.y);
-    await expect(card).toBeVisible();
+    const bead = await freeBead(page, true);
+    await page.touchscreen.tap(bead.x, bead.y);
+    await expect(
+      page.locator(`[data-spot-card="${bead.id}"]`),
+    ).toBeInViewport();
     await expect(page).toHaveURL(/\/$/);
-    const link = card.getByRole("link", { name: "Open spot" });
-    await expect(link).toHaveAttribute("href", new RegExp(`/spot/${dot.id}`));
-    // Over the land's open water, away from the dot: the card goes.
-    const away = await openWater(page);
-    await page.touchscreen.tap(away.x, away.y);
-    await expect(card).toBeHidden();
-    await page.touchscreen.tap(dot.x, dot.y);
-    await expect(card).toBeVisible();
-    const at = (await link.boundingBox())!;
-    await page.touchscreen.tap(at.x + at.width / 2, at.y + at.height / 2);
-    await expect(page).toHaveURL(new RegExp(`/spot/${dot.id}`));
+    await expect(page.locator(".map-card:not([hidden])")).toHaveCount(0);
   });
 });
 

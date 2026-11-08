@@ -30,22 +30,25 @@
  * chart has no room for every ring and arrow, so a spot with no stars at the
  * hour is a small dot (src/map.css `.z-lo`), a rated one a ring with no arrow,
  * and a mark that would stand on a better one steps down to a dot of its own
- * colour. Beside the list, a pill does the same. Every spot stays on the chart.
+ * colour. Every spot stays on the chart.
  *
- * On the Spot finder's plain map (the map's box has `is-plain`), each light
- * is a pill instead of a ring: an arrow blowing downwind, the wind, and the
- * gust raised beside it, filled in the same stars' colours, dashed at none,
- * with a red arrow offshore (src/map.css). The same button either way, so
- * hover, click, the lit light and the hour it follows are the ring's; only
- * the stylesheet, and the canvas's picture of it, tell the two apart.
+ * On the Spot finder's plain map beside the list (the map's box has
+ * `is-plain`) a spot is a pill or a bead, and no spot's name stands on the
+ * map. A pill is a card the rider can see: each card at least half in the
+ * list's view has its pill (`order`, its place among them), always, centred
+ * on its spot, and where spots are close each moved the least it must to
+ * stand clear, with a notch pointing at its spot (./pillPlace.ts, laid out
+ * once the camera rests). It is neutral, dark with light words, and says
+ * what the map shows (./pillContent.ts). Every other spot is a bead, a small
+ * off-white dot, the same whatever the map shows, with a finger's reach where
+ * the nearest bead is the one meant (`lt-bead`, src/map.css).
  *
- * There, a spot that is not on the list is a small muted dot instead
- * (`unlisted`, `lt-dot` in src/map.css). A dot stands under everything, thins
- * no pill and moves no name, and a press on a pill never picks a dot. It has no
- * card of its own in the list, so hovering it does not light one: it opens a
- * small card of its own over the map (./mapCard.ts), with the wind there. A
- * mouse or the keys open it, a press goes to the place (`onSelect`), and a tap
- * pins the card, which holds the link.
+ * Under the pointer, or the keys, a pill turns light, and so does a bead,
+ * which becomes its light pill there (`light`), and the page outlines the
+ * spot's card (`onHover`); a card under the pointer lights its pill the same
+ * way. No card opens over the map. A pill pressed opens its spot; a bead
+ * pressed is the page's to bring its card into view, or open the spot
+ * (`onSelect`, told which was pressed).
  *
  * To the keys the lights are one stop (a roving tab stop, as the layers'
  * rail is): Tab comes to one light, the open spot's or the last the keys
@@ -56,6 +59,7 @@
  */
 import type * as maplibregl from "maplibre-gl";
 import {
+  nearestLight,
   nextLight,
   pressedLight,
   tappedLight,
@@ -63,9 +67,10 @@ import {
   type Way,
 } from "./lightHit";
 import { drawLights, lookOf, type Drawn, type Look } from "./lightsCanvas";
-import { arrowSvg, createMapCard, part } from "./mapCard";
+import { pillHtml, pillKey, type PillParts } from "./pillContent";
+import { placePills, type Box as PillBox, type PillItem } from "./pillPlace";
 import type { Wedge } from "./rideWedge";
-import { speedShort, unitLabel, type Units } from "./units";
+import { speedShort, type Units } from "./units";
 import type { Spot } from "./weather";
 
 export interface LightState {
@@ -84,42 +89,16 @@ export interface LightState {
   mark: "struck" | "cross-off" | null;
   /** The headings the rider can hold out to sea, or null. */
   wedge: Wedge | null;
-  /** On the plain map, a spot that is not on the list: a muted dot. */
-  unlisted?: boolean;
-}
-
-/**
- * What a dot's card says of a place's wind and stars, at the hour `when`
- * ("at 13:00 today"). Under a knot it is calm, which is the point of looking:
- * no figure, no arrow.
- */
-export function dotWords(
-  s: LightState | undefined,
-  when: string | null,
-  units: Units,
-) {
-  if (!s || s.pending)
-    return { calm: false, speed: null, gust: null, line: "Not read yet" };
-  const at = when ? ` ${when}` : "";
-  if (s.windKn === null)
-    return {
-      calm: false,
-      speed: null,
-      gust: null,
-      line: "No forecast at this hour",
-    };
-  const stars =
-    s.dark || s.stars === null
-      ? "Dark"
-      : s.mark === "struck"
-        ? "Offshore"
-        : `${s.stars} star${s.stars === 1 ? "" : "s"}${s.mark === "cross-off" ? ", cross-offshore" : ""}`;
-  return {
-    calm: s.windKn < 1,
-    speed: speedShort(s.windKn, units),
-    gust: s.gustKn == null ? null : speedShort(s.gustKn, units),
-    line: `${stars}${at}`,
-  };
+  /**
+   * On the plain map, what the spot's pill says (./pillContent.ts), or null
+   * for no pill at all: a bead, even lit.
+   */
+  pill?: PillParts | null;
+  /**
+   * On the plain map, the place of the spot's card among those the rider can
+   * see in the list, or null: a bead. Placed in this order, the first least moved.
+   */
+  order?: number | null;
 }
 
 interface Entry {
@@ -144,10 +123,15 @@ interface Entry {
   wedge: SVGPathElement;
   figure: SVGTextElement;
   sub: HTMLElement;
-  /** The pill's arrow, wind and gust, on the plain map. */
-  pillTurn: SVGGElement;
-  pillWind: HTMLElement;
-  pillGust: HTMLElement;
+  /** The pill, on the plain map, and what it says. */
+  pill: HTMLElement;
+  pillSays: string;
+  /** Its place among the pills, or null: a bead. */
+  order: number | null;
+  /** How far the pill stands off its spot, and its notch's side and place. */
+  dx: number;
+  dy: number;
+  notch: string;
   key: string;
 }
 
@@ -168,19 +152,17 @@ const MANAGED = [
   "named",
   "w-over",
   "lt-thin",
-  "lt-dot",
 ];
 
 /** What a full mark takes on the chart from the national zoom, a little clear. */
 const FAR_REACH = 12;
-/** A pill's margin beside the list, so two never touch. */
-const PILL_MARGIN = 3;
-
 /** How long a frame of a move may spend making the lights' pictures. */
 const BUDGET_MS = 4;
 
-/** How near a tap through a move must fall to a muted dot, in pixels. */
-const DOT_REACH = 10;
+/** A bead's reach, half its 44 px hit area (src/map.css `.lt-bead`). */
+const BEAD_REACH = 22;
+/** How far in from the map's edge a pill stands. */
+const PILL_ROOM = 4;
 
 /** The base map's own names, which a light's name should not print over. */
 const PLACE_LAYERS = ["places", "places-near", "water-names"];
@@ -200,8 +182,8 @@ interface Box {
   right: number;
   bottom: number;
 }
-/** A muted dot (src/map.css), not a pill or a ring. */
-const isDot = (el: HTMLElement) => el.classList.contains("lt-dot");
+/** A bead on the plain map (src/map.css), not a pill or a ring. */
+const isBead = (el: HTMLElement) => el.classList.contains("lt-bead");
 
 const overlaps = (a: Box, b: Box, pad = 1) =>
   a.left < b.right + pad &&
@@ -209,9 +191,8 @@ const overlaps = (a: Box, b: Box, pad = 1) =>
   a.top < b.bottom + pad &&
   b.top < a.bottom + pad;
 
-/** The pill's arrow (src/map.css .lt-pill), pointing downwind once turned. */
-export const PILL_ARROW = "M0 4.6V-4.4M-2.7 -1.6L0 -4.8L2.7 -1.6";
-const PILL_HTML = `<span class="lt-pill" aria-hidden="true"><svg class="lt-pa" viewBox="-6 -6 12 12"><g><path d="${PILL_ARROW}"/></g></svg><b class="lt-kn"></b><sup class="lt-gu"></sup></span>`;
+/** The plain map's pill (written by `update`) and bead (src/map.css). */
+const PILL_HTML = `<span class="lt-pill" aria-hidden="true"></span><span class="lt-bead-dot" aria-hidden="true"></span>`;
 
 const LIGHT_SVG = `<svg viewBox="-30 -30 60 60" aria-hidden="true"><g class="lt-wind"><path class="lt-arrow" d="M0 -9.6V-20.5M-3.4 -16.6L0 -21L3.4 -16.6"/></g><circle class="lt-ring" r="7.6"/><line class="lt-strike" x1="-5.6" y1="5.6" x2="5.6" y2="-5.6"/><text class="lt-n" y="3.4" text-anchor="middle"></text></svg>`;
 
@@ -237,8 +218,6 @@ export interface Lights {
     named: ReadonlySet<string>,
     label: (spot: Spot, state: LightState | undefined) => string,
     units: Units,
-    /** The hour the lights stand at, in words ("at 13:00 today"), for a dot's card. */
-    when?: string | null,
   ): void;
   element(id: string): HTMLButtonElement | undefined;
   /**
@@ -252,19 +231,23 @@ export interface Lights {
    * puts it out. A class on the light, so nothing is drawn again but it.
    */
   light(id: string | null): void;
+  /**
+   * The room the map's dock takes at the map's foot, in pixels: beside the
+   * list no pill stands there, as no camera move puts a spot there.
+   */
+  foot(px: number): void;
   destroy(): void;
 }
 
 export function createLights(
   map: maplibregl.Map,
   spots: readonly Spot[],
-  onSelect: (spot: Spot) => void,
+  /** A light pressed: its place, and whether it was a bead on the plain map. */
+  onSelect: (spot: Spot, bead: boolean) => void,
   /** A mouse comes onto a light (its place), or leaves it (null). */
   onHover?: (spot: Spot | null) => void,
   /** The chosen light's name is pressed: its place's own page. */
   onOpen?: (spot: Spot) => void,
-  /** A place's own page, for the link on a card a tap has pinned. */
-  link?: (spot: Spot) => string,
 ): Lights {
   const entries = new Map<string, Entry>();
   /**
@@ -282,14 +265,10 @@ export function createLights(
   const laidOut = ({ classList: c }: HTMLElement) =>
     `${c.contains("lab-hide")}${c.contains("lab-left")}${c.contains("lt-thin")}`;
   const placeLabels = () => {
-    const camera = `${map.getZoom().toFixed(3)}|${map.getCenter().toArray().join(",")}`;
-    if (!dirty && camera === laid) return;
-    laid = camera;
-    dirty = false;
     const frame = map.getContainer().getBoundingClientRect();
     const layers = PLACE_LAYERS.filter((id) => map.getLayer(id));
-    // A pill fills its button; a ring sits inside its button's square.
-    const inset = map.getContainer().classList.contains("is-plain") ? 0 : 3;
+    // A ring sits inside its button's square.
+    const inset = 3;
     const rings: { el: HTMLElement; box: Box }[] = [];
     // The Live wind layer's pills (./readingPills.ts): a name is not printed
     // over a reading either.
@@ -304,36 +283,25 @@ export function createLights(
       el.classList.remove("lab-hide", "lab-left", "lt-thin");
     }
     // A crowded coast first: what a better mark stands on steps down to a dot
-    // (./lightHit `thinLights`), and a dot has no name to lay out. On the
-    // chart from the national zoom only the rated have a full mark to lose;
-    // beside the list every spot is a pill.
-    const box = map.getContainer().classList;
-    const pills = box.contains("is-plain");
-    if (pills || box.contains("z-lo")) {
+    // (./lightHit `thinLights`), and a dot has no name to lay out. From the
+    // national zoom only the rated have a full mark to lose.
+    if (map.getContainer().classList.contains("z-lo")) {
       const crowd = [...entries]
         .filter(([, { el }]) =>
-          pills
-            ? !isDot(el)
-            : el.matches(".s1, .s2, .s3, .s4, .s5, .sel, .lit"),
+          el.matches(".s1, .s2, .s3, .s4, .s5, .sel, .lit"),
         )
-        .map(([id, { el, x, y }]) => {
-          const r = pills ? el.getBoundingClientRect() : null;
-          const lit = el.matches(".sel, .lit");
-          return {
-            id,
-            x,
-            y,
-            halfW: r ? r.width / 2 + PILL_MARGIN : FAR_REACH,
-            halfH: r ? r.height / 2 + PILL_MARGIN : FAR_REACH,
-            rank: labelRank(el) + (lit ? 200 : 0),
-          };
-        });
+        .map(([id, { el, x, y }]) => ({
+          id,
+          x,
+          y,
+          halfW: FAR_REACH,
+          halfH: FAR_REACH,
+          rank: labelRank(el) + (el.matches(".sel, .lit") ? 200 : 0),
+        }));
       for (const id of thinLights(crowd))
         entries.get(id)?.el.classList.add("lt-thin");
     }
     for (const { el } of entries.values()) {
-      // A dot stands under the names, and is no reason to move one.
-      if (isDot(el)) continue;
       const r = el.getBoundingClientRect();
       if (
         r.right < frame.left ||
@@ -394,6 +362,201 @@ export function createLights(
     for (const [entry, was] of before)
       if (laidOut(entry.el) !== was) entry.rev++;
   };
+  /** The map's own controls and the rider's mark, which no pill stands on. */
+  const walls = (frame: DOMRect): PillBox[] =>
+    [
+      ...map.getContainer().querySelectorAll(".maplibregl-ctrl, .map-you"),
+      ...document.querySelectorAll("[data-map-wall]"),
+    ]
+      .map((el) => el.getBoundingClientRect())
+      .filter((r) => r.width && r.height)
+      .map((r) => ({
+        l: r.left - frame.left,
+        t: r.top - frame.top,
+        r: r.right - frame.left,
+        b: r.bottom - frame.top,
+      }));
+  /**
+   * The map's own names on the screen, as near as their points and lengths
+   * say: centred on their points (src/chartStyle.ts), a little wider than the
+   * words for their halo.
+   */
+  const names = (): PillBox[] => {
+    const layers = PLACE_LAYERS.filter((id) => map.getLayer(id));
+    if (!layers.length) return [];
+    const out: PillBox[] = [];
+    for (const f of map.queryRenderedFeatures({ layers })) {
+      if (f.geometry.type !== "Point") continue;
+      const words = String(
+        f.properties?.["name:en"] ?? f.properties?.name ?? "",
+      );
+      // The largest the names are set at: a city's.
+      const size = 13;
+      const at = map.project(f.geometry.coordinates as [number, number]);
+      const half = words.length * size * 0.3 + 3;
+      out.push({
+        l: at.x - half,
+        t: at.y - size * 0.7,
+        r: at.x + half,
+        b: at.y + size * 0.7,
+      });
+    }
+    return out;
+  };
+  /**
+   * Beside the list: each card in view a pill, placed clear of the others
+   * (./pillPlace.ts) where the camera rests, and every other spot a bead.
+   * A bead or a station's reading a pill stands on gives it the place.
+   */
+  const placeFinderPills = () => {
+    const box = map.getContainer();
+    const frame = box.getBoundingClientRect();
+    const items: PillItem[] = [];
+    const wanted = [...entries.values()]
+      .filter((e) => e.order !== null && e.pillSays)
+      .sort((a, b) => a.order! - b.order!);
+    for (const e of wanted)
+      items.push({
+        id: e.spot.id,
+        x: e.x,
+        y: e.y,
+        // Its own size, as laid out even while hidden: transforms aside.
+        w: e.pill.offsetWidth,
+        h: e.pill.offsetHeight,
+        seaward: e.spot.facing ?? null,
+      });
+    const room = {
+      l: PILL_ROOM,
+      t: PILL_ROOM,
+      r: boxW - PILL_ROOM,
+      b: boxH - footRoom - PILL_ROOM,
+    };
+    const placed = new Map(
+      placePills(items, room, walls(frame), names()).map((p) => [p.id, p]),
+    );
+    const boxes = [...placed.values()].map((p) => p.box);
+    for (const entry of entries.values()) {
+      const p = placed.get(entry.spot.id);
+      const dx = p ? Math.round((p.box.l + p.box.r) / 2 - p.x) : 0;
+      const dy = p ? Math.round((p.box.t + p.box.b) / 2 - p.y) : 0;
+      const notch = p?.notch
+        ? `${p.notch.side}|${Math.round(p.notch.along)}`
+        : "";
+      // A bead a pill stands on is under it, and out of reach.
+      const under =
+        !p &&
+        boxes.some(
+          (b) =>
+            entry.x > b.l - 3 &&
+            entry.x < b.r + 3 &&
+            entry.y > b.t - 3 &&
+            entry.y < b.b + 3,
+        );
+      const { el, pill } = entry;
+      const was = `${el.className}|${entry.dx}|${entry.dy}|${entry.notch}`;
+      el.classList.toggle("lt-pilled", !!p);
+      el.classList.toggle("lt-bead", !p);
+      el.classList.toggle("lt-under", under);
+      if (dx !== entry.dx || dy !== entry.dy) {
+        entry.dx = dx;
+        entry.dy = dy;
+        // Its button is the pill: moved off the spot with it.
+        moveTo(el, entry.x + dx, entry.y + dy);
+      }
+      if (notch !== entry.notch) {
+        entry.notch = notch;
+        if (p?.notch) {
+          pill.dataset.n = p.notch.side;
+          pill.style.setProperty("--n", `${Math.round(p.notch.along)}px`);
+        } else delete pill.dataset.n;
+      }
+      if (`${el.className}|${entry.dx}|${entry.dy}|${entry.notch}` !== was)
+        entry.rev++;
+    }
+    pillBoxes = boxes;
+  };
+  /** Where the pills beside the list stand, as last placed. */
+  let pillBoxes: PillBox[] = [];
+  /** The dock's room at the map's foot (`foot`). */
+  let footRoom = 0;
+  /**
+   * The Live wind layer's readings beside the list (./readingPills.ts): a
+   * pill has the place, and so do the map's names and a reading kept before
+   * it, so nothing stands on anything; one the map's edge or the dock would
+   * cut is not shown. Read again whenever the map rests, as the readings
+   * come and go of their own accord.
+   */
+  const thinReadings = () => {
+    const box = map.getContainer();
+    const frame = box.getBoundingClientRect();
+    const taken = [...pillBoxes, ...names()];
+    for (const reading of box.querySelectorAll<HTMLElement>(".obs-mark")) {
+      const r = reading.getBoundingClientRect();
+      const at = {
+        l: r.left - frame.left,
+        t: r.top - frame.top,
+        r: r.right - frame.left,
+        b: r.bottom - frame.top,
+      };
+      // Cut by the map's edge or in the dock's room: not shown at all.
+      const out = at.l < 0 || at.t < 0 || at.r > boxW || at.b > boxH - footRoom;
+      const under =
+        out ||
+        taken.some(
+          (b) =>
+            at.l < b.r + 2 &&
+            b.l < at.r + 2 &&
+            at.t < b.b + 2 &&
+            b.t < at.b + 2,
+        );
+      reading.classList.toggle("obs-under", under);
+      if (!under) taken.push(at);
+    }
+  };
+  /** Back on the chart: no pill, no bead, nothing moved off its spot. */
+  const clearFinderPills = () => {
+    for (const entry of entries.values()) {
+      const { el, pill } = entry;
+      if (
+        !el.matches(".lt-pilled, .lt-bead, .lt-under") &&
+        !entry.dx &&
+        !entry.dy &&
+        !entry.notch
+      )
+        continue;
+      el.classList.remove("lt-pilled", "lt-bead", "lt-under");
+      entry.dx = entry.dy = 0;
+      entry.notch = "";
+      moveTo(el, entry.x, entry.y);
+      delete pill.dataset.n;
+      entry.rev++;
+    }
+    pillBoxes = [];
+    for (const reading of map
+      .getContainer()
+      .querySelectorAll(".obs-mark.obs-under"))
+      reading.classList.remove("obs-under");
+  };
+  const plain = () => map.getContainer().classList.contains("is-plain");
+  /** The names on the chart, or the pills beside the list, where the camera rests. */
+  const layout = () => {
+    const camera = `${map.getZoom().toFixed(3)}|${map.getCenter().toArray().join(",")}`;
+    if (!dirty && camera === laid) {
+      if (plain()) thinReadings();
+      return;
+    }
+    laid = camera;
+    dirty = false;
+    if (plain()) {
+      for (const { el } of entries.values())
+        el.classList.remove("lab-hide", "lab-left", "lt-thin");
+      placeFinderPills();
+      thinReadings();
+    } else {
+      clearFinderPills();
+      placeLabels();
+    }
+  };
   let queued = 0;
   const queue = () => {
     if (!queued)
@@ -402,7 +565,7 @@ export function createLights(
         // Laid out where the buttons stand, once the camera rests: through a
         // move they stand where it last did.
         if (moving) return;
-        placeLabels();
+        layout();
       });
   };
   map.on("moveend", queue);
@@ -433,14 +596,17 @@ export function createLights(
    */
   const meant = (spot: Spot, el: HTMLElement, event: MouseEvent): Spot => {
     if (!event.detail) return spot;
-    const reach = parseFloat(getComputedStyle(el, "::before").width) / 2 || 22;
+    // Pills never overlap: the one under the pointer is the one meant.
+    if (el.classList.contains("lt-pilled")) return spot;
+    const reach =
+      parseFloat(getComputedStyle(el, "::before").width) / 2 || BEAD_REACH;
     const centres = [...entries].map(([id, entry]) => {
       const r = entry.el.getBoundingClientRect();
       return {
         id,
         x: r.left + r.width / 2,
         y: r.top + r.height / 2,
-        dot: isDot(entry.el),
+        dot: isBead(entry.el),
       };
     });
     const id = pressedLight(
@@ -448,7 +614,7 @@ export function createLights(
       event.clientX,
       event.clientY,
       reach,
-      isDot(el),
+      isBead(el),
     );
     return (id && byId.get(id)) || spot;
   };
@@ -547,13 +713,16 @@ export function createLights(
       entry.el.classList.toggle("lt-live", wait);
     }
     const named = (e: Entry) => e.el.classList.contains("named");
-    const all = [...looks.keys()];
-    const marks = all.filter((e) => !isDot(e.el));
+    // A bead a pill stands on is not drawn: the pill has the place.
+    const all = [...looks.keys()].filter(
+      (e) => !e.el.classList.contains("lt-under"),
+    );
+    const marks = all.filter((e) => !isBead(e.el));
     drawn = [
-      ...all.filter((e) => isDot(e.el)),
+      ...all.filter((e) => isBead(e.el)),
       ...marks.filter((e) => !named(e)),
       ...marks.filter(named),
-    ].map((e) => ({ x: e.x, y: e.y, look: looks.get(e)! }));
+    ].map((e) => ({ x: e.x, y: e.y, dx: e.dx, dy: e.dy, look: looks.get(e)! }));
   };
   /** Each light at its place on the screen, with the camera at rest. */
   const place = () => {
@@ -561,7 +730,7 @@ export function createLights(
       const p = map.project(entry.lngLat);
       entry.x = Math.round(p.x);
       entry.y = Math.round(p.y);
-      moveTo(entry.el, entry.x, entry.y);
+      moveTo(entry.el, entry.x + entry.dx, entry.y + entry.dy);
     }
     origin = map.unproject([0, 0]);
     restZoom = map.getZoom();
@@ -582,9 +751,9 @@ export function createLights(
       to ??
       all.find((entry) => entry.el === document.activeElement) ??
       [all.find((entry) => entry.el.classList.contains("sel")), stop].find(
-        (entry) => entry && inView(entry) && !isDot(entry.el),
+        (entry) => entry && inView(entry) && !isBead(entry.el),
       ) ??
-      all.find((entry) => inView(entry) && !isDot(entry.el)) ??
+      all.find((entry) => inView(entry) && !isBead(entry.el)) ??
       all.find(inView) ??
       all[0];
     if (next === stop) return;
@@ -653,6 +822,9 @@ export function createLights(
   const resized = () => {
     measure();
     end();
+    // A new box is new room for the pills beside the list.
+    dirty = true;
+    queue();
   };
   /** A move begins: the lights step aside for their pictures. */
   const begin = () => {
@@ -673,8 +845,9 @@ export function createLights(
     const at = map.project(origin);
     const k = 2 ** (map.getZoom() - restZoom);
     drawLights(canvas, drawn, k, at.x, at.y, dpr());
-    for (const { el, x, y } of live) moveTo(el, k * x + at.x, k * y + at.y);
-    for (const { el, x, y } of waiting) moveTo(el, k * x + at.x, k * y + at.y);
+    // A pill moved off its spot stays as far off it, whatever the zoom.
+    for (const { el, x, y, dx, dy } of [...live, ...waiting])
+      moveTo(el, k * x + at.x + dx, k * y + at.y + dy);
   };
   /** At rest: the buttons back, where the camera has them. */
   const end = () => {
@@ -691,22 +864,34 @@ export function createLights(
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, canvas.width, canvas.height);
   };
-  /** Whether the last press was a finger's, which a dot's card waits for. */
-  let touched = false;
-  const onPress = (event: PointerEvent) => {
-    touched = event.pointerType !== "mouse";
-  };
-  window.addEventListener("pointerdown", onPress, true);
-  /**
-   * A light pressed: its place, but for a dot under a finger, which has no
-   * hover to show its card: the first tap pins the card, with the link.
-   */
-  const press = (spot: Spot, pointer: boolean) => {
+  /** A light pressed: its place, and whether it was a bead. */
+  const press = (spot: Spot) => {
     const entry = entries.get(spot.id);
-    if (!entry || !pointer || !touched || !isDot(entry.el))
-      return onSelect(spot);
-    if (card.open === entry && card.pinned) card.hide();
-    else card.show(entry, true);
+    onSelect(spot, !!entry && isBead(entry.el));
+  };
+  /**
+   * The light under the mouse beside the list, or on the keys: its pill lit
+   * and its card outlined, by the page (`onHover`). Among beads the nearest
+   * to the pointer, their reaches overlapping.
+   */
+  let hovered: Entry | null = null;
+  const hover = (entry: Entry | null) => {
+    if (entry === hovered) return;
+    hovered = entry;
+    onHover?.(entry?.spot ?? null);
+  };
+  /** The bead nearest a point on the page, within a bead's reach of it. */
+  const nearestBead = (x: number, y: number): Entry | null => {
+    const frame = map.getContainer().getBoundingClientRect();
+    const id = nearestLight(
+      [...entries]
+        .filter(([, e]) => isBead(e.el) && !e.el.classList.contains("lt-under"))
+        .map(([id, e]) => ({ id, x: e.x, y: e.y })),
+      x - frame.left,
+      y - frame.top,
+      BEAD_REACH,
+    );
+    return id ? (entries.get(id) ?? null) : null;
   };
   for (const spot of spots) {
     const el = document.createElement("button");
@@ -731,9 +916,12 @@ export function createLights(
       wedge: el.querySelector<SVGPathElement>(".lt-wedge path")!,
       figure: el.querySelector<SVGTextElement>(".lt-n")!,
       sub: el.querySelector<HTMLElement>(".lt-lab i")!,
-      pillTurn: el.querySelector<SVGGElement>(".lt-pa g")!,
-      pillWind: el.querySelector<HTMLElement>(".lt-kn")!,
-      pillGust: el.querySelector<HTMLElement>(".lt-gu")!,
+      pill: el.querySelector<HTMLElement>(".lt-pill")!,
+      pillSays: "",
+      order: null,
+      dx: 0,
+      dy: 0,
+      notch: "",
       key: "",
     };
     el.addEventListener("click", (event) => {
@@ -746,25 +934,36 @@ export function createLights(
         (event.target as Element).closest?.(".lt-lab")
       )
         return onOpen(spot);
-      press(meant(spot, el, event), event.detail > 0);
+      press(meant(spot, el, event));
     });
-    // A dot under the mouse opens its card, and lights nothing: `lit` is for
-    // a spot on the list, and would fade every other mark.
     el.addEventListener("pointerenter", (event) => {
-      if (event.pointerType !== "mouse") return;
-      if (!isDot(el)) onHover?.(spot);
-      else if (!card.pinned) card.show(entry, false);
+      if (event.pointerType !== "mouse" || plain()) return;
+      onHover?.(spot);
+    });
+    // Beside the list: a pill is the one under the pointer; over a bead's
+    // reach, the nearest bead, until its light pill is under the pointer.
+    el.addEventListener("pointermove", (event) => {
+      if (event.pointerType !== "mouse" || !plain()) return;
+      const onPill = (event.target as Element).closest?.(".lt-pill");
+      hover(
+        isBead(el) && !onPill
+          ? (nearestBead(event.clientX, event.clientY) ?? entry)
+          : entry,
+      );
     });
     el.addEventListener("pointerleave", (event) => {
       if (event.pointerType !== "mouse") return;
-      onHover?.(null);
-      if (card.open === entry && !card.pinned) card.hide();
+      if (!plain()) return onHover?.(null);
+      // Onto another light: its own move takes the hover.
+      const next = (event.relatedTarget as Element | null)?.closest?.(".lt");
+      if (next && layer.contains(next)) return;
+      hover(null);
     });
     el.addEventListener("focus", () => {
-      if (isDot(el) && !card.pinned) card.show(entry, false);
+      if (plain()) hover(entry);
     });
     el.addEventListener("blur", () => {
-      if (card.open === entry && !card.pinned) card.hide();
+      if (plain() && hovered === entry) hover(null);
     });
     // As MapLibre's markers do: a press on a light neither drags it as an
     // image nor moves the focus.
@@ -782,11 +981,12 @@ export function createLights(
     const frame = box.getBoundingClientRect();
     const at = map.project(origin);
     const k = 2 ** (map.getZoom() - restZoom);
-    const centres = [...entries].map(([id, { el, x, y }]) => ({
+    // A pill as drawn: off its spot by as much as it was placed.
+    const centres = [...entries].map(([id, { el, x, y, dx, dy }]) => ({
       id,
-      x: frame.left + k * x + at.x,
-      y: frame.top + k * y + at.y,
-      dot: isDot(el),
+      x: frame.left + k * x + at.x + dx,
+      y: frame.top + k * y + at.y + dy,
+      dot: isBead(el),
     }));
     // A button's reach (src/map.css .lt::before): 44 px across under a
     // finger, 32 under a mouse.
@@ -796,12 +996,12 @@ export function createLights(
       event.clientX,
       event.clientY,
       reach,
-      DOT_REACH,
+      BEAD_REACH / 2,
     );
     const spot = id ? byId.get(id) : undefined;
     if (!spot) return;
     event.stopPropagation();
-    press(spot, true);
+    press(spot);
   };
   window.addEventListener("click", tapped, true);
   measure();
@@ -810,53 +1010,8 @@ export function createLights(
   map.on("move", follow);
   map.on("moveend", end);
   map.on("resize", resized);
-  /** What a dot's card reads, as the lights were last told it. */
-  let readings: ReadonlyMap<string, LightState> = new Map();
-  let shownIn: Units = "kn";
-  let shownWhen: string | null = null;
-  // Made after `follow` takes the map's `move`, so it stands by the button
-  // as moved for this frame, not the last.
-  const card = createMapCard<Entry>(map, "lt-card", ({ spot }, el) => {
-    const s = readings.get(spot.id);
-    const words = dotWords(s, shownWhen, shownIn);
-    el.replaceChildren();
-    const head = part("div", "map-card-head");
-    head.append(part("b", "map-card-name", spot.name));
-    if (spot.county)
-      head.append(part("span", "map-card-net", `Co. ${spot.county}`));
-    el.append(head);
-    if (words.calm) {
-      const figures = part("div", "map-card-wind");
-      figures.append(part("b", "map-card-speed", "Calm"));
-      el.append(figures);
-    } else if (words.speed !== null) {
-      const figures = part("div", "map-card-wind");
-      const from = s?.from ?? null;
-      figures.append(
-        arrowSvg(from).svg,
-        part("b", "map-card-speed", words.speed),
-        ...(words.gust
-          ? [part("span", "map-card-gust", `g${words.gust}`)]
-          : []),
-        ...(shownIn === "bft"
-          ? []
-          : [part("span", "map-card-unit", unitLabel(shownIn))]),
-        ...(s?.compass ? [part("span", "map-card-from", s.compass)] : []),
-      );
-      el.append(figures);
-    }
-    el.append(part("div", "map-card-when", words.line));
-    if (card.pinned && link) {
-      const open = part("a", "map-card-link", "Open spot") as HTMLAnchorElement;
-      open.href = link(spot);
-      el.append(open);
-    }
-  });
   return {
-    update(states, selected, named, label, units, when = null) {
-      readings = states;
-      shownIn = units;
-      shownWhen = when;
+    update(states, selected, named, label, units) {
       for (const spot of spots) {
         const entry = entries.get(spot.id);
         if (!entry) continue;
@@ -864,7 +1019,7 @@ export function createLights(
         const on = spot.id === selected;
         const w = s?.wedge;
         const key = s
-          ? `${s.pending}|${s.stars}|${s.dark}|${s.mark}|${s.from === null ? "" : Math.round(s.from)}|${s.windKn === null ? "" : speedShort(s.windKn, units)}|${s.gustKn == null ? "" : speedShort(s.gustKn, units)}|${w ? `${Math.round(w.from)},${Math.round(w.to)},${Math.round(w.power * 20)},${w.state}` : ""}|${on}|${named.has(spot.id)}|${!!s.unlisted}`
+          ? `${s.pending}|${s.stars}|${s.dark}|${s.mark}|${s.from === null ? "" : Math.round(s.from)}|${s.windKn === null ? "" : speedShort(s.windKn, units)}|${w ? `${Math.round(w.from)},${Math.round(w.to)},${Math.round(w.power * 20)},${w.state}` : ""}|${on}|${named.has(spot.id)}|${s.order ?? ""}|${pillKey(s.pill ?? null)}`
           : `none|${on}|${named.has(spot.id)}`;
         if (entry.key === key) continue;
         entry.key = key;
@@ -883,7 +1038,6 @@ export function createLights(
           ...(w?.state === "over" ? ["w-over"] : []),
           ...(on ? ["sel", "active"] : []),
           ...(named.has(spot.id) ? ["named"] : []),
-          ...(s?.unlisted ? ["lt-dot"] : []),
         ]);
         for (const name of MANAGED) el.classList.toggle(name, want.has(name));
         entry.figure.textContent =
@@ -894,24 +1048,14 @@ export function createLights(
             `rotate(${Math.round(s.from + 180)})`,
           );
           entry.arrow.style.display = "";
-          entry.pillTurn.setAttribute(
-            "transform",
-            `rotate(${Math.round(s.from + 180)})`,
-          );
-          entry.pillTurn.style.display = "";
-        } else {
-          entry.arrow.style.display = "none";
-          entry.pillTurn.style.display = "none";
+        } else entry.arrow.style.display = "none";
+        // The plain map's pill: what it says, and its place among the pills.
+        const says = pillKey(s?.pill ?? null);
+        if (says !== entry.pillSays) {
+          entry.pillSays = says;
+          entry.pill.innerHTML = pillHtml(s?.pill ?? null);
         }
-        // The pill's figures: the wind, and the gust raised beside it.
-        entry.pillWind.textContent =
-          s && !s.pending && s.windKn !== null
-            ? speedShort(s.windKn, units)
-            : "";
-        entry.pillGust.textContent =
-          s && !s.pending && s.windKn !== null && s.gustKn != null
-            ? speedShort(s.gustKn, units)
-            : "";
+        entry.order = s?.order ?? null;
         if (w && level.startsWith("s")) {
           entry.wedge.setAttribute("d", wedgePath(w));
           entry.pulse.style.display = "";
@@ -934,12 +1078,6 @@ export function createLights(
       }
       if (dirty) queue();
       rove();
-      // The card keeps up with its dot, or goes with it onto the list.
-      const shown = card.open;
-      if (shown) {
-        if (isDot(shown.el)) card.show(shown, card.pinned);
-        else card.hide();
-      }
     },
     element: (id) => entries.get(id)?.el,
     choose(id) {
@@ -969,6 +1107,12 @@ export function createLights(
       }
       layer.classList.toggle("has-lit", id !== null && entries.has(id));
     },
+    foot(px) {
+      if (px === footRoom) return;
+      footRoom = px;
+      dirty = true;
+      queue();
+    },
     destroy() {
       cancelAnimationFrame(queued);
       classes.disconnect();
@@ -978,8 +1122,6 @@ export function createLights(
       map.off("move", follow);
       map.off("moveend", end);
       map.off("resize", resized);
-      card.destroy();
-      window.removeEventListener("pointerdown", onPress, true);
       window.removeEventListener("click", tapped, true);
       layer.removeEventListener("keydown", onKey);
       layer.removeEventListener("focusin", onFocus);
