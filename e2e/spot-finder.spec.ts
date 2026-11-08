@@ -417,6 +417,11 @@ test.describe("on a desktop", () => {
   test("the waves in metres, and water the sea's waves do not reach keeps its Waves row, empty", async ({
     page,
   }) => {
+    // GFS-Wave alone: the sample's SWAN run, which the finder would read
+    // first, starts a day after the evening this test looks at.
+    await page.route("**/weather/mi-swan.json", (route) =>
+      route.fulfill({ status: 404 }),
+    );
     // Keel as a lough: the wave run is read, and does not have it.
     await page.route("**/gfs-wave-*/spots/*.json", async (route) => {
       const response = await route.fetch();
