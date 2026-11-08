@@ -1920,8 +1920,18 @@ export default function App() {
    */
   const [panelView, setPanelView] = useState<ViewBounds | null>(null);
   useEffect(() => {
-    if (listFollows && pageRef.current === "finder") setPanelView(mapView);
-  }, [listFollows, mapView]);
+    if (!listFollows || pageRef.current !== "finder") return;
+    // The map above the dock: what the rider sees, and its middle the one a
+    // fit centres, since the camera keeps fitted spots clear of the dock.
+    const map = controls.current?.map;
+    if (!mapView || !map || dockRoom <= 0) return setPanelView(mapView);
+    const box = map.getContainer();
+    const foot = map.unproject([
+      box.clientWidth / 2,
+      box.clientHeight - dockRoom,
+    ]);
+    setPanelView({ ...mapView, south: Math.max(mapView.south, foot.lat) });
+  }, [listFollows, mapView, dockRoom]);
   /**
    * A card under the pointer: its light lit, and on Favourites brought into
    * view if it is not. Never on Nearby: its cards are the spots in view
