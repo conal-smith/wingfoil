@@ -279,8 +279,6 @@ const SPLIT = "(min-width: 1100px)";
  */
 const FIELD_SOURCES: FieldSources = { waves: false };
 const OFFERED = offeredFields(FIELD_SOURCES);
-/** The height the map's dock takes over the scrub bar on a phone, its gap with it. */
-const MAP_DOCK_ROOM = 60;
 /** How long the chart takes to open out from beside the list, or back. */
 const OPEN_MS = 420;
 
@@ -607,6 +605,11 @@ export default function App() {
 
   const dock = useRef<HTMLDivElement>(null);
   const [dockHeight, setDockHeight] = useState(110);
+  /**
+   * The room the map's dock takes at the map's foot (src/MapDock.tsx): over
+   * the scrub bar on the chart, the bar's height with it.
+   */
+  const [dockRoom, setDockRoom] = useState(0);
   const [clockNow, setClockNow] = useState(() => Date.now());
   const modelRequest = useRef<AbortController | null>(null);
   const [pendingModel, setPendingModel] = useState<ModelId | null>(null);
@@ -2502,6 +2505,7 @@ export default function App() {
   /** The map's dock: its field's chips and legend, and beside the list the day's hours. */
   const mapDock = (hours: boolean) => (
     <MapDock
+      onRoom={setDockRoom}
       field={fieldShown}
       offered={OFFERED}
       onField={chooseField}
@@ -2762,7 +2766,12 @@ export default function App() {
                     rain={rain.view}
                     satellite={onChart ? satellite.image : null}
                     reducedMotion={reducedMotion}
-                    bottomInset={barShown ? dockHeight : 0}
+                    // Clear of the scrub bar and of the map's dock over it,
+                    // so a fitted spot never lands under either.
+                    bottomInset={Math.max(
+                      barShown ? dockHeight : 0,
+                      dockRoom,
+                    )}
                     phone={phone}
                     onSelect={(spot) =>
                       pageRef.current === "chart"
@@ -2996,8 +3005,8 @@ export default function App() {
             }
             // Over the scrub bar and the lane its pill rides in, and on a
             // phone over the map's dock too, which is the screen's width there.
-            launcherBottom={dockHeight + (phone ? MAP_DOCK_ROOM : 0) + 24}
-            panelBottom={dockHeight + (phone ? MAP_DOCK_ROOM : 0) + 12}
+            launcherBottom={(phone ? dockRoom : dockHeight) + 24}
+            panelBottom={(phone ? dockRoom : dockHeight) + 12}
           />
         </Suspense>
       )}

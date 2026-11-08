@@ -1,5 +1,11 @@
 import { CloudSun, Waves, Wind } from "lucide-react";
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { Chip } from "../ui/Chip";
 import {
   FIELD_NAMES,
@@ -34,6 +40,7 @@ export default function MapDock({
   onField,
   phone,
   where,
+  onRoom,
   children,
 }: {
   /** The field the map draws. */
@@ -44,9 +51,37 @@ export default function MapDock({
   phone: boolean;
   /** The page it is on: beside the list, or on the full chart. */
   where: "finder" | "chart";
+  /**
+   * The room it takes at the map's foot, from its top to the foot of the box
+   * it stands in, as it changes: the map keeps what it fits clear of it.
+   */
+  onRoom?: (px: number) => void;
   /** The hour bar, where the page has one. */
   children?: ReactNode;
 }) {
+  const dock = useRef<HTMLDivElement>(null);
+  const room = useRef(onRoom);
+  room.current = onRoom;
+  useLayoutEffect(() => {
+    const el = dock.current;
+    const holder = el?.offsetParent;
+    if (!el || !holder) return;
+    const measure = () =>
+      room.current?.(
+        Math.round(
+          holder.getBoundingClientRect().bottom -
+            el.getBoundingClientRect().top,
+        ),
+      );
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    watch.observe(holder);
+    return () => {
+      watch.disconnect();
+      room.current?.(0);
+    };
+  }, [where]);
   const chips = useRef<HTMLDivElement>(null);
   // The chip Tab stops on: the last one the keys were on, else the one on,
   // else the first.
@@ -95,6 +130,7 @@ export default function MapDock({
   };
   return (
     <div
+      ref={dock}
       className="map-dock"
       data-map-dock={where}
       data-field={field}
