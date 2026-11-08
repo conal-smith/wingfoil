@@ -71,6 +71,16 @@ export function spotsBounds(
 export const fitPadding = { top: 64, bottom: 48, left: 44, right: 64 };
 
 /**
+ * The same, kept clear of the map's dock at its foot too (src/MapDock.tsx):
+ * `dock` is the room the dock takes from the chart's foot, and a fitted place
+ * stands a margin above it.
+ */
+export const fitPaddingOver = (dock: number) => ({
+  ...fitPadding,
+  bottom: Math.max(fitPadding.bottom, dock + 24),
+});
+
+/**
  * Whether a point on the chart (its pixel `x`, `y`) is comfortably inside
  * it: more than 18% of the chart's width or height from each edge, and at
  * least 70 px. A card for a place that is, only lights it; one that is not

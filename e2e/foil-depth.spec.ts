@@ -1,8 +1,9 @@
 import {
+  FIELD_KEY,
   barPill,
-  closeLayers,
   expect,
-  setLayer,
+  mapDock,
+  setField,
   test,
   timeSlider,
   type Page,
@@ -90,11 +91,10 @@ async function open(page: Page, ranges: boolean) {
         headers: { "content-type": "application/octet-stream" },
       });
     });
-  await page.addInitScript(() =>
-    localStorage.setItem(
-      "wingfoil.map.layers.v1",
-      JSON.stringify({ foil: true }),
-    ),
+  // No field on the map: the tidal depth is drawn.
+  await page.addInitScript(
+    (key) => localStorage.setItem(key, "none"),
+    FIELD_KEY,
   );
   // No flights and no drifting arrows: the same chart, photographed twice,
   // is the same picture.
@@ -133,11 +133,12 @@ function trackArchives(page: Page) {
  */
 async function photograph(page: Page) {
   const map = (await page.locator(".maplibregl-canvas").boundingBox())!;
-  // Clear of the scrub bar, and of the pill over its playhead, which moves
-  // along with the hour.
+  // Clear of the scrub bar, of the pill over its playhead, which moves
+  // along with the hour, and of the map's dock over them, whose chips change.
   const foot = Math.min(
     (await page.locator(".map-footer").boundingBox())!.y,
     (await barPill(page).boundingBox())!.y,
+    (await mapDock(page).boundingBox())!.y + 40,
   );
   const clip = {
     x: map.x + 80,
@@ -212,9 +213,9 @@ for (const ranges of [true, false])
     await slider.fill(String(low.i));
     await expect(slider).toHaveValue(String(low.i));
     const atLow = await photograph(page);
-    // The same hour with the layer off.
-    await setLayer(page, "Tidal depth", false);
-    await closeLayers(page);
+    // The same hour with the layer off: a field on in its place, Weather,
+    // whose rain is clear where it is dry.
+    await setField(page, "Weather", true);
     const off = await photograph(page);
 
     // The tints are over the estuary at both tides, and the tide moves them.

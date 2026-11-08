@@ -1,10 +1,19 @@
-import { barReady, expect, test, type Page } from "./fixtures";
+import {
+  barReady,
+  expect,
+  fieldChip,
+  mapDock,
+  test,
+  type Page,
+} from "./fixtures";
 
 /**
  * The layers' rail (src/LayerRail.tsx), the one way to the layers: Layers
  * under the zoom opens a column of round switches beside it, one a layer, in
  * the groups of src/layerGroups.tsx, on a desktop and on a phone. There is no
- * panel behind it; where it would run into the scrub bar it scrolls.
+ * panel behind it; where it would run into the scrub bar, or the map's dock
+ * over it, it scrolls. What colours the map is the dock's field, not a layer
+ * of the rail's (the ruling of 2026-11-07).
  */
 
 const RAIL_KEY = "wingfoil.map.rail.v1";
@@ -25,11 +34,15 @@ async function openSpot(page: Page, width: number, height: number) {
   await barReady(page);
 }
 
-/** The top of the chart's foot: the scrub bar, the full width of the map. */
+/**
+ * The top of the chart's foot: the scrub bar, the full width of the map, and
+ * the map's dock standing over it.
+ */
 const barTop = async (page: Page) =>
   Math.min(
     (await page.locator(".map-footer").boundingBox())!.y,
     (await page.locator(".scrub").boundingBox())!.y,
+    (await mapDock(page).boundingBox())!.y,
   );
 
 /** Each group's name and its layers' names, top to bottom. */
@@ -78,17 +91,16 @@ test("on a desktop, Layers opens the rail beside the zoom, clear of the scrub ba
   // a phone (the owner's ruling of 2026-11-02). The names are always drawn,
   // the depths one switch (the ruling of 2026-11-03); the satellite is one
   // button for either tide; the loupe is on or off, the range ring standing
-  // in for it.
+  // in for it. Coloured wind, Tidal depth and Rain are the dock's field now.
   expect(await groupsOf(rail(page))).toEqual([
-    ["Wind", ["Coloured wind", "Particles", "Live wind"]],
-    ["Sea", ["Tidal depth", "Currents", "Depths"]],
-    ["Weather", ["Rain"]],
+    ["Wind", ["Particles", "Live wind"]],
+    ["Sea", ["Currents", "Depths"]],
     ["Ground", ["Satellite, high tide"]],
     ["Round your spot", ["Loupe"]],
   ]);
 });
 
-test("the rail's switches: a layer on and off, the wind's two layers each by itself, the loupe or the ring, one tide or none", async ({
+test("the rail's switches: a layer on and off, the particles by themselves, the loupe or the ring, one tide or none", async ({
   page,
 }) => {
   await openSpot(page, 1440, 900);
@@ -96,54 +108,33 @@ test("the rail's switches: a layer on and off, the wind's two layers each by its
   await expect(rail(page)).toBeVisible();
 
   // A layer, on and off.
-  await expect(railButton(page, "Rain")).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
-  await railButton(page, "Rain").click();
-  await expect(railButton(page, "Rain")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  const live = railButton(page, "Live wind");
+  await expect(live).toHaveAttribute("aria-pressed", "false");
+  await live.click();
+  await expect(live).toHaveAttribute("aria-pressed", "true");
   // Its name, and whether it is on, to its left under the pointer.
-  await railButton(page, "Rain").hover();
-  const tip = railButton(page, "Rain").locator(".lr-tip");
+  await live.hover();
+  const tip = live.locator(".lr-tip");
   await expect(tip).toBeVisible();
-  await expect(tip).toContainText("Rain · on");
+  await expect(tip).toContainText("Live wind · on");
   const at = (await tip.boundingBox())!;
-  const button = (await railButton(page, "Rain").boundingBox())!;
+  const button = (await live.boundingBox())!;
   expect(at.x + at.width).toBeLessThanOrEqual(button.x);
-  await railButton(page, "Rain").click();
-  await expect(railButton(page, "Rain")).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
+  await live.click();
+  await expect(live).toHaveAttribute("aria-pressed", "false");
 
-  // The wind's two layers, each on and off by itself: the coloured wind on
-  // leaves the particles on over it, and they go off and on alone.
-  await railButton(page, "Coloured wind").click();
-  await expect(railButton(page, "Coloured wind")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(railButton(page, "Particles")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await railButton(page, "Particles").click();
-  await expect(railButton(page, "Particles")).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
-  await expect(railButton(page, "Coloured wind")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await railButton(page, "Particles").click();
-  await expect(railButton(page, "Particles")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  // The particles, off and on by themselves, and on under the dock's Wind,
+  // which leaves them as they are.
+  const particles = railButton(page, "Particles");
+  await expect(particles).toHaveAttribute("aria-pressed", "true");
+  await particles.click();
+  await expect(particles).toHaveAttribute("aria-pressed", "false");
+  await fieldChip(page, "Wind").click();
+  await expect(fieldChip(page, "Wind")).toHaveAttribute("aria-pressed", "true");
+  await expect(particles).toHaveAttribute("aria-pressed", "false");
+  await particles.click();
+  await expect(particles).toHaveAttribute("aria-pressed", "true");
+  await expect(fieldChip(page, "Wind")).toHaveAttribute("aria-pressed", "true");
   // Round the spot: the range ring, or the loupe in its place, and pressed
   // again the ring.
   const loupe = railButton(page, "Loupe");
@@ -183,7 +174,7 @@ test("the rail stays open or shut on the device, as it was left", async ({
 }) => {
   await openSpot(page, 1440, 900);
   await zoomLayers(page).click();
-  await railButton(page, "Coloured wind").click();
+  await railButton(page, "Live wind").click();
   expect(
     await page.evaluate((key) => localStorage.getItem(key), RAIL_KEY),
   ).toBe("1");
@@ -191,7 +182,7 @@ test("the rail stays open or shut on the device, as it was left", async ({
   // next.
   await page.reload();
   await expect(rail(page)).toBeVisible({ timeout: 30000 });
-  await expect(railButton(page, "Coloured wind")).toHaveAttribute(
+  await expect(railButton(page, "Live wind")).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -215,29 +206,27 @@ test("the rail is a toolbar: one stop on Tab, the arrows walk it, Space switches
   await expect(rail(page)).toBeVisible();
   await expect(rail(page)).toHaveAttribute("aria-orientation", "vertical");
   await page.keyboard.press("Tab");
-  await expect(railButton(page, "Coloured wind")).toBeFocused();
-  // Its name shows on the keys' focus too.
-  await expect(
-    railButton(page, "Coloured wind").locator(".lr-tip"),
-  ).toBeVisible();
-  await page.keyboard.press("ArrowDown");
   await expect(railButton(page, "Particles")).toBeFocused();
+  // Its name shows on the keys' focus too.
+  await expect(railButton(page, "Particles").locator(".lr-tip")).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(railButton(page, "Live wind")).toBeFocused();
   await page.keyboard.press("Space");
+  await expect(railButton(page, "Live wind")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("ArrowUp");
+  await expect(railButton(page, "Particles")).toBeFocused();
+  await page.keyboard.press("Enter");
   await expect(railButton(page, "Particles")).toHaveAttribute(
     "aria-pressed",
     "false",
   );
-  await page.keyboard.press("ArrowUp");
-  await expect(railButton(page, "Coloured wind")).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(railButton(page, "Coloured wind")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
   await page.keyboard.press("End");
   await expect(railButton(page, "Loupe")).toBeFocused();
   await page.keyboard.press("Home");
-  await expect(railButton(page, "Coloured wind")).toBeFocused();
+  await expect(railButton(page, "Particles")).toBeFocused();
   // One stop: Tab leaves the rail, and Shift+Tab comes back to where it was.
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
@@ -247,7 +236,7 @@ test("the rail is a toolbar: one stop on Tab, the arrows walk it, Space switches
     await rail(page).evaluate((el) => el.contains(document.activeElement)),
   ).toBe(false);
   await page.keyboard.press("Shift+Tab");
-  await expect(railButton(page, "Tidal depth")).toBeFocused();
+  await expect(railButton(page, "Depths")).toBeFocused();
 });
 
 test("the scrub bar has no Layers of its own; where the rail would run into the bar, it scrolls above it", async ({
@@ -310,11 +299,10 @@ test.describe("on a phone", () => {
     expect(Math.abs(box.x + box.width - (zbox.x + zbox.width))).toBeLessThan(2);
     expect(box.y).toBeGreaterThanOrEqual(zbox.y + zbox.height);
     expect(box.y + box.height).toBeLessThanOrEqual(await barTop(page));
-    const first = (await railButton(page, "Coloured wind").boundingBox())!;
+    const first = (await railButton(page, "Particles").boundingBox())!;
     expect(first.y).toBeGreaterThanOrEqual(head.y + head.height);
-    // Every layer in the room there, or for a spot's week open under it,
-    // scrolled by no more than a switch: Live wind made it nine (the ruling
-    // of 2026-11-03), a switch more than the room over a phone's open dock.
+    // Every layer in the room there, or for a spot's week open under it and
+    // the map's dock over that, scrolled by no more than a switch.
     expect(
       await rail(page).evaluate(
         (el) => el.scrollHeight <= el.clientHeight + 48,
@@ -340,27 +328,32 @@ test.describe("on a phone", () => {
   });
 });
 
-test("coloured wind and the tidal depth turn each other off", async ({
+test("the rail colours nothing: the dock's chips choose the map's field, and the rail's layers stay as they were", async ({
   page,
 }) => {
   await page.goto("/?map");
   await zoomLayers(page).click();
-  await railButton(page, "Coloured wind").click();
-  await expect(railButton(page, "Coloured wind")).toHaveAttribute(
+  await expect(rail(page)).toBeVisible();
+  for (const name of ["Coloured wind", "Tidal depth", "Rain"])
+    await expect(railButton(page, name)).toHaveCount(0);
+  await railButton(page, "Currents").click();
+  await expect(railButton(page, "Currents")).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await expect(railButton(page, "Tidal depth")).toHaveAttribute(
+  // Weather on, then Wind in its place: the rail's own layers are untouched.
+  await fieldChip(page, "Weather").click();
+  await fieldChip(page, "Wind").click();
+  await expect(fieldChip(page, "Weather")).toHaveAttribute(
     "aria-pressed",
     "false",
   );
-  await railButton(page, "Tidal depth").click();
-  await expect(railButton(page, "Tidal depth")).toHaveAttribute(
+  await expect(railButton(page, "Currents")).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await expect(railButton(page, "Coloured wind")).toHaveAttribute(
+  await expect(railButton(page, "Particles")).toHaveAttribute(
     "aria-pressed",
-    "false",
+    "true",
   );
 });

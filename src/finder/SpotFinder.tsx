@@ -216,7 +216,8 @@ export interface FinderProps {
   stations?: readonly WindStation[] | null;
   /**
    * The hour picked on the cards' bars, or null for the hour the day stands
-   * at; App keeps it, so the page shares one time. Kept here when not given.
+   * at; App keeps it, so the page shares one time (the hour bar on the map
+   * beside the list picks it too). Kept here when not given.
    */
   picked?: number | null;
   /** An hour is picked on a card, or let go (null). */

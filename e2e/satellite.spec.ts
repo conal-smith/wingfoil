@@ -1,4 +1,5 @@
 import {
+  FIELD_KEY,
   barPill,
   closeLayers,
   expect,
@@ -36,11 +37,11 @@ function trackArchives(page: Page) {
 
 async function open(page: Page) {
   trackArchives(page);
-  // The foil layer off, so the photographs are of the image and the chart only.
+  // No field over the image: the plain map, whose tidal depth is the same in
+  // every photograph here, as the hour never changes between them.
   await page.addInitScript((key) => {
-    if (!localStorage.getItem(key))
-      localStorage.setItem(key, JSON.stringify({ foil: false }));
-  }, LAYERS_KEY);
+    if (!localStorage.getItem(key)) localStorage.setItem(key, "none");
+  }, FIELD_KEY);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?spot=kilcrea");
   await expect(page.locator(".spot-marker").first()).toBeAttached({
@@ -210,7 +211,11 @@ test("the satellite image draws at high and at low tide in the Malahide estuary,
     LAYERS_KEY,
   );
   expect(stored.satellite).toBe("low");
-  expect(stored.foil).toBe(false);
+  // The field is kept on its own, not in the layers' store.
+  expect(stored.foil).toBeUndefined();
+  expect(
+    await page.evaluate((key) => localStorage.getItem(key), FIELD_KEY),
+  ).toBe("none");
   await page.reload();
   await expect(page.locator("[data-satellite='low']")).toHaveCount(1, {
     timeout: 30000,
