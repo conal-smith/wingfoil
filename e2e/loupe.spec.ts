@@ -203,43 +203,6 @@ test("a spot with no shore facing: no red, no out or home, the needle and the re
   expect(await labels(page)).not.toContain("Out");
 });
 
-test("on a phone the rose fits above the scrub bar, and stays readable zoomed out or in", async ({
-  page,
-}) => {
-  await open(page, "dollymount", 390, 844);
-  const reading = await firstHour(page, "Cross");
-  const r = rose(page);
-  // Flown in to fit: the rim inside the screen's width, its foot box above
-  // the scrub bar (the rim is the one fine line now, the bezel's inner edge).
-  const rim = await page.locator(".map-loupe-edge.is-inner").boundingBox();
-  expect(rim!.x).toBeGreaterThanOrEqual(0);
-  expect(rim!.x + rim!.width).toBeLessThanOrEqual(390);
-  const foot = await r.locator(".map-loupe-foot-box").boundingBox();
-  const bar = await scrubBar(page).boundingBox();
-  expect(foot!.y + foot!.height).toBeLessThanOrEqual(bar!.y);
-  await expect(r.locator(".map-rose-fan.is-out")).toHaveCount(1);
-  await expect(r.locator(".map-loupe-reading")).toHaveText(reading);
-
-  // Zoomed far out the rose is held at its smallest: no fans, the wind stays.
-  const zoomOut = page.getByRole("button", { name: "Zoom out", exact: true });
-  for (let i = 0; i < 4; i++) await zoomOut.click();
-  await expect(r.locator(".map-rose-fan")).toHaveCount(0);
-  await expect(r.locator(".map-rose-nogo")).toHaveCount(0);
-  await expect(r.locator(".map-dial-needle")).toHaveCount(1);
-  await expect.poll(() => radius(page)).toBeCloseTo(70, 0);
-  expect(await labels(page)).not.toContain("0.5 NM");
-
-  // Zoomed all the way in the bezel runs off the screen; the box stays in view.
-  const zoomIn = page.getByRole("button", { name: "Zoom in", exact: true });
-  for (let i = 0; i < 6; i++) await zoomIn.click();
-  await expect.poll(() => radius(page)).toBeGreaterThan(195);
-  const pinned = await r.locator(".map-loupe-foot-box").boundingBox();
-  const barNow = await scrubBar(page).boundingBox();
-  expect(pinned!.y + pinned!.height).toBeLessThanOrEqual(barNow!.y);
-  expect(pinned!.x).toBeGreaterThanOrEqual(0);
-  expect(pinned!.x + pinned!.width).toBeLessThanOrEqual(390);
-});
-
 test("degrees into the wind and below across: set in Settings, they move the course, and are kept", async ({
   page,
 }) => {

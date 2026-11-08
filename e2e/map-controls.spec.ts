@@ -19,7 +19,7 @@ import {
 test("the chart's controls: zoom and Layers on the right, Layers the rail on a phone, the menu by keyboard, with the credits behind the i", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 800, height: 844 });
   await page.goto("/?map");
   await expect(page.locator(".spot-marker")).toHaveCount(149, {
     timeout: 30000,
@@ -209,7 +209,7 @@ test("the map's information is one dialog over the dimmed chart, from the menu's
   ).toHaveAttribute("href", "/stars?spot=brandon");
 });
 
-for (const width of [390, 1440]) {
+for (const width of [800, 1440]) {
   test(`the menu is the forecast, your settings, help and more, in named groups, at ${width}px`, async ({
     page,
   }) => {

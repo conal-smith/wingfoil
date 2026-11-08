@@ -175,14 +175,12 @@ test("a thread with a spot shows its name, its wind now and the way to the map",
     path: "test-results/community-spot-card-mobile.png",
   });
 
-  // The link is a page load into the map, which opens on the spot.
+  // The link is a page load: a phone has no chart, so the spot's own page.
   await card(page).click();
-  await expect(page).toHaveURL(/\/\?spot=dollymount$/);
-  await expect(page.locator('[data-spot-id="dollymount"]')).toHaveClass(
-    /active/,
-    { timeout: 30000 },
-  );
-  await expect(barName(page)).toHaveText("Dollymount");
+  await expect(page).toHaveURL(/\/spot\/dollymount/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Dollymount", exact: true }),
+  ).toBeVisible({ timeout: 30000 });
 });
 
 test("a thread without a spot shows no card, and neither does a spot the map does not list", async ({

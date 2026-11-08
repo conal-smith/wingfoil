@@ -1,6 +1,6 @@
 import { barName, expect, scrubBar, test, timeSlider } from "./fixtures";
 
-for (const width of [390, 1440]) {
+for (const width of [800, 1440]) {
   test(`a light opens its spot in the scrub bar, with no box over the map, at ${width}px`, async ({
     page,
   }) => {

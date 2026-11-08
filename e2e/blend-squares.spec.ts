@@ -22,26 +22,35 @@ test("the lights read the blend's squares in view, and nothing where the blend h
     const path = new URL(response.url()).pathname;
     const square = SQUARE.exec(path)?.[1];
     if (square) squares.push(square);
-    if (path.endsWith("/weather/blend.json")) pointers.push(await response.json());
+    if (path.endsWith("/weather/blend.json"))
+      pointers.push(await response.json());
     if (path.includes("/weather/blend") && !response.ok())
       problems.push(`${path} answered ${response.status()}`);
   });
   page.on("pageerror", (error) => problems.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error" && /blend|square|spots\//i.test(message.text()))
+    if (
+      message.type() === "error" &&
+      /blend|square|spots\//i.test(message.text())
+    )
       problems.push(message.text());
   });
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?map");
   // All of Ireland is in view: every place rated, from Ireland's squares.
-  await expect(page.locator(".spot-marker")).toHaveCount(149, { timeout: 30000 });
+  await expect(page.locator(".spot-marker")).toHaveCount(149, {
+    timeout: 30000,
+  });
   await expect(page.locator(".spot-marker.pending")).toHaveCount(0, {
     timeout: 30000,
   });
   // The pointer names the squares and carries no places of its own.
   expect(pointers).toHaveLength(1);
-  expect(pointers[0]).toMatchObject({ schemaVersion: 2, spots: { keys: ["spotBlend"] } });
+  expect(pointers[0]).toMatchObject({
+    schemaVersion: 2,
+    spots: { keys: ["spotBlend"] },
+  });
   expect(pointers[0]).not.toHaveProperty("spotBlend");
   expect([...new Set(squares)].sort()).toEqual(pointer.spots.squares);
   // Each square once: a square is immutable, and kept once read.
@@ -93,16 +102,17 @@ test("the lights read the blend's squares in view, and nothing where the blend h
   }
   // Nowhere near a light now: every one is off the screen once the camera stops.
   const onScreen = () =>
-    page.locator(".spot-marker").evaluateAll((markers) =>
-      markers.filter((marker) => {
-        const box = marker.getBoundingClientRect();
-        return (
-          box.right > 0 &&
-          box.bottom > 0 &&
-          box.left < window.innerWidth &&
-          box.top < window.innerHeight
-        );
-      }).length,
+    page.locator(".spot-marker").evaluateAll(
+      (markers) =>
+        markers.filter((marker) => {
+          const box = marker.getBoundingClientRect();
+          return (
+            box.right > 0 &&
+            box.bottom > 0 &&
+            box.left < window.innerWidth &&
+            box.top < window.innerHeight
+          );
+        }).length,
     );
   await expect.poll(onScreen, { timeout: 30000 }).toBe(0);
   // Settled there, it has asked for nothing new, and nothing went wrong.

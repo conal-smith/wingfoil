@@ -248,41 +248,6 @@ test("on the full chart the Live wind layer is a switch under Wind, off until as
   await expect(readings(page)).toHaveCount(STATIONS, { timeout: 30000 });
 });
 
-test.describe("on a phone", () => {
-  test.use({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-  });
-
-  test("a reading tapped opens its card, which a tap elsewhere shuts", async ({
-    page,
-  }) => {
-    await page.addInitScript(() =>
-      localStorage.setItem(
-        "wingfoil.map.layers.v1",
-        JSON.stringify({ live: true }),
-      ),
-    );
-    await page.goto("/?map");
-    await expect(readings(page)).toHaveCount(STATIONS, { timeout: 30000 });
-    await page.waitForTimeout(1000);
-    const pill = reading(page, "ME_03963");
-    await pill.tap();
-    await expect(card(page)).toBeVisible();
-    await expect(card(page).locator(".map-card-name")).toHaveText("Mace Head");
-    // Inside the screen.
-    const c = (await card(page).boundingBox())!;
-    expect(c.x).toBeGreaterThanOrEqual(0);
-    expect(c.x + c.width).toBeLessThanOrEqual(390);
-    // The tap read no point's forecast.
-    await expect(page.locator(".scrub .sb-name")).toHaveCount(0);
-    // Out over the open sea, west of Mayo: nothing there to tap but the chart.
-    await page.touchscreen.tap(20, 200);
-    await expect(card(page)).toBeHidden();
-  });
-});
-
 test("the map's credits name both networks while the readings are shown", async ({
   page,
 }) => {

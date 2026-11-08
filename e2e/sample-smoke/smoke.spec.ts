@@ -2,7 +2,6 @@ import {
   test as frozen,
   expect,
   barName,
-  barReady,
   chooseSpot,
   siteRow,
   SPOTS_KEY,
@@ -270,18 +269,18 @@ test.describe("on a phone", () => {
     await finderReads(page, 2);
   });
 
-  test("the chart draws its lights, and a spot in the link opens on its week", async ({
+  test("the map draws its lights, and a spot's chart link opens its page", async ({
     page,
   }) => {
-    await page.goto("/?spot=brandon");
+    await page.goto("/");
     await expect
       .poll(() => page.locator(".spot-marker").count(), { timeout: 30000 })
       .toBeGreaterThan(100);
-    await barReady(page);
-    await expect(page.locator(".scrub")).toHaveAttribute(
-      "data-spot",
-      "brandon",
-    );
+    await page.goto("/?spot=brandon");
+    await expect(page).toHaveURL(/\/spot\/brandon/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Brandon Bay", exact: true }),
+    ).toBeVisible({ timeout: 30000 });
   });
 
   test("a spot's page draws its week", async ({ page }) => {
