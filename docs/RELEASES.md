@@ -205,9 +205,8 @@ have the detail):
 3. **Pick a quiet window.** A run whose pinned digest is not the deployed image
    fails at once rather than waiting, so swap between slots: from :25 to :45 in
    an hour with no job at :20 to :45 (00, 01 and 02 UTC with today's
-   `jobs.toml`, since HARMONIE and its blend take :35 and :45 from 03 to 21 UTC;
-   in winter the gated slots after dark exit at once, but on a wrong digest
-   they still fail). Start the admin session,
+   `jobs.toml`, since HARMONIE and its blend take :35 and :45 at 05, 08, 11, 16,
+   19 and 23 UTC, and hourly jobs such as the wind observations take :50). Start the admin session,
    `HC_ADMIN=http://127.0.0.1:8790; cloud/scripts/local-admin.sh` (or use an
    Access service token against hc-web), and check that `GET $HC_ADMIN/v1/snapshot`
    lists no `activeRuns`.

@@ -90,7 +90,7 @@ in UTC. The shipped schedule is:
 
 | Job               | When (UTC)         | Why                                                   |
 | ----------------- | ------------------ | ----------------------------------------------------- |
-| `harmonie`        | 03-21 at :35, daylight only | every hour from 2.5 h before civil first light to civil last light, plus 05:35 and 19:35 always; ~826 MB a run, 17 h |
+| `harmonie`        | 05/08/11/16/19/23 at :35 | six fixed slots, each taking the run from 2 h 35 m before; ~826 MB a run, 17 h age limit |
 | `icon-eu`         | 03/09/15 at :30    | the 00, 06 and 12 UTC cycles; 30 h age limit          |
 | `icon-eu-weather` | 03 at :40          | once a day, the 00 UTC cycle, hourly steps; 30 h age limit |
 | `ecmwf`           | 08/10/20/22 at :20 | the 00 and 12 UTC runs, out ~07:35 and ~19:35; retries |
@@ -116,14 +116,14 @@ in UTC. The shipped schedule is:
 | `forecast-archive`| every hour at :15  | copies served wind runs and observations to archive/  |
 | `verify`          | 07:25 daily        | model and blend scores (docs/VERIFICATION.md)         |
 | `blend`           | every hour at :05  | every spot's blend, from what the wind jobs published, and its wave blend, from what the wave jobs published |
-| `blend-after-harmonie` | 03-21 at :45, daylight only | ten minutes after each HARMONIE slot, under its gate |
+| `blend-after-harmonie` | 05/08/11/16/19/23 at :45 | ten minutes after each HARMONIE slot |
 | `prune`           | every hour at :10  | retention (see below)                                 |
 
-"Daylight only" is the worker's `--daylight-only --always-hours 5,19`
+The worker can also gate a job on the light with `--daylight-only --always-hours 5,19`
 (`force5/ingest/daylight.py`): a slot outside the day's riding window over Ireland
 logs a `forecast_unchanged` event with `"reason": "dark"` and exits at once, having
-downloaded nothing, except at 05 and 19 UTC. The window follows the season in UTC,
-so HARMONIE fetches 13 times a day in December and 19 in June, about 16 on average.
+downloaded nothing, except at the named hours. No shipped job uses it now; HARMONIE
+was gated and hourly from 03 to 21 UTC in November 2026, before the six fixed slots.
 
 Six models were **retired** on 10 October 2026, to keep downloads under an 80 GB
 a month target on a home connection: the ECMWF ensemble, AIFS, GEFS, ARPEGE, AROME
@@ -143,7 +143,7 @@ already published download nothing):
 
 | Job | Per run | Runs a day | A month |
 | --- | --- | --- | --- |
-| `harmonie` | ~826 MB (61 whole files) | 13-19, ~16 | ~400 GB |
+| `harmonie` | ~826 MB (61 whole files) | 6 | ~150 GB |
 | `met-office-wave` | ~430 MB (45 whole files) | 4 | ~52 GB |
 | `icon-eu-weather` | ~845 MB (949 files, hourly) | 1 | ~25 GB |
 | `icon-eu` | ~250 MB | 3 | ~22 GB |
@@ -153,12 +153,12 @@ already published download nothing):
 | `ibi-wave` | ~80-450 MB (16 × 16-cell tiles; grows as the store's time chunk fills) | 1 | ~3-14 GB |
 | `mi-swan` | ~23 MB (the spot series ~5 MB, 49 wave-height frames ~18 MB) | 1 | ~0.7 GB |
 | `gfs`, `gfs-wave`, observations, tides | 1-8 MB each | 4-24 | ~1 GB |
-| **Total** | | | **~545 GB** |
+| **Total** | | | **~295 GB** |
 
-HARMONIE went from six runs a day to every hour in daylight in November 2026, and
-ICON-EU wind from one cycle a day to three: about 265 GB a month more than the ~200 GB
-before, nearly all of it HARMONIE, the price of a forecast at most about three hours
-behind Met Éireann's newest run whenever it is light enough to ride.
+HARMONIE ran every hour in daylight for a few weeks of November 2026 (about 400 GB a
+month) and is back to six fixed runs a day, with ICON-EU wind at three cycles a day
+rather than one: the price of a forecast at most about nine hours behind Met Éireann's
+newest run.
 
 ICON-EU weather and GFS weather went hourly on 24 October 2026, so the dock's rain is
 each hour's own and the map has a Rain layer: about 17 GB a month more than the

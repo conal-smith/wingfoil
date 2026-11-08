@@ -53,13 +53,11 @@ PUBLISHED_RUN_ENV = "FORCE5_PUBLISHED_RUN"
 # re-upload a run the site already serves. Tides and sea temperature do not: see
 # their entries.
 MODELS = {
-    # Fetched every hour at :35 from 03 to 21 UTC while it is light enough to ride
-    # (`--daylight-only`, daylight.py), and at 05:35 and 19:35 whatever the light,
-    # each time the cycle about three hours earlier. The longest gap, December's
-    # 19:35 to 05:35, leaves the served run about 13 h old before the next lands; 17 h
-    # leaves one failed slot to the next (13 h across 16:35, the last before dark,
-    # to 05:35, plus 3 h of lag and an hour of queueing and download) before it reads
-    # as stale.
+    # Fetched at six fixed hours, 05:35, 08:35, 11:35, 16:35, 19:35 and 23:35 UTC,
+    # each time the cycle about three hours earlier. The longest gap, 23:35 to
+    # 05:35, leaves the served run about 9 h old before the next lands; 17 h leaves
+    # a failed slot or two to the next (11 h across 19:35 to 05:35, plus 3 h of lag
+    # and an hour of queueing and download) before it reads as stale.
     "harmonie": {"script": "fetch_harmonie.py", "manifest": "weather/harmonie.json",
                  "kind": "wind", "maxAgeHours": 17, "cache": "harmonie", "readsPublishedRun": True},
     # The 00, 06 and 12 UTC cycles (each about 3.5 h behind) at 03:30, 09:30 and 15:30
