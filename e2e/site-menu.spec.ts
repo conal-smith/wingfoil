@@ -429,7 +429,7 @@ test("at 390px the menu shares the top bar's row without wrapping or scrolling",
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/?map");
+  await page.goto("/");
   const overflow = () =>
     page.evaluate(
       () =>
@@ -437,23 +437,20 @@ test("at 390px the menu shares the top bar's row without wrapping or scrolling",
         document.documentElement.clientWidth,
     );
 
-  // The top bar: the name, the search, Spots and the menu on one row, the
-  // menu at the far right, the chart's controls under the bar.
+  // The top bar: the name, the search, Map | List and the menu on one row,
+  // the menu at the far right.
   const bar = page.locator("[data-top-bar]");
   const menu = (await trigger(page).boundingBox())!;
   const brand = (await bar.getByText("wingfoil.ie").boundingBox())!;
   const search = (await bar
     .getByRole("button", { name: "Search spots" })
     .boundingBox())!;
-  const head = (await bar.boundingBox())!;
-  const controls = (await page.locator(".map-ctrl").boundingBox())!;
   expect(
     Math.abs(menu.y + menu.height / 2 - (brand.y + brand.height / 2)),
   ).toBeLessThan(4);
   expect(brand.x + brand.width).toBeLessThanOrEqual(search.x);
   expect(search.x + search.width).toBeLessThanOrEqual(menu.x);
   expect(menu.x + menu.width).toBeLessThanOrEqual(390);
-  expect(controls.y).toBeGreaterThanOrEqual(head.y + head.height);
   expect(await overflow()).toBeLessThanOrEqual(0);
 
   // Open, the drawer stands at the right edge, the full height of the
@@ -516,17 +513,15 @@ test("at 390px the marketplace's top bar takes its own actions without overflowi
   const bar = page.locator("[data-top-bar]");
   await expect(bar).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
-  // The menu at the far right, the section's action and Chart (its glyph
-  // only, beside an action) before it, nothing spilling out of the row.
+  // The menu at the far right, the section's action before it, and no Chart
+  // on a phone, nothing spilling out of the row.
   const menu = (await trigger(page).boundingBox())!;
-  const chart = (await bar.getByRole("link", { name: "Chart" }).boundingBox())!;
+  await expect(bar.getByRole("link", { name: "Chart" })).toHaveCount(0);
   const account = (await bar
     .getByRole("navigation", { name: "Marketplace" })
     .boundingBox())!;
   expect(menu.x + menu.width).toBeLessThanOrEqual(390);
-  expect(chart.x + chart.width).toBeLessThanOrEqual(menu.x);
-  expect(account.x + account.width).toBeLessThanOrEqual(chart.x);
-  expect(Math.abs(menu.y - chart.y)).toBeLessThan(4);
+  expect(account.x + account.width).toBeLessThanOrEqual(menu.x);
   expect(
     await bar.evaluate((el) => el.scrollWidth - el.clientWidth),
   ).toBeLessThanOrEqual(0);
@@ -597,10 +592,10 @@ test.describe("on a coarse pointer", () => {
     page,
   }) => {
     await page.goto("/market");
-    const chart = page
+    const beside = page
       .locator("[data-top-bar]")
-      .getByRole("link", { name: "Chart" });
-    const box = (await chart.boundingBox())!;
+      .getByRole("navigation", { name: "Marketplace" });
+    const box = (await beside.boundingBox())!;
     // One pixel inside the button's trailing edge, at its middle.
     const owner = await ownerAt(
       page,

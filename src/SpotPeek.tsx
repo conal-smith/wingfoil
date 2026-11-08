@@ -53,9 +53,9 @@ function Figures({ html }: { html: string }) {
  * One spot at the hour the map shows, where no list stands beside the map:
  * its name, then its wind, waves, weather and tide, and its stars. On the
  * phone it is the peek above the dock, opened by a tap on a pill, whose
- * second tap opens the spot (`peek`); on the full chart a card beside the
- * pill tapped, a small pointer at it (`card`, placed by src/cardPlace.ts),
- * never over it. The figures are the pills' own, so the card and the pill
+ * second tap opens the spot (`peek`); on the full chart, wider than a phone,
+ * a card beside the pill tapped, a small pointer at it (`card`, placed by
+ * force5/src/cardPlace.ts), never over it. The figures are the pills' own, so the card and the pill
  * read alike.
  */
 const SpotPeek = forwardRef<

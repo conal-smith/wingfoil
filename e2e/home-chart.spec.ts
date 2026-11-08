@@ -892,7 +892,7 @@ test.describe("on a phone", () => {
     hasTouch: true,
   });
 
-  test("the map is made as the finder opens, and kept; the chart keeps its zoom and Layers", async ({
+  test("the map is made as the finder opens, one map, and no Chart beside it", async ({
     page,
   }) => {
     await star(page, ["brandon", "keel"]);
@@ -902,34 +902,6 @@ test.describe("on a phone", () => {
     await expect(page.locator(".maplibregl-canvas")).toHaveCount(1, {
       timeout: 30000,
     });
-    await mapButton(page).tap();
-    await expect(page.locator(".maplibregl-canvas")).toHaveCount(1, {
-      timeout: 30000,
-    });
-    await expect(lights(page)).toHaveCount(149, { timeout: 30000 });
-    await mark(page);
-    const controls = page.getByRole("group", { name: "Map controls" });
-    for (const name of ["Zoom in", "Zoom out", "Layers"])
-      await expect(controls.getByRole("button", { name })).toBeVisible();
-    // The controls start under the bar, not under its 56px.
-    const top = (await bar(page).boundingBox())!;
-    const zoom = (await controls.boundingBox())!;
-    expect(zoom.y).toBeGreaterThanOrEqual(top.y + top.height);
-    // A spot: its week in the scrub bar; the top bar's Spots back to the list.
-    await page
-      .locator('.spot-marker[data-spot-id="brandon"]')
-      .dispatchEvent("click");
-    await expect(barName(page)).toHaveText("Brandon Bay", {
-      timeout: 30000,
-    });
-    await listButton(page).tap();
-    await expect(page).toHaveURL(/\/$/);
-    await expect(cards(page)).toHaveCount(2);
-    await expect(scrubBar(page)).toHaveCount(0);
-    // Kept, out of sight, for the next time.
-    expect(await kept(page)).toBe(true);
-    await mapButton(page).tap();
-    await expect(onChart(page)).toBeVisible();
-    expect(await kept(page)).toBe(true);
+    await expect(bar(page).getByRole("link", { name: "Chart" })).toHaveCount(0);
   });
 });

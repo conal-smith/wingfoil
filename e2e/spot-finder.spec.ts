@@ -1252,7 +1252,7 @@ test.describe("on a phone", () => {
     hasTouch: true,
   });
 
-  test("the top bar keeps the wordmark, the search, Chart and the menu in one row", async ({
+  test("the top bar keeps the wordmark, the search, Map | List and the menu in one row", async ({
     page,
   }) => {
     await star(page, ["brandon"]);
@@ -1260,17 +1260,17 @@ test.describe("on a phone", () => {
     const bar = page.locator("[data-top-bar]");
     const mark = bar.getByText("wingfoil.ie");
     await expect(mark).toBeVisible();
-    const [name, find, chart, menu] = [
+    const [name, find, views, menu] = [
       (await mark.boundingBox())!,
       (await bar.getByRole("button", { name: "Search spots" }).boundingBox())!,
-      (await bar.getByRole("link", { name: "Chart" }).boundingBox())!,
+      (await bar.getByRole("group", { name: "Map or list" }).boundingBox())!,
       (await bar.getByRole("button", { name: "Site menu" }).boundingBox())!,
     ];
     // In one row, in that order, all on the screen; light or dark is in the
     // menu on a phone.
     expect(find.x).toBeGreaterThanOrEqual(name.x + name.width);
-    expect(chart.x).toBeGreaterThanOrEqual(find.x + find.width);
-    expect(menu.x).toBeGreaterThanOrEqual(chart.x + chart.width);
+    expect(views.x).toBeGreaterThanOrEqual(find.x + find.width);
+    expect(menu.x).toBeGreaterThanOrEqual(views.x + views.width);
     expect(menu.x + menu.width).toBeLessThanOrEqual(390);
     await expect(bar.locator("[data-theme-button]")).toBeHidden();
     // The search opens over the bar, the width of the screen.

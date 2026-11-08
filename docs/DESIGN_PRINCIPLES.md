@@ -1234,3 +1234,10 @@ This replaces the list alone under 1100 pixels (2026-10-26), the List and Map
 buttons' going (2026-11-01, for the finder under 1100 pixels), the range ring
 and the spot's name beside its light on the chart (2026-11-02), and the
 station tags beside the list (2026-11-03).
+
+**2026-11-08 — No full chart on a phone.** The owner's decision. Up to 720 px
+the finder's Map and List are the whole of it: Map | List stands in the top bar
+beside the search, in place of Chart, and the layers are the dock's Wind, Waves
+and Weather. The chart's address opens the map, a spot's chart address opens
+the spot's page, and the menu leaves out Chart and the tour. Wider screens keep
+the chart.

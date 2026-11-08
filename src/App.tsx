@@ -403,11 +403,24 @@ export default function App() {
    * and one map, which is never taken down once it is made: the panel
    * beside the list and the full chart are the same map in a bigger box.
    */
-  const [page, setPage] = useState<Page>(() =>
+  const [askedPage, setPage] = useState<Page>(() =>
     isChartAddress(window.location) ? "chart" : "finder",
   );
+  // A phone has no full chart: its map and its list are the finder's.
+  const phone = useMedia(PHONE);
+  const page: Page = phone ? "finder" : askedPage;
   const pageRef = useRef(page);
   pageRef.current = page;
+  // The full chart's address on a phone: a spot's opens the spot's own page,
+  // and the chart's the map.
+  useEffect(() => {
+    if (!phone || !isChartAddress(window.location)) return;
+    const query = new URLSearchParams(window.location.search);
+    const spot = query.get("spot");
+    if (spot)
+      window.location.replace(spotHref(spot, query.get("at") ?? undefined));
+    else window.history.replaceState({}, "", FINDER_HREF);
+  }, [phone]);
   /** Room for the chart beside the list. */
   const split = useMedia(SPLIT);
   const splitRef = useRef(split);
@@ -510,7 +523,6 @@ export default function App() {
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
-  const phone = useMedia(PHONE);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [picked, setPicked] = useState<Picked | null>(null);
   // The layers' rail, the one way to the layers: Layers opens and shuts it,
@@ -1278,6 +1290,14 @@ export default function App() {
    */
   const [cardsSeen, setCardsSeen] = useState<readonly string[]>([]);
   const [finderReadings, setFinderReadings] = useState(NO_READINGS);
+  // Where no list stands beside the map the pills go to the best in view,
+  // listed or not: what those read, for their pills to say.
+  const [bestPillIds, setBestPillIds] = useState<readonly string[]>([]);
+  const bestPillSpots = useMemo(() => {
+    const ids = new Set(bestPillIds);
+    return spots.filter((spot) => ids.has(spot.id));
+  }, [spots, bestPillIds]);
+  const bestPillReadings = useReadings(bestPillSpots, axis);
   const lights = useMemo(() => {
     const out = new Map<string, LightState>();
     // Beside the list, a card in view is a pill and every other spot a bead;
@@ -1294,7 +1314,11 @@ export default function App() {
     for (const spot of spots) {
       const row = hours.get(spot.id);
       const hour = row?.[lightAt];
-      const reading = pillReading(hour, finderReadings.get(spot.id), lightAt);
+      const reading = pillReading(
+        hour,
+        finderReadings.get(spot.id) ?? bestPillReadings.get(spot.id),
+        lightAt,
+      );
       out.set(spot.id, {
         pending: !row,
         stars: hour?.rating ? hour.rating.stars : null,
@@ -1330,6 +1354,7 @@ export default function App() {
     split,
     cardsSeen,
     finderReadings,
+    bestPillReadings,
     fieldShown,
     prefs.units,
     rider,
@@ -2458,7 +2483,7 @@ export default function App() {
    * cards showed, as the lights beside them did.
    */
   const openChart = () => {
-    if (pageRef.current === "chart") return;
+    if (phone || pageRef.current === "chart") return;
     if (panelAt !== selected) selectColumn(panelAt);
     window.history.pushState(
       { fromList: 1 } satisfies ListEntry,
@@ -2630,6 +2655,44 @@ export default function App() {
       </>
     );
   };
+  /** The phone's and the tablet's two views: the map, or the list. */
+  const viewSwitch = (inBar: boolean) => (
+    <div
+      className={inBar ? "nf-switch in-bar" : "nf-switch"}
+      role="group"
+      aria-label="Map or list"
+      data-map-wall={inBar ? undefined : true}
+      data-view-switch
+    >
+      <Button
+        variant="quiet"
+        size="sm"
+        pressed={!narrowList}
+        onClick={() => {
+          setNarrowList(false);
+          window.scrollTo(0, 0);
+        }}
+        data-view="map"
+      >
+        {!inBar && <MapIcon size={14} strokeWidth={1.75} aria-hidden="true" />}
+        Map
+      </Button>
+      <Button
+        variant="quiet"
+        size="sm"
+        pressed={narrowList}
+        onClick={() => {
+          setNarrowList(true);
+          setPeekId(null);
+          setCrowd(null);
+        }}
+        data-view="list"
+      >
+        {!inBar && <List size={14} strokeWidth={1.75} aria-hidden="true" />}
+        List
+      </Button>
+    </div>
+  );
   const topBar = (
     <div className="app-bar">
       <TopBar
@@ -2643,6 +2706,7 @@ export default function App() {
             describeLabel="At the hour shown"
           />
         }
+        actions={phone ? viewSwitch(true) : undefined}
         view={
           onChart
             ? { to: "spots", href: FINDER_HREF, onClick: openList }
@@ -2742,8 +2806,12 @@ export default function App() {
    * rests, out of sight through a move.
    */
   const chartCard = useRef<HTMLDivElement>(null);
+  // Not on a phone: the card has no room beside a pill there, and the dock
+  // under the map already says the spot's wind, waves and tide.
   const cardSpot =
-    onChart && !picked && point && focusId === point.id ? point : null;
+    onChart && !phone && !picked && point && focusId === point.id
+      ? point
+      : null;
   const [cardAt, setCardAt] = useState<CardPlace | null>(null);
   // The spot a peek or a card is open on, read for itself where the list
   // has not read it (a spot in view past the list's thirty, or on the chart).
@@ -3143,6 +3211,7 @@ export default function App() {
                     phone={phone}
                     onSelect={pressLight}
                     onCrowd={setCrowd}
+                    onBestPills={setBestPillIds}
                     pills={pills}
                     onHoverSpot={hoverLight}
                     onOpenPage={(place) =>
@@ -3332,41 +3401,7 @@ export default function App() {
                 peekSpot &&
                 peekOf(peekSpot, "peek", () => setPeekId(null))}
               {!narrowList && chooser}
-              <div
-                className="nf-switch"
-                role="group"
-                aria-label="Map or list"
-                data-map-wall
-                data-view-switch
-              >
-                <Button
-                  variant="quiet"
-                  size="sm"
-                  pressed={!narrowList}
-                  onClick={() => {
-                    setNarrowList(false);
-                    window.scrollTo(0, 0);
-                  }}
-                  data-view="map"
-                >
-                  <MapIcon size={14} strokeWidth={1.75} aria-hidden="true" />
-                  Map
-                </Button>
-                <Button
-                  variant="quiet"
-                  size="sm"
-                  pressed={narrowList}
-                  onClick={() => {
-                    setNarrowList(true);
-                    setPeekId(null);
-                    setCrowd(null);
-                  }}
-                  data-view="list"
-                >
-                  <List size={14} strokeWidth={1.75} aria-hidden="true" />
-                  List
-                </Button>
-              </div>
+              {!phone && viewSwitch(false)}
               {mapDock(!narrowList)}
             </div>
           )}

@@ -226,7 +226,13 @@ export function SiteNav({
     const preview = id === "market" || id === "community";
     const s = siteMenuStyles({ current: here });
     return (
-      <li key={id}>
+      // The chart and its tour are not on a phone: the finder is its map.
+      <li
+        key={id}
+        className={
+          id === "chart" || id === "tour" ? "max-wide:hidden" : undefined
+        }
+      >
         <a
           ref={index === 0 ? first : undefined}
           className={s.row()}

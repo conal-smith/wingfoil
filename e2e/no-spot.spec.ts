@@ -88,7 +88,7 @@ async function openChart(page: Page) {
 }
 
 for (const [width, height] of [
-  [390, 844],
+  [800, 844],
   [1440, 900],
 ]) {
   test(`a first visit opens on the chart alone, and a spot brings its week at the chart's hour, at ${width}px`, async ({
@@ -172,64 +172,6 @@ for (const [width, height] of [
     ).toBe(true);
     expect(errors).toEqual([]);
   });
-}
-
-test.describe("on a phone", () => {
-  test.use({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-  });
-
-  test("in the morning the hour opened on is the one the playhead stands on", async ({
-    page,
-  }) => {
-    // 11:00 Irish time, between the morning's three-hourly steps. The strip
-    // fills out as the models answer, and the opening hour is set again for
-    // the longer strip: a strip read a frame late, against the strip as it
-    // was, once picked an hour it was no longer showing.
-    const now = Date.parse("2026-09-13T10:00:00Z");
-    await page.clock.setFixedTime(new Date(now));
-    await openMap(page, "/?spot=brandon");
-    await expect(barName(page)).toHaveText("Brandon Bay");
-    await expectHourUnderPlayhead(page, now);
-  });
-});
-
-/**
- * The slider on the hour the strip opens on at `now`, the pill reading it
- * out, and the playhead on it in the week in view.
- */
-async function expectHourUnderPlayhead(page: Page, now: number) {
-  const slider = timeSlider(page);
-  const pill = barPill(page);
-  const columns = stripAt(now);
-  const at = openingColumn(columns, now);
-  const settled = async () => {
-    await expect(slider).toHaveValue(String(at));
-    await expect(slider).toHaveAttribute(
-      "aria-valuetext",
-      timeSpoken(columns[at].time),
-    );
-    await expect(pill).toContainText(pillTime(columns[at].time));
-    const [x, width] = await scrubBar(page)
-      .locator(".sb-strip")
-      .evaluate((strip) => [
-        Number(
-          strip
-            .querySelector(".sb-head")!
-            .getAttribute("transform")!
-            .match(/translate\(([-\d.]+)/)![1],
-        ),
-        strip.clientWidth,
-      ]);
-    expect(x).toBeGreaterThan(0);
-    expect(x).toBeLessThan(width);
-  };
-  await settled();
-  // And it stays there once the strip has settled.
-  await page.waitForTimeout(1000);
-  await settled();
 }
 
 test("the spot chosen is remembered, a bare point is not, and neither opens the next visit", async ({
@@ -316,7 +258,7 @@ test("the spot chosen is in the link, by search or light, and Back steps through
 test("Back lets go of a tap on the chart still waiting to pick a point: the chart alone at the link with no spot (#90)", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 800, height: 844 });
   await openMap(page);
   await page.locator('[data-spot-id="tramore"]').dispatchEvent("click");
   await expect(barName(page)).toHaveText("Tramore", { timeout: 30000 });
@@ -392,7 +334,7 @@ test("a spot in the link opens on it, focused; a remembered one waits to be chos
 });
 
 for (const [width, height] of [
-  [390, 844],
+  [800, 844],
   [1440, 900],
 ]) {
   test(`a visitor with stars and a spot chosen before still opens on the chart alone, at ${width}px`, async ({

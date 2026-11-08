@@ -19,6 +19,12 @@ describe("placeCard", () => {
     expect(east.box.l).toBeGreaterThan(pill.r);
   });
 
+  it("is no card at all where no side holds it inside the map", () => {
+    const phone = { l: 10, t: 10, r: 343, b: 330 };
+    const middle = { l: 145, t: 150, r: 205, b: 176 };
+    expect(placeCard(middle, 256, 180, phone, [], 270)).toBeNull();
+  });
+
   it("takes another side where the first has no room", () => {
     const edge = { l: 20, t: 340, r: 80, b: 366 };
     const card = placeCard(edge, 256, 180, room, [], 270)!;
