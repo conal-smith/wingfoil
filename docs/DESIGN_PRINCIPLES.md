@@ -1141,16 +1141,16 @@ reads the same or would touch it. The pills are read again 150 ms after a
 scroll of the list comes to rest, never in the middle of one, and whenever the
 cards change. A pill stands centred on its spot, with no dot under it and no
 line to it. Where spots are close, each pill moves the least it must to stand
-clear of the others and of the map's controls, the sea side first, at most
-about 40 px from its spot, and keeps a small notch on the edge facing its spot,
-pointing at it (force5/src/pillPlace.ts); the first card's pill moves least.
-Pills are neutral, dark with light words in either theme, never filled in the
-stars' colours, and say what the map shows (force5/src/pillContent.ts): with no
-field on, the wind's arrow, the wind with its unit and the sky ("↗ 13 kn" and
-a cloud); with Wind, the arrow, the wind and the gust; with Waves, the sea's
-arrow, its height and its period, and none at a spot the sea's waves do not
-reach; with Weather, the sky beside the air's temperature and the rain while
-it rains. The arrow alone may be red, offshore.
+clear of the others, of the map's controls and of the dock, the sea side first,
+at most about 40 px from its spot, and keeps a small notch on the edge facing
+its spot, pointing at it (force5/src/pillPlace.ts); the first card's pill moves
+least. Pills are neutral, dark with light words in either theme, never filled
+in the stars' colours, and say what the dock's field shows
+(force5/src/pillContent.ts): with no field on, the wind's arrow, the wind with
+its unit and the sky ("↗ 13 kn" and a cloud); with Wind, the arrow, the wind
+and the gust; with Waves, the sea's arrow, its height and its period, and none
+at a spot the sea's waves do not reach; with Weather, the sky beside the air's
+temperature and the rain while it rains. The arrow alone may be red, offshore.
 
 Every other spot is a bead: a dot of 4 to 5 px, off-white at low strength on
 the dark map (dark on the white one) with a thin dark halo, the same whatever

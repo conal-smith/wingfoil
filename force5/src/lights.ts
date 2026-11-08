@@ -482,7 +482,8 @@ export function createLights(
   /**
    * The Live wind layer's readings beside the list (./readingPills.ts): a
    * pill has the place, and so do the map's names and a reading kept before
-   * it, so nothing stands on anything. Read again whenever the map rests, as the readings
+   * it, so nothing stands on anything; one the map's edge or the dock would
+   * cut is not shown. Read again whenever the map rests, as the readings
    * come and go of their own accord.
    */
   const thinReadings = () => {
@@ -497,10 +498,17 @@ export function createLights(
         r: r.right - frame.left,
         b: r.bottom - frame.top,
       };
-      const under = taken.some(
-        (b) =>
-          at.l < b.r + 2 && b.l < at.r + 2 && at.t < b.b + 2 && b.t < at.b + 2,
-      );
+      // Cut by the map's edge or in the dock's room: not shown at all.
+      const out = at.l < 0 || at.t < 0 || at.r > boxW || at.b > boxH - footRoom;
+      const under =
+        out ||
+        taken.some(
+          (b) =>
+            at.l < b.r + 2 &&
+            b.l < at.r + 2 &&
+            at.t < b.b + 2 &&
+            b.t < at.b + 2,
+        );
       reading.classList.toggle("obs-under", under);
       if (!under) taken.push(at);
     }

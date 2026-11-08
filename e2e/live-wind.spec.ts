@@ -106,7 +106,8 @@ test.describe("beside the list", () => {
     const pill = reading(page, "ME_03963");
     await expect(pill.locator("b")).toHaveText(kn(mace.speed));
     await expect(pill.locator("sup")).toHaveText(kn(mace.gust));
-    await expect(pill).toHaveAccessibleName(
+    await expect(pill).toHaveAttribute(
+      "aria-label",
       new RegExp(
         `^Mace Head, Met Éireann: ${kn(mace.speed)} knots, gusting ${kn(mace.gust)}, from .+, measured 22:00$`,
       ),
@@ -125,7 +126,8 @@ test.describe("beside the list", () => {
     await expect(reading(page, "ME_03966").locator("sup")).toBeHidden();
     // A buoy that stopped reporting five hours ago is faded, and says so.
     await expect(page.locator(".obs-mark.is-stale")).toHaveCount(1);
-    await expect(reading(page, "MI_M6")).toHaveAccessibleName(
+    await expect(reading(page, "MI_M6")).toHaveAttribute(
+      "aria-label",
       /M6 Atlantic buoy, Marine Institute: .+, measured 17:00, over 3 hours ago$/,
     );
 
