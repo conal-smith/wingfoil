@@ -24,6 +24,8 @@ export const noticeStyles = tv({
     title: "min-w-0 pt-px text-prose leading-tight font-semibold text-pretty",
     meta: "col-start-2 min-w-0 text-body leading-normal text-ink-2",
     end: "col-start-3 row-span-2 row-start-1 self-center",
+    aside: "",
+    words: "",
     details:
       "col-span-2 col-start-2 mt-2.5 min-w-0 text-body leading-normal text-ink-2",
     chevron:
@@ -38,6 +40,21 @@ export const noticeStyles = tv({
       red: { mark: "bg-met-red text-photo-line" },
       water: { mark: "bg-warn-ground text-pen-ink" },
       "water-advice": { mark: "bg-raised text-depth" },
+    },
+    // One thin line over a forecast: the square small, the title and the
+    // second line side by side, their source at the end, the details under.
+    compact: {
+      true: {
+        base: "grid-cols-notice-compact items-center gap-x-2.5 gap-y-0 px-3 py-1",
+        mark: "row-span-1 size-6",
+        words: "col-start-2 min-w-0 wide:flex wide:items-baseline wide:gap-2.5",
+        title: "pt-0 text-body wide:truncate",
+        meta: "col-auto text-label wide:shrink-0",
+        aside:
+          "col-start-3 hidden font-body text-label whitespace-nowrap text-ink-muted cards:block",
+        end: "col-start-4 row-span-1",
+        details: "col-span-3 col-start-2 mt-1 mb-1",
+      },
     },
     // In a narrow column: the action under the words, not squeezing them.
     stacked: {
@@ -84,6 +101,10 @@ export interface NoticeProps {
   action?: ReactNode;
   /** The action under the words, for a column too narrow to hold it beside them. */
   stacked?: boolean;
+  /** One thin line, for a notice above a forecast. */
+  compact?: boolean;
+  /** Where it comes from, at the end of a compact line, on a wide window. */
+  aside?: ReactNode;
   /**
    * Interrupts a screen reader: something went wrong just now. A notice that
    * was there when the page came (a weather warning) does not.
@@ -101,10 +122,12 @@ export function Notice({
   detailsLabel = "Details",
   action,
   stacked = false,
+  compact = false,
+  aside,
   alert = false,
   className,
 }: NoticeProps) {
-  const styles = noticeStyles({ level, stacked });
+  const styles = noticeStyles({ level, stacked, compact });
   const [open, setOpen] = useState(defaultOpen);
   const detailsId = useId();
   const Icon = ICON[level];
@@ -116,9 +139,17 @@ export function Notice({
       data-level={level}
     >
       <span className={styles.mark()} aria-hidden="true">
-        <Icon size={18} strokeWidth={1.75} />
+        <Icon size={compact ? 14 : 18} strokeWidth={1.75} />
       </span>
-      <div className={styles.title()}>{title}</div>
+      {compact ? (
+        <div className={styles.words()}>
+          <div className={styles.title()}>{title}</div>
+          {children && <div className={styles.meta()}>{children}</div>}
+        </div>
+      ) : (
+        <div className={styles.title()}>{title}</div>
+      )}
+      {compact && aside && <div className={styles.aside()}>{aside}</div>}
       {action ? (
         <div className={styles.end()}>{action}</div>
       ) : (
@@ -142,7 +173,7 @@ export function Notice({
           </Button>
         )
       )}
-      {children && <div className={styles.meta()}>{children}</div>}
+      {!compact && children && <div className={styles.meta()}>{children}</div>}
       {details && (
         <div className={styles.details()} id={detailsId} hidden={!open}>
           {details}
