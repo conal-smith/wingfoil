@@ -4,8 +4,10 @@ No API key (DWD open data, CC BY 4.0). Thirteen single-level parameters are read
 from the same four ICON-EU cycles as the wind importer, cropped to the same
 Ireland/Atlantic 0.0625° grid, and published as a `kind: "weather"` bundle: a
 declared `variables` map, a precomputed series per riding location carrying
-every variable, and one map frame an hour carrying `precip` alone, which the
-chart's Rain layer draws (docs/TILING_DESIGN.md, "As built: the Rain layer").
+every variable, and one map frame an hour carrying `precip`, which the chart's
+Rain layer draws (docs/TILING_DESIGN.md, "As built: the Rain layer"), and
+`clct`, the total cloud a Weather layer shades the sky with, in per cent rounded
+to the nearest 5 (the series keep it to the whole per cent).
 Steps are hourly by default, so each hour's rain is its own and not a share of
 a three-hour total.
 
@@ -134,10 +136,16 @@ VARIABLES = {
 # What is downloaded. `spotSeries` carries every variable at every hour.
 DIRECTORIES = {name: entry["directory"] for name, entry in VARIABLES.items() if entry["directory"]}
 DERIVED = tuple(name for name, entry in VARIABLES.items() if not entry["directory"])
-# What the map frames carry: the rain in the step, for the chart's Rain layer. One
-# array of 56,817 cells is about 230 KB of JSON and a few KB brotli on a dry hour;
-# every variable would be some 3 MB a frame that nothing draws.
-FRAME_VARIABLES = ("precip",)
+# What the map frames carry: the rain in the step, for the chart's Rain layer, and
+# the total cloud, for the sky of a Weather layer. Each array of 56,817 cells is
+# about 190–230 KB of JSON; compressed, rain is 5–10 KB on a mostly dry hour and
+# cloud, whose edges are everywhere, some 15–25 KB in steps of 5 %, half what whole
+# per cent costs (docs/LIVE_FORECAST_PIPELINE.md). Every variable would be some
+# 3 MB a frame that nothing draws.
+FRAME_VARIABLES = ("precip", "clct")
+# The frames' cloud is in per cent rounded to the nearest 5: still per cent, so a
+# reader needs no scale, and finer than a shade of grey on a map can show.
+CLOUD_FRAME_STEP = 5
 
 
 def validate_metadata(metadata, field, run, hour):
@@ -264,16 +272,29 @@ def parse_args(argv=None):
     return args
 
 
-def frame_payload(run, hour, valid, grid, interval, precip):
-    """One hour's map frame: the rain in the step, or nulls at initialization.
+def frame_cloud(clct):
+    """Whole per cent, as `convert` publishes it, to the nearest CLOUD_FRAME_STEP.
 
-    An hour with no interval has no amount anywhere, so it publishes nulls rather
-    than a field of zeros, which would read as a dry hour that was forecast.
+    A whole number over 5 never sits halfway between two steps, so how ties round
+    never matters; 0 and 100 stay exactly clear and overcast.
+    """
+    step = CLOUD_FRAME_STEP
+    return [None if value is None else int(round(value / step)) * step for value in clct]
+
+
+def frame_payload(run, hour, valid, grid, interval, precip, clct):
+    """One hour's map frame: the rain in the step and the total cloud at the hour.
+
+    An hour with no interval has no amount anywhere, so its rain is nulls rather
+    than a field of zeros, which would read as a dry hour that was forecast. Cloud
+    is read at the hour itself, so initialization has it like any other hour, in
+    per cent to the nearest 5 (`frame_cloud`).
     """
     cells = grid["width"] * grid["height"]
     return {"model": MODEL, "run": run, "hour": hour, "validTime": valid, "grid": grid,
             "precipIntervalHours": interval,
-            "precip": [None] * cells if precip is None else precip}
+            "precip": [None] * cells if precip is None else precip,
+            "clct": frame_cloud(clct)}
 
 
 def manifest_for(run, run_time, args, grid, frames, series):
@@ -288,8 +309,9 @@ def manifest_for(run, run_time, args, grid, frames, series):
         "variables": {name: {key: entry[key] for key in ("units", "label", "description")}
                               | ({"kind": CODE} if entry.get("kind") == CODE else {})
                       for name, entry in VARIABLES.items()},
-        # The frames carry the rain alone, for the chart's Rain layer; the spot series
-        # carries every variable (docs/TILING_DESIGN.md, "As built: the Rain layer").
+        # The frames carry the rain, for the chart's Rain layer, and the total cloud,
+        # for the sky of a Weather layer; the spot series carries every variable
+        # (docs/TILING_DESIGN.md, "As built: the Rain layer").
         "frameVariables": list(FRAME_VARIABLES),
         "frames": frames, "horizonHours": args.hours, "spotSeries": series,
         "rainChanceNote": rain_chance.NOTE,
@@ -314,8 +336,9 @@ def manifest_for(run, run_time, args, grid, frames, series):
             "units and rounded once (0.1 °C, whole per cent, 0.1 hPa, 0.1 km, 0.1 mm, whole J/kg) and "
             "clipped into their plausible range; a value outside it fails the run. precip is derived by "
             "differencing tot_prec, and pop from precip around each place (see rainChanceNote). "
-            "Each frame carries precip alone, on the whole crop, for the "
-            "map; spotSeries carries every variable at every published hour, "
+            "Each frame carries precip and clct, on the whole crop, for the "
+            f"map, clct there rounded to the nearest {CLOUD_FRAME_STEP} %; "
+            "spotSeries carries every variable at every published hour, "
             "bilinearly sampled except ww, which is read from the containing cell, and pop. "
             "No hour is interpolated: only native forecast steps are published."),
         "sourceUrl": BASE + "/",
@@ -387,7 +410,8 @@ def main(argv=None):
         previous_tp = fields["tp"]
         valid = (run_time + timedelta(hours=hour)).isoformat().replace("+00:00", "Z")
         name = frame_name(prefix, hour, "json")
-        write_json(output / name, frame_payload(run, hour, valid, grid, interval, fields["precip"]))
+        write_json(output / name, frame_payload(run, hour, valid, grid, interval, fields["precip"],
+                                                fields["clct"]))
         size = (output / name).stat().st_size
         published += size
         frames.append({"hour": hour, "validTime": valid, "url": f"weather/{name}",
@@ -400,12 +424,12 @@ def main(argv=None):
             series[spot["id"]].append({"hour": hour, "validTime": valid,
                                        "precipIntervalHours": interval, "values": sampled})
         print(f"  +{hour:03d}h — {grid['width']} × {grid['height']} sampled, "
-              f"rain frame {size / 1e3:.0f} KB", flush=True)
+              f"rain and cloud frame {size / 1e3:.0f} KB", flush=True)
     manifest = manifest_for(run, run_time, args, grid, frames, series)
     # Only this final operation advances the published snapshot.
     write_run(output, f"{MODEL}.json", manifest, prefix, spots)
     print(f"Published {len(hours)} ICON-EU weather steps for {len(spots)} spots and "
-          f"{len(frames)} rain frames ({published / 1e6:.1f} MB) to "
+          f"{len(frames)} rain and cloud frames ({published / 1e6:.1f} MB) to "
           f"{output / (MODEL + '.json')}", flush=True)
 
 

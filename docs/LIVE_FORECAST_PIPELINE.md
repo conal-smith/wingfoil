@@ -39,7 +39,7 @@ The website and forecast worker are separate deployments. A forecast refresh mus
 - `force5/ingest/publish_s3.py`: validates the whole run directory before uploading anything: it must sit beside the pointer, be named for this model, hash to the name it carries and hold exactly the tiles, frames and squares the pointer names — for a wind run every tile its `tiles` block does not call absent, at every hour. The `tiles` block must match the grid (`f5tile.check_tiles`: the grid on the global lattice, exactly the levels and cell sizes the grid gives, absent tiles inside their ranges, gust blocks exactly when some frame has a gust window). Then every tile is checked: its header must name the run, the hour, the level and the place it is published as, carry a gust block exactly where the frame has a gust window, and hold only plausible values, and a native tile may leave no cell of the grid missing; the spot data read back from the squares is checked as the whole manifest used to be. A tile carries no model, so the **model** comes from the path — the run directory must be named for this model, by the same rule the bucket sweep's protection of a model with no pointer uses — and the directory's hash proves the bytes are the ones published under that name. What is therefore _not_ checked: that a tile's numbers are this model's rather than another's, if someone builds one model's run directory out of another's tiles, nor that an overview tile is the mean of the native ones. It uploads one encoding per immutable object: a `.bin` tile brotli-encoded as `application/octet-stream` with `Content-Encoding: br` (`FORCE5_BUCKET_ENCODING=gzip` switches it), JSON gzipped as before, with the sha256 metadata always taken over the uncompressed bytes. It reuses the `.br`/`.gz` sidecar the adapter already wrote — after decompressing it and confirming it is exactly these bytes — rather than compressing the same tile twice. Then the public pointer with an ETag conditional write. The sidecars are for the local Caddy deployment only and are never uploaded as objects of their own.
 - `VITE_FORECAST_BASE_URL`: optional frontend build-time CDN root. All forecast manifests and frames use it; the spot catalogue and application assets remain on the website origin.
 
-**Published sizes recorded per model below predate the binary frames and the tiles** and were measured when wind frames were JSON. Divide a wind model's published figure by roughly eleven for one whole binary frame on disk plus its sidecars, or by three against what a browser was sent for one; a frame's tiles at every level are about 1.7 times its whole binary frame on disk (127 KB brotli against 74 KB for HARMONIE), and a browser fetches one level of them for its view. Wave and weather runs publish JSON frames only of what the map draws: ICON-EU weather's rain every hour and Irish Shelf SWAN's wave height every three hours.
+**Published sizes recorded per model below predate the binary frames and the tiles** and were measured when wind frames were JSON. Divide a wind model's published figure by roughly eleven for one whole binary frame on disk plus its sidecars, or by three against what a browser was sent for one; a frame's tiles at every level are about 1.7 times its whole binary frame on disk (127 KB brotli against 74 KB for HARMONIE), and a browser fetches one level of them for its view. Wave and weather runs publish JSON frames only for the map's layers: ICON-EU weather's rain and cloud every hour and Irish Shelf SWAN's wave height every three hours.
 
 The worker defaults to **hourly HARMONIE**, with the importer's full 60-hour horizon: 61 frames including hour zero. ICON-EU uses its full 72-hour horizon when selected. The existing bundled website snapshots remain three-hourly until a new snapshot is generated and served. Hourly output is genuine source data, not temporal interpolation. On 13 September 2026 the live Met Éireann inventory was checked and contained all control files from +000 through +060 at one-hour intervals.
 
@@ -420,14 +420,23 @@ hourly run downloads about 545 MB more, some 16 GB a month at one run a day. The
 lives in the same `.cache/grib/<run>/` directory as the wind importer under distinct
 parameter names, so a volume holding both ICON jobs for one run needs roughly 1.1 GB.
 
-Each frame (`frames/<HHH>.json`) carries `precip` alone (`frameVariables:
-["precip"]`), the rain in the hour ending at it, on the whole 321 × 177 crop: about
-230 KB of JSON, **10–25 KB gzipped or brotli** (measured from the real 00 UTC run of
-24 October 2026: 24 KB in an hour with rain over three quarters of the crop, 10 KB
-in one with a quarter), so 73 frames add 1–1.8 MB a run to the bucket. The chart's
-Rain layer reads the frame of the hour shown (docs/TILING_DESIGN.md, "As built: the
-Rain layer"). Thirteen arrays a frame would be about 3 MB, so `spotSeries` carries
-every variable and the frames the one the map draws. `precip` is differenced from
+Each frame (`frames/<HHH>.json`) carries two arrays on the whole 321 × 177 crop
+(`frameVariables: ["precip", "clct"]`): `precip`, the rain in the hour ending at it,
+which the chart's Rain layer reads for the hour shown (docs/TILING_DESIGN.md, "As
+built: the Rain layer"), and `clct`, the total cloud at the hour, for the sky of a
+Weather layer. The frames' cloud is **per cent rounded to the nearest 5** (0, 5, …,
+100; `CLOUD_FRAME_STEP`), still per cent rather than a count of steps, so a reader
+needs no scale; the spot series keep whole per cent. Rain alone was about 230 KB of
+JSON and **10–25 KB gzipped or brotli** (measured from the real 00 UTC run of 24
+October 2026: 24 KB in an hour with rain over three quarters of the crop, 10 KB in
+one with a quarter). Cloud compresses far worse, since its edges are everywhere and
+rain is mostly dry zeros. Measured on eight hours of the real 00 UTC run of 7
+November 2026, a frame went from 228 KB of JSON, 7–10 KB gzip and 5–8 KB brotli to
+**412–428 KB, 24–30 KB gzip** (how the bucket stores JSON) **and 19–24 KB brotli**.
+In whole per cent the same frames were 39–49 KB gzip: the steps of 5 % halve the
+cloud's compressed share, at a precision finer than a map's shade of grey shows. So
+73 frames are some 2 MB a run in the bucket. Thirteen arrays a frame would be about
+3 MB, so `spotSeries` carries every variable and the frames the two the map draws. `precip` is differenced from
 DWD's `tot_prec` accumulation and is `null` at hour 0, where the frame is all nulls;
 `ww` is a WMO code that must never be interpolated or blended; `tg` over sea is a
 model SST **proxy** and must be labelled as one wherever it is shown.
@@ -1506,7 +1515,7 @@ weather/harmonie-eps.json, weather/harmonie-eps-RUN-48h-v1-HASH8/ HARMONIE EPS, 
 weather/mi-swan.json, weather/mi-swan-RUN-144h-v1-HASH8/    Irish Shelf SWAN: squares + 49 wave-height frames (--frames)
 weather/ibi-wave.json, weather/ibi-wave-RUN-239h-v1-HASH8/  Copernicus Marine IBI waves: squares only
 weather/currents.json, weather/currents-RUN-72h-v1-HASH8/   ROMS surface currents: 73 JSON frames + squares
-weather/icon-eu-weather.json, weather/icon-eu-weather-RUN-72h-v1-HASH8/  surface weather: 73 rain frames + squares
+weather/icon-eu-weather.json, weather/icon-eu-weather-RUN-72h-v1-HASH8/  surface weather: 73 rain and cloud frames + squares
 weather/gfs-weather.json, weather/gfs-weather-RUN-384h-v1-HASH8/  GFS surface weather: squares only
 weather/gfs-wave.json, weather/gfs-wave-RUN-240h-v1-HASH8/  GFS-Wave: squares only
 weather/met-office-wave.json, weather/met-office-wave-RUN-60h-v1-HASH8/  Met Office NWS Wave: squares only
