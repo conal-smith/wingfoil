@@ -672,7 +672,9 @@ export function createLights(
         (entry) => entry && inView(entry) && !isBead(entry.el),
       ) ??
       all.find((entry) => inView(entry) && !isBead(entry.el)) ??
-      all.find(inView) ??
+      all.find(
+        (entry) => inView(entry) && !entry.el.classList.contains("lt-under"),
+      ) ??
       all[0];
     if (next === stop) return;
     if (stop) stop.el.tabIndex = -1;
@@ -699,7 +701,11 @@ export function createLights(
       map.getCanvas().focus();
       return;
     }
-    const shown = [...entries].filter(([, e]) => e === from || inView(e));
+    // Not a bead a pill stands on: it is out of sight, and takes no focus.
+    const shown = [...entries].filter(
+      ([, e]) =>
+        e === from || (inView(e) && !e.el.classList.contains("lt-under")),
+    );
     const id = nextLight(
       shown.map(([id, { x, y }]) => ({ id, x, y })),
       { id: from.el.dataset.spotId!, x: from.x, y: from.y },

@@ -76,7 +76,8 @@ test("the first stop skips to the forecast, and the lights are one stop on the w
   await page.keyboard.press("Tab");
   expect((await focused(page)).bar).toBe(true);
 
-  // Without it, the forecast is a dozen presses from the top, past one light.
+  // Without it, the forecast is a dozen presses from the top, past one light
+  // and the card beside its pill (its close and its link).
   await page.reload();
   await lightsUp(page, false);
   await expect(page.locator(".scrub[data-spot=brandon]")).toBeVisible({
@@ -84,7 +85,7 @@ test("the first stop skips to the forecast, and the lights are one stop on the w
   });
   const way = await tabsUntil(page, (at) => at.bar);
   expect(way.lights).toBe(1);
-  expect(way.presses).toBeLessThan(16);
+  expect(way.presses).toBeLessThan(19);
   await expect(page.locator('.spot-marker[tabindex="0"]')).toHaveCount(1);
 });
 
@@ -113,9 +114,10 @@ test("the arrows walk the lights, Enter opens one, and Escape leaves them", asyn
   expect(
     await page.locator(`.spot-marker[data-spot-id="${from}"]`).boundingBox(),
   ).toEqual(box);
-  // Its name shows on the light the keys are on.
+  // The light the keys are on shows as its light pill: no name stands on
+  // the map (2026-11-08).
   await expect(
-    page.locator(`.spot-marker[data-spot-id="${to}"] .lt-lab`),
+    page.locator(`.spot-marker[data-spot-id="${to}"] .lt-pill`),
   ).toBeVisible();
 
   // Tab leaves the lights in one press, and Shift+Tab comes back to that one.
