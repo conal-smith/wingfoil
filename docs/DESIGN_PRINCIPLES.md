@@ -935,6 +935,21 @@ cheaper. And then when you zoom in, then you know it shows the more detail."
 Coloured wind stays off by default, and the two exclude each other: turning
 either on turns the other off.
 
+**2026-11-07 — The sea's coast is the chart's one bright line.** At country
+zoom every lough, pond and river polygon, and every island in them, was
+outlined in the coast's ink, and dozens of squiggles across the midlands and
+Scotland drew the eye off the coast, where the spots are. Now the coast's ink
+goes round the sea alone. Inland water is a wash of the water's ink (the
+rivers' colour, as on the light chart paper and land are a shade apart), faint
+and with no line below zoom 7.5, where ponds and intermittent water are left
+out too. From 7.5 the wash comes up and the loughs take a faint shore of their
+own, full by zoom 9 (`INLAND_QUIET_UNTIL`, force5/src/chartStyle.ts). The
+basemap's tiles carry no area, so a lough is not chosen by size; they thin
+their own water the further out they are, and the faint wash leaves what they
+keep a few pixels at most. An island in the sea is a hole in the sea's
+polygon, so its outline is the coast's and stays; the tiles drop the smallest
+at the widest zooms.
+
 ---
 
 ## Still open

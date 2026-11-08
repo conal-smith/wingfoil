@@ -7,6 +7,8 @@ ECMWF_RANGES = [{"throughHour": 144, "stepHours": 3},
 # wave stream share it exactly, so both are held to it rather than to the looser
 # general rule: a resampled or invented hour cannot publish under these ids.
 ECMWF_LADDER_MODELS = ("ecmwf", "ecmwf-wave")
+# The kinds whose runs publish spot series of declared variables and optional frames.
+VARIABLES_KINDS = ("wave", "weather", "current")
 
 
 def ladder_hours(ranges):
@@ -55,12 +57,33 @@ def expected_hours(manifest):
         return hours
     if step not in (1, 3, 6):
         raise ValueError("Unsupported source cadence")
-    if not manifest["frames"] and manifest.get("kind") in ("wave", "weather", "current"):
-        # A wave, weather or current bundle publishes spot series with no map frames; the horizon is
-        # then declared rather than implied by the frame count.
+    if ((not manifest["frames"] or manifest.get("frameStepHours") is not None)
+            and manifest.get("kind") in VARIABLES_KINDS):
+        # A wave, weather or current bundle publishes spot series with no map frames, or
+        # frames at a step of their own (`frame_hours`); the horizon is then declared
+        # rather than implied by the frame count.
         horizon = manifest.get("horizonHours")
         if (not isinstance(horizon, int) or isinstance(horizon, bool)
                 or not 0 < horizon <= 384 or horizon % step):
             raise ValueError("Unsupported source cadence")
         return tuple(range(0, horizon + step, step))
     return tuple(range(0, len(manifest["frames"]) * step, step))
+
+
+def frame_hours(manifest):
+    """The hours a run's map frames are at: the series' own, or every `frameStepHours`.
+
+    A wave, weather or current run may publish its frames more sparsely than its
+    spot series (MI SWAN's wave-height map every three hours beside hourly
+    series), declaring `frameStepHours` and its `horizonHours`. The frames then
+    fall on series steps from the run hour to the horizon, both included.
+    """
+    step = manifest.get("frameStepHours")
+    if step is None:
+        return expected_hours(manifest)
+    series = expected_hours(manifest)
+    if (manifest.get("kind") not in VARIABLES_KINDS or manifest.get("stepRanges") is not None
+            or not isinstance(step, int) or isinstance(step, bool) or step not in (1, 3, 6)
+            or step % manifest["stepHours"] or series[-1] % step):
+        raise ValueError("Unsupported frame cadence")
+    return tuple(range(0, series[-1] + 1, step))

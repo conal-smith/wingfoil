@@ -14,9 +14,11 @@
  * Wind frames are published as tiles (scripts/f5tile.mjs, the same bytes
  * force5/ingest/f5tile.py writes), every tile of every level of every hour,
  * with the manifest's `tiles` block saying where they are. Wave and weather
- * frames are JSON. Production no longer publishes those, because nothing reads
- * them; the samples keep them so that the contract's optional frame path, which
- * every validator still accepts, keeps a fixture of its own.
+ * frames are JSON. Production publishes them only for the map's layers:
+ * ICON-EU weather's rain and cloud every hour and MI SWAN's wave height every
+ * three hours, each carrying only those variables (`frameVariables`). The samples
+ * keep GFS-Wave's full frames as well, so that the contract's general frame
+ * path, which every validator still accepts, keeps a fixture of its own.
  *
  *   npm run weather:fixtures     the committed fixtures the unit tests read
  *   npm run weather:sample       the same bundles in public/weather, for local
@@ -400,6 +402,9 @@ const WEATHER_VARIABLES = {
     // corner of every frame is genuinely clear sky, which is the case a reader
     // that treats 0 as "nothing loaded" rather than "none" gets wrong.
     spec: { base: 0, amp: 0, gx: 7, gy: 6, period: 21, phase: 0.05, floor: 0 },
+    // The frames carry it in per cent to the nearest 5, as the adapter does
+    // (CLOUD_FRAME_STEP); the series keep the whole per cent.
+    frameStep: 5,
   },
   clcl: {
     units: "%",
@@ -720,6 +725,15 @@ function waveBundle(model, spots, runMs, grid) {
   const hours = frameHours(model);
   const prefix = `${model.id}-${run}-${hours[hours.length - 1]}h-v1`;
   const names = Object.keys(WAVE_VARIABLES);
+  // A run may grid fewer variables than its series carry, every
+  // `frameStepHours` rather than every step, and round them more coarsely
+  // (`framePrecision`), as MI SWAN's wave-height frames are.
+  const gridded = model.frameVariables ?? names;
+  const frameStep = model.frameStepHours ?? model.stepHours;
+  const digits = (name) =>
+    model.framePrecision?.[name] === undefined
+      ? 2
+      : Math.round(-Math.log10(model.framePrecision[name]));
   const mask = new Array(grid.width * grid.height).fill(false);
   // A cell another location reads from stays water: one masked corner is
   // enough to mask a location, and with 149 places on a coarse sample grid a
@@ -756,6 +770,7 @@ function waveBundle(model, spots, runMs, grid) {
     const valid = iso(runMs + hour * HOUR);
     const fields = {};
     const planes = {};
+    const framed = hour % frameStep === 0;
     for (const [name, variable] of Object.entries(WAVE_VARIABLES)) {
       planes[name] = plane(
         grid,
@@ -763,29 +778,32 @@ function waveBundle(model, spots, runMs, grid) {
         hour,
         model.seed + names.indexOf(name) * 0.11,
       );
+      if (!framed || !gridded.includes(name)) continue;
       // A partition only exists where the source separated one. This bundle
       // separates the first swell at initialization and nowhere else, which is
       // how a real run reads: a sparser row of dashes, never a row of zeroes.
       fields[name] = bounded(
         separated(name, hour)
-          ? field(grid, planes[name], 2, mask)
+          ? field(grid, planes[name], digits(name), mask)
           : new Array(grid.width * grid.height).fill(null),
         1000,
         null,
         `${model.id} ${name}`,
       );
     }
-    const payload = {
-      model: model.id,
-      run,
-      hour,
-      validTime: valid,
-      grid,
-      ...fields,
-    };
-    const url = `weather/${prefix}/${pad(hour, 3)}.json`;
-    files.push([url, payload]);
-    frames.push({ hour, validTime: valid, url });
+    if (framed) {
+      const payload = {
+        model: model.id,
+        run,
+        hour,
+        validTime: valid,
+        grid,
+        ...fields,
+      };
+      const url = `weather/${prefix}/${pad(hour, 3)}.json`;
+      files.push([url, payload]);
+      frames.push({ hour, validTime: valid, url });
+    }
     for (const spot of spots) {
       const wet = resolved.get(spot.id);
       const x = spotX(grid, spot.lon);
@@ -837,7 +855,15 @@ function waveBundle(model, spots, runMs, grid) {
     runTime: iso(runMs),
     generatedAt: iso(runMs),
     stepHours: model.stepHours,
+    ...(model.frameStepHours === undefined
+      ? {}
+      : {
+          horizonHours: hours[hours.length - 1],
+          frameStepHours: model.frameStepHours,
+        }),
     grid,
+    ...(model.frameVariables ? { frameVariables: model.frameVariables } : {}),
+    ...(model.framePrecision ? { framePrecision: model.framePrecision } : {}),
     variables: Object.fromEntries(
       Object.entries(WAVE_VARIABLES).map(([name, variable]) => [
         name,
@@ -1007,6 +1033,12 @@ function weatherBundle(model, spots, runMs, grid) {
         // The step that has no interval has no amount either, everywhere.
         fields[name] = new Array(grid.width * grid.height).fill(null);
       else fields[name] = field(grid, planes[name], variable.decimals);
+      if (variable.frameStep)
+        fields[name] = fields[name].map((value) =>
+          value === null
+            ? null
+            : Math.round(value / variable.frameStep) * variable.frameStep,
+        );
       bounded(
         fields[name],
         100000,
@@ -1119,6 +1151,9 @@ const FIXTURE_RUNS = {
   arome: "2026-09-16T15:00:00Z",
   aifs: "2026-09-16T06:00:00Z",
   "gfs-wave": "2026-09-16T18:00:00Z",
+  // The model day after GFS-Wave's sample run, at 00 UTC as SWAN's always is,
+  // so its hours fall in the night midweek GFS-Wave's cover.
+  "mi-swan": "2026-09-17T00:00:00Z",
   "icon-eu-weather": "2026-09-16T18:00:00Z",
   "gfs-weather": "2026-09-16T18:00:00Z",
   currents: "2026-09-13T00:00:00Z",
@@ -1246,8 +1281,30 @@ const CATALOGUE = [
     live: { horizonHours: 72 },
   },
   {
-    // Hourly, as the adapter fetches it, with the rain alone in its frames:
-    // the chart's Rain layer draws them.
+    // Only with --all (the dev sample and the e2e site): MI SWAN as its job
+    // publishes it, hourly series and a wave-height frame every three hours
+    // at a tenth of a metre on the shelf grid's 0.025°, for the map's Waves
+    // layer (force5/src/waveFrames.ts). The e2e site's run has three frames,
+    // at 00, 03 and 06 UTC, the last three hours past GFS-Wave's sample run.
+    id: "mi-swan",
+    file: "mi-swan.json",
+    kind: "wave",
+    name: "Irish Shelf SWAN",
+    seed: 0.47,
+    stepHours: 1,
+    horizonHours: 6,
+    frameStepHours: 3,
+    frameVariables: ["swh"],
+    framePrecision: { swh: 0.1 },
+    resolutionKm: 2.8,
+    spacing: { fixtures: 0.125, live: 0.025, site: 0.025 },
+    live: { horizonHours: 144 },
+    optional: true,
+  },
+  {
+    // Hourly, as the adapter fetches it, with the rain and the total cloud in
+    // its frames: the chart's Rain layer draws the rain, and the cloud, from a
+    // clear corner to most of the sky overcast, is there for the sky.
     id: "icon-eu-weather",
     file: "icon-eu-weather.json",
     kind: "weather",
@@ -1256,7 +1313,7 @@ const CATALOGUE = [
     stepHours: 1,
     horizonHours: 3,
     resolutionKm: 6.5,
-    frameVariables: ["precip"],
+    frameVariables: ["precip", "clct"],
     spacing: { fixtures: 0.25, live: 0.125 },
     live: { horizonHours: 72 },
     // The e2e site's run is the day's own, as production's is: it starts with

@@ -105,6 +105,12 @@ def main():
                         help="HARMONIE/ICON (wind and weather) cadence; ECMWF always uses "
                         "native 3/6-hour steps, GFS weather hourly to +120 h and 3-hourly beyond")
     parser.add_argument("--run", help="Optional available run; normally discover automatically")
+    parser.add_argument("--frames", action="store_true",
+                        help="Map frames from an adapter that publishes them only when asked "
+                        "(registry `framesOnRequest`: MI SWAN's wave height)")
+    parser.add_argument("--frame-step", type=int, choices=[1, 3, 6],
+                        help="With --frames: hours between those frames, the adapter's own "
+                        "default otherwise; its spot series keep their step")
     parser.add_argument("--ecmwf-source", choices=["aws", "ecmwf", "google"],
                         default=os.environ.get("ECMWF_SOURCE", "ecmwf"),
                         help="ECMWF-hosted by default; the AWS mirror throttles with 503 SlowDown")
@@ -137,6 +143,11 @@ def main():
         parser.error("Age limit and timeout must be positive")
     if args.always_hours and not args.daylight_only:
         parser.error("--always-hours only applies with --daylight-only")
+    if args.frame_step is not None and not args.frames:
+        parser.error("--frame-step only applies with --frames")
+    unframed = [model for model in args.models if not MODELS[model].get("framesOnRequest")]
+    if args.frames and unframed:
+        parser.error(f"--frames: {', '.join(unframed)} publish no frames on request")
     if args.daylight_only and skipped_in_the_dark(args.models, args.always_hours):
         return 0
     root = Path(os.environ.get("FORCE5_WORK_DIR", str(Path(__file__).resolve().parents[2])))
@@ -241,6 +252,10 @@ def run_models(args, root, s3):
                     command += ["--source", args.noaa_source]
                 if args.run and MODELS[model]["kind"] == "wind":
                     command += ["--run", args.run]
+                if args.frames:
+                    command += ["--frames"]
+                    if args.frame_step is not None:
+                        command += ["--frame-step", str(args.frame_step)]
                 # The blend, the archive and the verification read what the bucket
                 # serves, so they are told where that is; the credentials stay in the
                 # environment they inherit.

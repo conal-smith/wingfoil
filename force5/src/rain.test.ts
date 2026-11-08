@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLOUD_FRAME_STEP,
+  CLOUD_VARIABLE,
   DRY_MM_PER_HOUR,
   RAIN_KEY_MM,
   RAIN_STOPS,
+  frameCloud,
+  framesCarryCloud,
   rainColour,
   rainFigure,
   rainFrameAt,
@@ -256,6 +260,58 @@ describe("a rain frame as published", () => {
       expect(() => validateRainFrame(bad, manifest, info)).toThrow(
         /Invalid rain frame/,
       );
+  });
+
+  it("keeps its rain whatever its cloud, which is checked on its own", () => {
+    for (const clct of [[0, 100], [101, 0], [50], [null, -1]])
+      expect(
+        validateRainFrame({ ...good, clct }, manifest, info).precip,
+      ).toEqual([0, 1.4]);
+  });
+});
+
+describe("the total cloud in a frame", () => {
+  const grid = { width: 2, height: 2 };
+  const frame = (clct: unknown) => ({ clct }) as Pick<RainFrame, "clct">;
+
+  it("reads per cent per cell, a clear 0 kept apart from an unknown null", () => {
+    // Published in steps of 5 %, and read as the per cent it is, not a count.
+    expect(CLOUD_FRAME_STEP).toBe(5);
+    expect(frameCloud(frame([0, 35, 100, null]), grid)).toEqual([
+      0,
+      35,
+      100,
+      null,
+    ]);
+  });
+
+  it("is none for a run published before the frames carried it", () => {
+    expect(frameCloud(frame(undefined), grid)).toBeNull();
+  });
+
+  it("is none, not an error, for the wrong size or a value off the scale", () => {
+    for (const bad of [
+      [0, 0, 0],
+      [0, 0, 0, 101],
+      [0, -1, 0, 0],
+      [0, "50", 0, 0],
+      [0, Number.NaN, 0, 0],
+      "overcast",
+    ])
+      expect(frameCloud(frame(bad), grid)).toBeNull();
+  });
+
+  it("is declared by the run's frame variables", () => {
+    const variables = { precip: {}, clct: {}, t2m: {} };
+    expect(CLOUD_VARIABLE).toBe("clct");
+    expect(
+      framesCarryCloud({ variables, frameVariables: ["precip", "clct"] }),
+    ).toBe(true);
+    expect(framesCarryCloud({ variables, frameVariables: ["precip"] })).toBe(
+      false,
+    );
+    // No narrowing: the frames carry every variable, cloud among them.
+    expect(framesCarryCloud({ variables })).toBe(true);
   });
 });
 

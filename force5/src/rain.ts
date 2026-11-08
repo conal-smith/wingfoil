@@ -1,6 +1,7 @@
 // Rain: ICON-EU's hourly precipitation, as force5/ingest/fetch_icon_weather.py
-// publishes it (weather/icon-eu-weather.json, one `precip` frame an hour), and
-// what the chart's Rain layer and the dock's rain row make of it.
+// publishes it (weather/icon-eu-weather.json, one frame an hour carrying
+// `precip` and the total cloud `clct`), and what the chart's Rain layer and the
+// dock's rain row make of it. The cloud is read here and drawn by nothing yet.
 //
 // A step's rain is the amount in the interval that ends at it, so it belongs
 // to that interval and to no other hour. Both readers say it per hour: the
@@ -18,8 +19,16 @@ import type { Grid } from "./weather";
 /** The weather run whose frames carry the rain. */
 export const RAIN_MODEL = "icon-eu-weather";
 export const RAIN_URL = "weather/icon-eu-weather.json";
-/** The variable the frames carry. */
+/** The variable the frames carry for the Rain layer. */
 export const RAIN_VARIABLE = "precip";
+/** The total cloud the same frames carry, for the sky. */
+export const CLOUD_VARIABLE = "clct";
+/**
+ * The frames' cloud is per cent rounded to the nearest 5 (0, 5, ..., 100),
+ * not a count of steps: half the bytes of whole per cent once compressed, and
+ * finer than a map's shade of grey shows. The spot series keep whole per cent.
+ */
+export const CLOUD_FRAME_STEP = 5;
 /** Less than this in an hour is dry: ICON rounds to 0.1 mm, so this is none. */
 export const DRY_MM_PER_HOUR = 0.05;
 /** Where the map's drizzle starts to fade in, between a dry cell and a wet one. */
@@ -55,6 +64,13 @@ export interface RainFrame {
   precipIntervalHours: [number, number] | null;
   /** Millimetres in the interval, per cell, rows north to south; null where none. */
   precip: (number | null)[];
+  /**
+   * Total cloud at the hour, per cent to the nearest 5 per cell, rows north
+   * to south.
+   * Absent from runs published before the frames carried it: read it through
+   * `frameCloud`, never directly.
+   */
+  clct?: (number | null)[];
 }
 
 /** What the map draws: the mm/h of every cell over some hours, on one grid. */
@@ -215,6 +231,40 @@ export function validateRainFrame(
   )
     throw new Error("Invalid rain frame. Refresh the weather forecast.");
   return frame;
+}
+
+/** Whether a weather run's frames carry the total cloud. */
+export const framesCarryCloud = (manifest: {
+  frameVariables?: readonly string[];
+  variables: Record<string, unknown>;
+}) =>
+  (manifest.frameVariables ?? Object.keys(manifest.variables)).includes(
+    CLOUD_VARIABLE,
+  );
+
+/**
+ * A frame's total cloud, per cell in per cent (0 clear, 100 overcast, null
+ * unknown), published to the nearest 5 % (`CLOUD_FRAME_STEP`) and read as the
+ * per cent it is, so nothing here depends on the step. Null when the frame
+ * carries none or carries it malformed: the wrong length for the grid, or a
+ * value outside 0 to 100. A frame whose cloud
+ * is bad still holds good rain, so `validateRainFrame` leaves the cloud alone
+ * and this says "no cloud" rather than throwing.
+ */
+export function frameCloud(
+  frame: Pick<RainFrame, "clct">,
+  grid: Pick<Grid, "width" | "height">,
+): readonly (number | null)[] | null {
+  const cloud: unknown = frame.clct;
+  if (!Array.isArray(cloud) || cloud.length !== grid.width * grid.height)
+    return null;
+  const usable = (value: unknown) =>
+    value === null ||
+    (typeof value === "number" &&
+      Number.isFinite(value) &&
+      value >= 0 &&
+      value <= 100);
+  return cloud.every(usable) ? (cloud as (number | null)[]) : null;
 }
 
 /**
