@@ -12,16 +12,17 @@
  */
 import {
   LEVEL_LABEL,
+  MET_WARNINGS_PAGE,
   validityText,
   warningKind,
 } from "../../force5/src/warnings";
 import type { WarningItem, WarningsAnswer } from "../../mcp/api/warnings";
-import { Notice } from "../../ui";
+import { Link, Notice } from "../../ui";
 import { tv } from "../../ui/tv";
 
 export const noticeListStyles = tv({
   slots: {
-    list: "m-0 grid list-none gap-2 p-0",
+    list: "m-0 grid list-none gap-1.5 p-0",
     effect: "font-medium text-ink",
     line: "m-0",
     more: "grid gap-1",
@@ -123,6 +124,13 @@ export function WarningNotices({
           >
             <Notice
               level={item.level}
+              compact
+              aside={
+                <>
+                  Met Éireann, CC BY 4.0,{" "}
+                  <Link href={MET_WARNINGS_PAGE}>met.ie</Link>
+                </>
+              }
               title={<span data-warning-headline>{warningTitle(item)}</span>}
               detailsLabel={`Details of the ${warningTitle(item).charAt(0).toLowerCase()}${warningTitle(item).slice(1)}`}
               details={

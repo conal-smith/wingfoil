@@ -1,5 +1,5 @@
 /**
- * The spot page's warnings and notices, one group above the cards: Met
+ * The spot page's warnings and notices, one thin line each above the week: Met
  * Éireann's weather warnings (./Warnings.tsx), then the EPA's bathing water
  * notices (./WaterQuality.tsx), under one sentence-case label, with the two
  * sources sharing a line of small print underneath. Nothing with neither.
@@ -21,10 +21,10 @@ import { WaterNotices } from "./WaterQuality";
 
 const styles = tv({
   slots: {
-    group: "grid gap-2",
-    label: "m-0 font-body text-body font-medium text-ink-muted",
+    group: "grid gap-1.5",
     more: "justify-self-start",
-    foot: "m-0 mt-0.5 font-body text-label leading-normal text-ink-muted",
+    // On the widest windows each line ends in its own source instead.
+    foot: "m-0 mt-0.5 font-body text-label leading-normal text-ink-muted cards:hidden",
   },
 });
 
@@ -82,7 +82,7 @@ export function SpotNotices({
   const watered = water.status === "current" && water.items.length > 0;
   return (
     <section className={s.group()} aria-labelledby="notices-title" data-notices>
-      <h2 className={s.label()} id="notices-title">
+      <h2 className="sr-only" id="notices-title">
         Warnings and notices
       </h2>
       <WarningNotices warnings={warnings} folded={folded} />

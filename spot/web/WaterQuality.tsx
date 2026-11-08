@@ -9,6 +9,7 @@
  * rule, the MCP's `spotForecast` the notices. Nothing is shown with none, or
  * none checked.
  */
+import { BEACHES_PAGE } from "../../force5/src/waterQuality";
 import type { WaterAnswer, WaterItem } from "../../mcp/api/waterQuality";
 import { Link, Notice } from "../../ui";
 import { noticeListStyles } from "./Warnings";
@@ -56,6 +57,12 @@ export function WaterNotices({
         >
           <Notice
             level={item.replaces_ratings ? "water" : "water-advice"}
+            compact
+            aside={
+              <>
+                EPA, CC BY 4.0, <Link href={BEACHES_PAGE}>beaches.ie</Link>
+              </>
+            }
             title={item.restriction}
             detailsLabel={`Details of the notice: ${item.restriction}, at ${item.beach}`}
             details={

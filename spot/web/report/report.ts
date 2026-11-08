@@ -5,8 +5,7 @@
  */
 import { LEVEL_LABEL, type WarningLevel } from "../../../force5/src/warnings";
 import { NOTICE_MARK } from "../../../force5/src/waterQuality";
-import type { Agreement } from "../../../mcp/api/forecast";
-import type { DaySun, SpotDay, SpotRow } from "../spot";
+import type { SpotDay, SpotRow } from "../spot";
 import { dayNames } from "../spot";
 
 /**
@@ -61,9 +60,6 @@ export function rowAt(rows: readonly SpotRow[], time: number): SpotRow | null {
   return at ?? rows[0] ?? null;
 }
 
-const isOff = (row: SpotRow) =>
-  row.shore === "offshore" || row.shore === "cross-off";
-
 /** One day's card in the week: its stars, its wind, its small curve. */
 export interface DayCard {
   date: string;
@@ -77,10 +73,6 @@ export interface DayCard {
   hi: number | null;
   /** The wind through the day, for the small curve: hours from midnight, knots. */
   spark: { hour: number; kn: number }[];
-  /** A daylight hour blows offshore or cross-offshore with wind to ride. */
-  offshore: boolean;
-  /** How far the models agree, most of the daylight hours. */
-  sure: Agreement | null;
   /** The strongest warning or notice that took a daylight hour's stars. */
   notice: StandIn | null;
 }
@@ -88,11 +80,6 @@ export interface DayCard {
 export function dayCard(day: SpotDay, now: number, midnight: number): DayCard {
   const light = day.rows.filter((r) => r.hour.daylight && r.hour.wind);
   const names = dayNames(day.date, now);
-  const sure = new Map<Agreement, number>();
-  for (const r of light) {
-    const a = r.hour.wind?.confidence ?? r.hour.wind?.agreement ?? null;
-    if (a) sure.set(a, (sure.get(a) ?? 0) + 1);
-  }
   return {
     date: day.date,
     label: names.relative === "Today" ? "Today" : names.short,
@@ -106,8 +93,6 @@ export function dayCard(day: SpotDay, now: number, midnight: number): DayCard {
         hour: (r.time - midnight) / 3600000,
         kn: r.hour.wind!.wind_kn,
       })),
-    offshore: light.some((r) => isOff(r) && r.hour.wind!.wind_kn >= 12),
-    sure: [...sure].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null,
     notice: day.rows
       .filter((r) => r.hour.daylight)
       .map(standIn)
@@ -139,39 +124,4 @@ export function smoothPath(
       ` ${f(c[0])},${f(c[1])}`;
   }
   return d;
-}
-
-/** Minutes of light left after now, to last light; null after dark. */
-export function lightLeft(now: number, sun: DaySun): number | null {
-  if (sun.lastLight === null || now >= sun.lastLight) return null;
-  return Math.round(
-    (sun.lastLight - Math.max(now, sun.firstLight ?? now)) / 60000,
-  );
-}
-
-/** "3 h 11 min", "45 min". */
-export function hoursMinutes(minutes: number): { h: number; m: number } {
-  return { h: Math.floor(minutes / 60), m: minutes % 60 };
-}
-
-/** The first moment after `from` the water at the launch falls under `metres`. */
-export function deepUntil(
-  depthAt: (time: number) => number | null,
-  from: number,
-  metres = 1,
-  stepMinutes = 5,
-  limitHours = 14,
-): number | null {
-  const first = depthAt(from);
-  if (first === null || first < metres) return null;
-  for (
-    let t = from;
-    t <= from + limitHours * 3600000;
-    t += stepMinutes * 60000
-  ) {
-    const d = depthAt(t);
-    if (d === null) return null;
-    if (d < metres) return t;
-  }
-  return null;
 }
