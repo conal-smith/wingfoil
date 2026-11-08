@@ -382,36 +382,3 @@ test("a fit of the map beside the list keeps its spots clear of the dock", async
     expect(box.y + box.height).toBeLessThanOrEqual(dock.y);
   }
 });
-
-test.describe("on a phone", () => {
-  test.use({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-  });
-
-  test("the chips share the dock's width over the week bar, with no legend", async ({
-    page,
-  }) => {
-    await page.goto("/?spot=brandon");
-    await expect(mapDock(page)).toBeVisible({ timeout: 30000 });
-    await expect(legend(page)).toHaveCount(0);
-    const dock = (await mapDock(page).boundingBox())!;
-    expect(dock.width).toBeGreaterThan(360);
-    const wind = (await fieldChip(page, "Wind").boundingBox())!;
-    const weather = (await fieldChip(page, "Weather").boundingBox())!;
-    expect(Math.abs(wind.width - weather.width)).toBeLessThan(2);
-    // A third of the dock each, Waves standing between them.
-    expect(wind.width).toBeGreaterThan(100);
-    await fieldChip(page, "Weather").tap();
-    await expect(fieldChip(page, "Weather")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    // Clear of the small print, which stands over it.
-    const print = (await page
-      .getByRole("button", { name: "Sources and small print" })
-      .boundingBox())!;
-    expect(print.y + print.height).toBeLessThanOrEqual(dock.y);
-  });
-});

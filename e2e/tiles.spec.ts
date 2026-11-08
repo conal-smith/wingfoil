@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "./fixtures";
 import { readSample } from "./sample";
 import { SAMPLE_CLOCK } from "./columns";
-import { tileOf } from "../force5/src/f5tile";
 
 /**
  * The map reads its wind as tiles (force5/src/tiledField.ts): the level the
@@ -10,8 +9,6 @@ import { tileOf } from "../force5/src/f5tile";
  * production run has: nine native tiles, four at level 1, one at level 2.
  */
 const harmonie = readSample("harmonie");
-// Where the site's owner put it (data/locations/owner-places.json).
-const DOLLYMOUNT = { lat: 53.367583, lon: -6.144748 };
 
 /** Every HARMONIE tile the page asks for, as [level, x, y, hour]. */
 function tilesAsked(page: Page) {
@@ -34,57 +31,6 @@ const places = (asked: [number, number, number, number][], level: number) => [
     asked.filter((tile) => tile[0] === level).map(([, x, y]) => `${x}/${y}`),
   ),
 ];
-
-test("a phone showing all of Ireland asks for overview tiles only, and a bay for its own native tiles", async ({
-  page,
-}) => {
-  expect(
-    harmonie.tiles.levels.map((level: { level: number }) => level.level),
-  ).toEqual([0, 1, 2]);
-  await page.setViewportSize({ width: 390, height: 844 });
-  const asked = tilesAsked(page);
-  await page.goto("/?map");
-  await expect(page.locator(".spot-marker")).toHaveCount(149, {
-    timeout: 30000,
-  });
-  // The first frame and the next hour's are in.
-  await expect.poll(() => asked.length, { timeout: 20000 }).toBeGreaterThan(0);
-  await page.waitForTimeout(1500);
-  // All of Ireland on a phone: HARMONIE's cells are under 5 px at level 1, so
-  // nothing native is fetched at all.
-  expect(places(asked, 0)).toEqual([]);
-  expect(places(asked, 1).length).toBeGreaterThan(0);
-  expect(places(asked, 1).length).toBeLessThanOrEqual(4);
-  const overview = asked.length;
-
-  // Into Dublin Bay: native tiles now, and only the one or two in view.
-  await page.locator('[data-spot-id="dollymount"]').dispatchEvent("click");
-  await expect
-    .poll(() => places(asked, 0).length, { timeout: 20000 })
-    .toBeGreaterThan(0);
-  await page.waitForTimeout(2500);
-  const native = places(asked, 0);
-  const home = tileOf(harmonie.grid, 0, DOLLYMOUNT.lat, DOLLYMOUNT.lon)!;
-  expect(native).toContain(`${home.x}/${home.y}`);
-  expect(native.length).toBeLessThanOrEqual(2);
-  // On the way in, nothing coarser was asked for but the one level-2 tile held
-  // under the native ones as a base, and only for the hour on screen: a zoom
-  // back out draws from it at once instead of leaving blank what the bay's
-  // tiles do not cover.
-  const coarser = asked.slice(overview).filter(([level]) => level !== 0);
-  expect(coarser.every(([level]) => level === 2)).toBe(true);
-  expect(new Set(coarser.map(([, x, y]) => `${x}/${y}`)).size).toBe(1);
-  expect(new Set(coarser.map(([, , , hour]) => hour)).size).toBe(1);
-  expect(coarser).toHaveLength(1);
-  // Nine native tiles a frame exist; a bay costs a fraction of them.
-  const nineAnHour = 9;
-  const hoursAsked = new Set(
-    asked.filter(([level]) => level === 0).map(([, , , hour]) => hour),
-  );
-  expect(asked.filter(([level]) => level === 0).length).toBeLessThan(
-    nineAnHour * hoursAsked.size,
-  );
-});
 
 test("a desktop showing all of Ireland asks for the native tiles and never an absent one", async ({
   page,

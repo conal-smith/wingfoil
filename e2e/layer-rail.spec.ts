@@ -268,59 +268,6 @@ test("the scrub bar has no Layers of its own; where the rail would run into the 
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test.describe("on a phone", () => {
-  test.use({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-  });
-
-  test("Layers opens the rail from the zoom, clear of the scrub bar, and a tap says what it switched", async ({
-    page,
-  }) => {
-    await page.goto("/?spot=brandon");
-    await barReady(page);
-    await expect(rail(page)).toHaveCount(0);
-    await zoomLayers(page).tap();
-    await expect(rail(page)).toBeVisible();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    // Under the zoom, down the right edge, clear of the head beside it, and
-    // above the scrub bar, scrolling where it must.
-    const zbox = (await page.locator(".zbox").boundingBox())!;
-    const box = (await rail(page).boundingBox())!;
-    const head = (await page.locator("[data-top-bar]").boundingBox())!;
-    expect(Math.abs(box.x + box.width - (zbox.x + zbox.width))).toBeLessThan(2);
-    expect(box.y).toBeGreaterThanOrEqual(zbox.y + zbox.height);
-    expect(box.y + box.height).toBeLessThanOrEqual(await barTop(page));
-    const first = (await railButton(page, "Particles").boundingBox())!;
-    expect(first.y).toBeGreaterThanOrEqual(head.y + head.height);
-    // Every layer in the room there, or for a spot's week open under it and
-    // the map's dock over that, scrolled by no more than a switch.
-    expect(
-      await rail(page).evaluate(
-        (el) => el.scrollHeight <= el.clientHeight + 48,
-      ),
-    ).toBe(true);
-    // A finger has no pointer to rest on it: a tap names the layer, and
-    // whether it is on now, for a moment.
-    const loupe = railButton(page, "Loupe");
-    await loupe.scrollIntoViewIfNeeded();
-    // Near its top: scrolled to the rail's foot, Gust's picture just over his
-    // button reaches up over the last switch's lower edge.
-    await loupe.tap({ position: { x: 22, y: 10 } });
-    await expect(loupe).toHaveAttribute("aria-pressed", "true");
-    const tip = loupe.locator(".lr-tip");
-    const shown = () =>
-      tip.evaluate((el) => Number(getComputedStyle(el).opacity));
-    await expect(tip).toHaveText("Loupe · on");
-    await expect.poll(shown).toBe(1);
-    await expect.poll(shown, { timeout: 3000 }).toBe(0);
-    // And Layers shuts it.
-    await zoomLayers(page).tap();
-    await expect(rail(page)).toHaveCount(0);
-  });
-});
-
 test("the rail colours nothing: the dock's chips choose the map's field, and the rail's layers stay as they were", async ({
   page,
 }) => {

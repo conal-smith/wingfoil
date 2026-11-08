@@ -248,6 +248,8 @@ export function createLights(
    * Without it, the nearest is chosen.
    */
   onCrowd?: (spots: Spot[]) => void,
+  /** The best few chosen anew: their spots, for the page to read for them. */
+  onBest?: (ids: readonly string[]) => void,
 ): Lights {
   const entries = new Map<string, Entry>();
   let laid = "";
@@ -341,6 +343,7 @@ export function createLights(
           },
         ),
       };
+      onBest?.(best.ids);
     }
     return best.ids.flatMap((id) => entries.get(id) ?? []);
   };

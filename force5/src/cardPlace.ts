@@ -2,7 +2,8 @@
  * Where a spot's card stands beside its pill on the full chart: on the side
  * with room, the sea side first and beside it rather than above or below, a
  * small pointer on the card's edge at the pill, and never over the pill. The
- * card stays inside the map, above its dock, and off the map's controls.
+ * card stays inside the map, above its dock, and off the map's controls; with
+ * no side that holds it there is no card.
  *
  * Pure: the pill's box, the card's size and the room in, the card's box and
  * its pointer out.
@@ -42,7 +43,7 @@ export function placeCard(
   const sea = ((seaward ?? 270) * Math.PI) / 180;
   const toSea = [Math.sin(sea), -Math.cos(sea)];
   const ways = { r: [1, 0], l: [-1, 0], b: [0, 1], t: [0, -1] } as const;
-  const options: (CardPlace & { fits: boolean; score: number })[] = [];
+  const options: (CardPlace & { score: number })[] = [];
   for (const side of ["r", "l", "b", "t"] as const) {
     let l: number;
     let t: number;
@@ -65,18 +66,16 @@ export function placeCard(
       box.t >= room.t &&
       box.b <= room.b &&
       !walls.some((wall) => hits(wall, box, 6));
+    if (!fits) continue;
     const [x, y] = ways[side];
     options.push({
       box,
       side,
       along,
-      fits,
       score:
         x * toSea[0] + y * toSea[1] + (side === "r" || side === "l" ? 0.35 : 0),
     });
   }
-  const best = [...options].sort(
-    (a, b) => Number(b.fits) - Number(a.fits) || b.score - a.score,
-  )[0];
+  const best = [...options].sort((a, b) => b.score - a.score)[0];
   return best ? { box: best.box, side: best.side, along: best.along } : null;
 }

@@ -3,7 +3,7 @@ import { barName, barPill, barReady, expect, test } from "./fixtures";
 test("public riding places are on the chart and the Blast alias finds Kilcrea, with its sources behind the i", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 800, height: 844 });
   await page.goto("/?map");
   await expect(page.locator(".spot-marker")).toHaveCount(149, {
     timeout: 30000,

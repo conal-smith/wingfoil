@@ -1929,6 +1929,29 @@
     var(--shadow-float),
     0 0 0 1px color-mix(in srgb, var(--map-pill-ink) 12%, transparent);
 }
+/* On a phone it stands in the top bar, beside the search. */
+.nf-switch.in-bar {
+  position: static;
+  transform: none;
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  background: none;
+}
+.nf-switch.in-bar > * {
+  padding: 0 9px;
+}
+@media (max-width: 340px) {
+  .nf-switch.in-bar > * {
+    padding: 0 5px;
+  }
+}
+@media (max-width: 720px) {
+  .narrow-foot[data-narrow-foot="list"]::before {
+    height: var(--nf-room, 62px);
+  }
+  .app-shell[data-narrow="list"] [data-finder-list] {
+    padding-bottom: 90px;
+  }
+}
 .nf-switch > * {
   height: 28px;
   gap: 5px;

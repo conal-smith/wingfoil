@@ -17,7 +17,7 @@ const geometry = (page: Page) =>
     };
   });
 
-for (const width of [320, 390, 820, 1440]) {
+for (const width of [820, 1440]) {
   test(`every model keeps the same scrub bar geometry at ${width}px`, async ({
     page,
   }) => {

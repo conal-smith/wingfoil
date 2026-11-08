@@ -283,7 +283,7 @@ describe("the navigation", () => {
       features: { market: false, community: false },
     });
     expect(markup).not.toMatch(/Marketplace|Community|\/market|\/community/);
-    expect(markup.match(/<li>/g)).toHaveLength(7);
+    expect(markup.match(/<li[ >]/g)).toHaveLength(7);
     expect(markup).not.toContain("Preview");
   });
 

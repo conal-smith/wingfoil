@@ -235,6 +235,8 @@ type Props = {
    * stands beside the map: the spots there, the nearest first.
    */
   onCrowd?: (spots: Spot[]) => void;
+  /** The spots the best few pills went to, as they are chosen. */
+  onBestPills?: (ids: readonly string[]) => void;
   /** Which spots have a pill (./lights.ts): the cards in view, or the best few. */
   pills: PillMode;
   /**
@@ -1403,6 +1405,7 @@ export default function WindMap(props: Props) {
       (spot, bead) => latest.current.onSelect(spot, bead),
       (spot) => latest.current.onHoverSpot?.(spot),
       (spots) => latest.current.onCrowd?.(spots),
+      (ids) => latest.current.onBestPills?.(ids),
     );
     lightsRef.current.light(lit.current);
     lightsRef.current.foot(latest.current.bottomInset);

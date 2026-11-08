@@ -86,8 +86,8 @@ test("the map opens first, then the list, the switch and the chips standing stil
   await page.waitForTimeout(600);
   expect(await pilled(page)).toEqual(before);
 
-  // The list: the head and the cards; the switch and the chips stay where
-  // they were, and the hours go, the cards having them.
+  // The list: the head and the cards; the switch in the top bar and the chips
+  // stay where they were, and the hours go, the cards having them.
   const switchBox = (await switchTo(page, "List").boundingBox())!;
   await switchTo(page, "List").tap();
   await expect(foot(page)).toHaveAttribute("data-narrow-foot", "list");
@@ -99,8 +99,10 @@ test("the map opens first, then the list, the switch and the chips standing stil
   const chipAfter = (await chips.first().boundingBox())!;
   expect(Math.abs(chipAfter.y - chipBox.y)).toBeLessThan(2);
   const switchAfter = (await switchTo(page, "List").boundingBox())!;
-  expect(switchAfter.y).toBeGreaterThan(chipAfter.y - 120);
-  expect(switchAfter.y).toBeLessThan(chipAfter.y);
+  const bar = (await page.locator("[data-top-bar]").boundingBox())!;
+  expect(switchAfter.y + switchAfter.height).toBeLessThanOrEqual(
+    bar.y + bar.height,
+  );
   expect(Math.abs(switchAfter.x - switchBox.x)).toBeLessThan(2);
   // The heart off, the list is the spots the map showed.
   expect(await page.locator("[data-spot-card]").count()).toBeLessThanOrEqual(
@@ -109,6 +111,38 @@ test("the map opens first, then the list, the switch and the chips standing stil
   await switchTo(page, "Map").tap();
   await expect(foot(page)).toHaveAttribute("data-narrow-foot", "map");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+});
+
+test("a phone has no full chart: its links land on the map or the spot", async ({
+  page,
+}) => {
+  await page.goto("/?map");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(switchTo(page, "Map")).toHaveAttribute("aria-pressed", "true");
+  const bar = page.locator("[data-top-bar]");
+  await expect(bar.getByRole("link", { name: "Chart" })).toHaveCount(0);
+  await bar.getByRole("button", { name: "Site menu" }).tap();
+  for (const name of ["Chart", "Take the tour"])
+    await expect(page.getByRole("link", { name, exact: true })).toHaveCount(0);
+  await page.goto("/?spot=keel");
+  await expect(page).toHaveURL(/\/spot\/keel/);
+  await expect(
+    page.locator("[data-top-bar]").getByRole("link", { name: "Chart" }),
+  ).toHaveCount(0);
+});
+
+test("a pill on the map says its figure, listed or not", async ({ page }) => {
+  await openMap(page);
+  await foot(page).getByRole("button", { name: "Weather" }).tap();
+  await expect
+    .poll(
+      () =>
+        pills(page)
+          .locator(".lt-pill")
+          .evaluateAll((els) => els.map((el) => el.textContent!.trim())),
+      { timeout: 30000 },
+    )
+    .not.toContain("–");
 });
 
 test("a pill tapped turns light and peeks; tapped again it opens its spot", async ({
@@ -124,10 +158,10 @@ test("a pill tapped turns light and peeks; tapped again it opens its spot", asyn
   ).toHaveCount(1);
   for (const row of ["Wind", "Waves", "Weather", "Tide"])
     await expect(peek(page).getByText(row, { exact: true })).toBeVisible();
-  // Above the dock and the switch, and on the screen.
+  // Above the dock, and on the screen.
   const box = (await peek(page).boundingBox())!;
-  const switchBox = (await switchTo(page, "Map").boundingBox())!;
-  expect(box.y + box.height).toBeLessThanOrEqual(switchBox.y);
+  const dockBox = (await foot(page).locator("[data-hour-bar]").boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(dockBox.y);
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(390);
   // Tapped again, a moment on, its spot.

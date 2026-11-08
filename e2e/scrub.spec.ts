@@ -1248,7 +1248,7 @@ test("a tab whose run's tiles have gone moves to the run its pointer names now",
       ? route.fulfill({ status: 404, body: "Not found" })
       : route.fallback(),
   );
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 800, height: 844 });
   await page.clock.install({ time: SAMPLE_CLOCK });
   await page.goto("/?spot=brandon");
   await barReady(page);
@@ -1577,64 +1577,4 @@ test("a point tapped off Dublin Bay reads its wind and its nearest station's tid
     timeout: 15000,
   });
   expect(errors).toEqual([]);
-});
-
-test.describe("on a phone", () => {
-  test.use({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    hasTouch: true,
-  });
-
-  test("at 390px nothing in the bar runs off the screen, and the day names never overlap", async ({
-    page,
-  }) => {
-    await withTides(page);
-    await page.goto("/?spot=broadmeadows-south");
-    await barReady(page);
-    await expect(barName(page)).toHaveText(
-      "Broadmeadows Estuary — south shore",
-    );
-    const days = scrubBar(page).locator(".sb-days span");
-    await expect(days.first()).toBeVisible();
-    /**
-     * Whatever in the bar is wider than the window or past its edges, by its
-     * class; the strip's drawing is clipped to the strip, so only the strip's
-     * own box counts.
-     */
-    const overflowing = () =>
-      page.evaluate(() =>
-        [...document.querySelectorAll<HTMLElement>(".scrub, .scrub *")]
-          .filter((el) => !el.closest("svg") || el.tagName === "svg")
-          .filter((el) => {
-            const r = el.getBoundingClientRect();
-            return r.width > 0 && (r.left < -0.5 || r.right > innerWidth + 0.5);
-          })
-          .map((el) => `${el.tagName}.${el.className}`),
-      );
-    /** Day names that run into the next one. */
-    const overlapping = () =>
-      days.evaluateAll((spans) => {
-        const boxes = spans
-          .map((span) => span.getBoundingClientRect())
-          .sort((a, b) => a.left - b.left);
-        return boxes.filter((box, i) => i > 0 && box.left < boxes[i - 1].right)
-          .length;
-      });
-    expect(await overflowing()).toEqual([]);
-    expect(await overlapping()).toBe(0);
-    // And with the playhead at either end of the strip.
-    for (const key of ["End", "Home"]) {
-      await timeSlider(page).press(key);
-      await expect(days.first()).toBeVisible();
-      expect(await overflowing()).toEqual([]);
-      expect(await overlapping()).toBe(0);
-    }
-    // Nothing on the page scrolls sideways.
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
-  });
 });

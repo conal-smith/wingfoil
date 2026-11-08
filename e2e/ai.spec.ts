@@ -34,14 +34,15 @@ test("the line, then a row for each app with its maker's mark", async ({
     "Another app",
   ]);
   // Each app's mark is its maker's own file, and it is there.
-  const marks = await page.locator(".ai-logo img, .ai-logo .mono").evaluateAll(
-    (els) =>
+  const marks = await page
+    .locator(".ai-logo img, .ai-logo .mono")
+    .evaluateAll((els) =>
       els.map((el) =>
         el instanceof HTMLImageElement
           ? el.getAttribute("src")
           : getComputedStyle(el).getPropertyValue("--ai-mark").trim(),
       ),
-  );
+    );
   expect(marks).toEqual([
     "url(/logos/openai-blossom.svg)",
     "url(/logos/grok-logomark.svg)",

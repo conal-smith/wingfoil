@@ -5,7 +5,7 @@
  * outlined button for the other view (Chart, or Spots on the chart), light or
  * dark, and the site menu at the far right. 64px tall, 56 on a phone, with one
  * hairline under it and nothing heavier. On a phone the search folds into a
- * round button and light or dark moves into the menu.
+ * round button, light or dark moves into the menu, and there is no Chart.
  *
  *   <TopBar
  *     search={<SpotSearch onPick={…} />}
@@ -116,7 +116,10 @@ export function TopBar({
       {view && (
         <Button
           href={view.href}
-          className={s.view()}
+          className={s.view({
+            // No full chart on a phone: its map is the finder's.
+            className: view.to === "chart" ? "max-wide:hidden" : undefined,
+          })}
           title={view.to === "chart" ? "The full chart" : "The list of spots"}
           onClick={
             view.onClick

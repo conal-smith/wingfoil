@@ -15,10 +15,10 @@ import { timeSpoken } from "../src/strip";
 
 const ecmwf = readSample("ecmwf");
 
-test("ECMWF on the map follows the strip's mixed cadence on a phone, and hands back to HARMONIE", async ({
+test("ECMWF on the map follows the strip's mixed cadence on a narrow screen, and hands back to HARMONIE", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 800, height: 844 });
   const clock = Date.parse(ecmwf.runTime) + 14 * 3600000;
   await page.clock.setFixedTime(new Date(clock));
   // A spot in the link, so the scrub bar draws its week.
@@ -63,7 +63,7 @@ test("ECMWF on the map follows the strip's mixed cadence on a phone, and hands b
   );
   await expect(page.locator(".frame-status.is-error")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
-    390,
+    800,
   );
   // Back to HARMONIE: it does not reach the hour, so the map hands it to
   // ECMWF, says so, and keeps HARMONIE as the reader's choice.

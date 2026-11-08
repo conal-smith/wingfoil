@@ -107,7 +107,7 @@ test("the chart opens on paper: the head, the controls, the lights and a flush s
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await openChart(page, 390, 844);
+  await openChart(page, 800, 844);
   await expect(page.locator(".map-loading")).toHaveCount(0);
   // The brand, not the old one: the wordmark in the top bar, and no Force5
   // logo or glass.
@@ -115,9 +115,9 @@ test("the chart opens on paper: the head, the controls, the lights and a flush s
   await expect(
     page.locator(".force5-logo, .platform-brand, .glass"),
   ).toHaveCount(0);
-  // On a phone the search is a round button in the bar.
+  // The search stands in the bar.
   await expect(
-    page.getByRole("button", { name: "Search spots" }),
+    page.getByRole("combobox", { name: "Search spots" }),
   ).toBeVisible();
   for (const box of ["[data-top-bar]", ".zbox"]) {
     const filter = await page
@@ -129,7 +129,7 @@ test("the chart opens on paper: the head, the controls, the lights and a flush s
   // round the chart.
   const foot = (await page.locator(".map-footer").boundingBox())!;
   expect(foot.x).toBe(0);
-  expect(foot.width).toBe(390);
+  expect(foot.width).toBe(800);
   expect(foot.y + foot.height).toBe(844);
   await expect(page.locator(".map-neat, .nl-t")).toHaveCount(0);
   // The spot's week in a slim bar over the chart: its name, the strip and
@@ -824,9 +824,9 @@ test("a light off the chart keeps its stars and wind in its name while a spot is
 for (const device of [
   { name: "desktop", use: { viewport: { width: 1440, height: 900 } } },
   {
-    name: "phone",
+    name: "tablet",
     use: {
-      viewport: { width: 393, height: 852 },
+      viewport: { width: 800, height: 852 },
       isMobile: true,
       hasTouch: true,
     },
