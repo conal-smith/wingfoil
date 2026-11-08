@@ -232,6 +232,15 @@ have the detail):
    (`If-Match: <revision>`). Add its model to the preset's `freshness` map
    (`presets/wingfoil.json`, the `maxAgeHours` of `force5/ingest/registry.py`) for
    the stale alert. Start its first run with `POST $HC_ADMIN/v1/jobs/<id>/run`.
+   **A changed job** is not updated by the import either, which only adds jobs:
+   when a release changes an existing job's arguments or timeout in
+   `deploy/local/jobs.toml`, set the job's parameters (as `task.parameters` in
+   `deploy/home-compute/home-compute.json` lists them) and its timeout by hand
+   with `PUT $HC_ADMIN/v1/jobs/<id>` (`If-Match: <revision>`), after the image
+   swap so the new arguments never reach an old image. The first release with
+   Irish Shelf SWAN's wave-height frames is one: `mi-swan` needs `--frames
+   --frame-step 3` after `--models mi-swan` (an older worker refuses them) and a
+   timeout of 1200 s, or it goes on publishing no frames.
 7. **Check** the jobs' next runs on the dashboard, then run the production
    monitor (*Actions → Production monitor → Run workflow*).
 

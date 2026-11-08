@@ -1,5 +1,6 @@
 import {
   FIELD_KEY,
+  SPOTS_KEY,
   expect,
   fieldChip,
   fieldChips,
@@ -36,7 +37,17 @@ const pressed = (page: Page) =>
     );
 const hourTrack = (page: Page) =>
   mapDock(page).getByRole("slider", { name: "Hour" });
-const panelWhen = (page: Page) => page.locator("[data-panel-when]");
+/** The hour the cards' roses stand at, where an hour is picked. */
+const cardHour = (page: Page) => page.locator("[data-picked-hour]").first();
+/** The hour the spots' marks on the map beside the list are at. */
+const mapHour = (page: Page) =>
+  page.locator(".spot-marker:not(.lt-dot)").evaluateAll((els) => {
+    for (const el of els) {
+      const hour = /: (\d\d:\d\d) /.exec(el.getAttribute("aria-label") ?? "");
+      if (hour) return hour[1];
+    }
+    return null;
+  });
 
 /** The finder beside its map, the map up. */
 async function openFinder(page: Page) {
@@ -236,7 +247,7 @@ test("beside the list the hour bar scrubs the list's day, sharing its hour with 
   await expect(track).toHaveAttribute("aria-valuemin", "6");
   await expect(track).toHaveAttribute("aria-valuemax", "21");
   await expect(track).toHaveAttribute("aria-valuetext", /^Today \d\d:00$/);
-  await expect(panelWhen(page)).toHaveText(/^Stars at \d\d:00 today$/);
+  await expect.poll(() => mapHour(page)).toMatch(/^\d\d:00$/);
   const start = Number(await track.getAttribute("aria-valuenow"));
   // The keys step it an hour, and the cards and the lights go with it.
   await track.focus();
@@ -248,8 +259,8 @@ test("beside the list the hour bar scrubs the list's day, sharing its hour with 
   await expect(mapDock(page).locator("[data-hour-when]")).toHaveText(
     `Today ${hour}:00`,
   );
-  await expect(panelWhen(page)).toHaveText(`Stars at ${hour}:00 today`);
-  await expect(page.locator("[data-picked-hour]").first()).toBeAttached();
+  await expect(cardHour(page)).toHaveText(`${hour}:00`);
+  await expect.poll(() => mapHour(page)).toBe(`${hour}:00`);
   // The wind tiles of that hour (Irish summer time is an hour ahead).
   const day = await mapDock(page)
     .locator("[data-hour-bar]")
@@ -267,7 +278,8 @@ test("beside the list the hour bar scrubs the list's day, sharing its hour with 
     .locator('[data-bar="wind"]');
   const box = (await bar.boundingBox())!;
   await page.mouse.click(box.x + box.width * 0.9, box.y + box.height / 2);
-  const picked = (await panelWhen(page).textContent())!.slice(9, 14);
+  await expect(cardHour(page)).not.toHaveText(`${hour}:00`);
+  const picked = await cardHour(page).textContent();
   await expect(track).toHaveAttribute("aria-valuetext", `Today ${picked}`);
 
   // A drag along the track picks the hour under it, the last one at its end.
@@ -289,6 +301,35 @@ test("with no field on, a scrub of the hour bar reads no wind for the map", asyn
   for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowRight");
   await page.waitForTimeout(1500);
   expect([...asked].filter((hour) => !before.has(hour))).toEqual([]);
+});
+
+test("a fit of the map beside the list keeps its spots clear of the dock", async ({
+  page,
+}) => {
+  // Favourites from the south-west coast to Achill: the heart opens on, and
+  // the map is fitted to them, the southernmost at its foot.
+  await page.addInitScript(
+    ([key, ids]) => {
+      if (localStorage.getItem(key) === null)
+        localStorage.setItem(key, JSON.stringify({ starred: ids, visits: {} }));
+    },
+    [SPOTS_KEY, ["keel", "schull", "garrettstown"]] as const,
+  );
+  // No easing: the fit lands at once.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openFinder(page);
+  const marks = ["keel", "schull", "garrettstown"].map((id) =>
+    page.locator(`.spot-marker[data-spot-id="${id}"]`),
+  );
+  for (const mark of marks) await expect(mark).toBeVisible({ timeout: 30000 });
+  await page.waitForTimeout(1500);
+  const dock = (await mapDock(page).boundingBox())!;
+  const map = (await page.locator(".maplibregl-canvas").boundingBox())!;
+  for (const mark of marks) {
+    const box = (await mark.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(map.y);
+    expect(box.y + box.height).toBeLessThanOrEqual(dock.y);
+  }
 });
 
 test.describe("on a phone", () => {

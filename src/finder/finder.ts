@@ -20,7 +20,11 @@ import { irishDate, irishHour, type StripColumn } from "../strip";
 import type { LatLon } from "../lastView";
 import { tidySearch } from "../../force5/src/siteNav";
 
-/** Favourites or every place round the rider. */
+/**
+ * What the list holds: the rider's favourites (the heart at its head on), or
+ * the spots in the map's view, and with no map beside the list the spots round
+ * the rider (the heart off). The address calls them `favourites` and `near`.
+ */
 export type Scope = "favourites" | "near";
 
 /** How far "near you" reaches, round the rider's own place. */
@@ -86,17 +90,19 @@ export function nearestSpots<S extends Spot>(
 }
 
 /**
- * The tab the finder opens on: the rider's favourites once they have
- * starred a place; before that, the places round them, so a first visit
- * is never an empty page.
+ * What the finder opens on: the heart on, the rider's favourites, once they
+ * have saved a place; before that the heart off, the spots in view, so a
+ * first visit is never an empty page.
  */
 export const openingScope = (starred: readonly string[]): Scope =>
   starred.length ? "favourites" : "near";
 
 /**
- * The tab in the finder's address, so Favourites and Near you can be linked
- * to, kept and reloaded: `/?tab=favourites`, `/?tab=near`. A bare `/` opens
- * on `openingScope`, and the address names a tab only once one is chosen.
+ * The heart in the finder's address, so the favourites can be linked to, kept
+ * and reloaded: `/?tab=favourites` is the heart on, `/?tab=near` off (the
+ * names of the two tabs the list's head had before the heart, which old links
+ * still carry). A bare `/` opens on `openingScope`, and the address names it
+ * only once the heart is pressed.
  */
 export const TAB_PARAM = "tab";
 
@@ -147,7 +153,68 @@ export function listFor<S extends Spot>(
 }
 
 /**
- * The places inside what the map shows, for Nearby beside it: those nearest
+ * How wide a view is, in kilometres across its middle: the list's order
+ * changes with it (`arrangementFor`), whatever the zoom that made it.
+ */
+export function viewWidthKm(view: ViewBounds): number {
+  const { west, south, east, north } = view;
+  const width = Math.min(360, east - west);
+  if (![west, south, east, north].every(Number.isFinite) || width <= 0)
+    return 0;
+  return width * 111.32 * Math.cos(rad((south + north) / 2));
+}
+
+/** Wider than this across, the list leads with the best of each county. */
+export const REGIONAL_KM = 180;
+/** Narrower than this across, the list is the spots nearest the map's middle first. */
+export const CLOSE_KM = 120;
+/**
+ * How far apart the leads of a regional list are, as a share of the view's
+ * width: about a pill's width on the map beside the list, so the counties'
+ * best do not stand on one another.
+ */
+export const LEAD_GAP = 0.06;
+
+/**
+ * How the spots in view are put in order, with the best first asked for:
+ * - `regional`, the view wider than `REGIONAL_KM`: the best spot in each
+ *   county first, then the rest by their stars, so a view of the country
+ *   opens on every coast rather than one bay's neighbours, which share a
+ *   forecast;
+ * - `best`, from `CLOSE_KM` to `REGIONAL_KM`: by their stars;
+ * - `centre`, under `CLOSE_KM`: the nearest the map's middle first, as the
+ *   rider is looking at one stretch of coast.
+ */
+export type Arrangement = "regional" | "best" | "centre";
+
+export const arrangementFor = (widthKm: number): Arrangement =>
+  widthKm > REGIONAL_KM ? "regional" : widthKm >= CLOSE_KM ? "best" : "centre";
+
+/**
+ * A ranked list led by the best spot in each county (`rankSpots`' order),
+ * each at least `gapKm` from the leads before it, then the rest as they were
+ * ranked. A spot with no county never leads.
+ */
+export function regionalLead<S extends Spot>(
+  ranked: readonly Listed<S>[],
+  gapKm = 0,
+): Listed<S>[] {
+  const lead: Listed<S>[] = [];
+  const seen = new Set<string>();
+  for (const item of ranked) {
+    const county = item.spot.county;
+    if (!county || seen.has(county)) continue;
+    if (gapKm > 0 && lead.some((l) => distanceKm(l.spot, item.spot) < gapKm))
+      continue;
+    lead.push(item);
+    seen.add(county);
+  }
+  const first = new Set(lead);
+  return [...lead, ...ranked.filter((item) => !first.has(item))];
+}
+
+/**
+ * The places inside what the map shows, for the list beside it: those nearest
  * the view's middle first, so among equals the cap keeps what the rider is
  * looking at. `from` is the rider's own place, which each card measures from;
  * with none, no card gives a distance. A view past the antimeridian has a west
@@ -330,6 +397,33 @@ export function dayRow(
   return { date, firstLight, lastLight, hours };
 }
 
+/**
+ * The columns of a day's row its figures and hours are written at: every
+ * third hour (06, 09, 12…) where the run is hourly, and every step where it is
+ * three-hourly or coarser, whose steps (01, 04, 07… in Irish summer time) may
+ * never fall on one; and never two closer than `room` of the row's width,
+ * which is what an hourly row's every third hour leaves them, so a morning
+ * of three-hourly steps beside an hourly afternoon does not crowd its figures
+ * into one another.
+ */
+export function everyThird(
+  hours: readonly { time: number }[],
+  room = 0.14,
+): boolean[] {
+  const apart = Math.max(1, Math.ceil(hours.length * room));
+  let last = -Infinity;
+  return hours.map((h, i) => {
+    const step = Math.min(
+      i > 0 ? h.time - hours[i - 1].time : Infinity,
+      i < hours.length - 1 ? hours[i + 1].time - h.time : Infinity,
+    );
+    const due = step >= 3 * HOUR || irishHour(h.time) % 3 === 0;
+    if (!due || i - last < apart) return false;
+    last = i;
+    return true;
+  });
+}
+
 /** Today at a place: its row of hours (`dayRow`). */
 export const todayRow = (
   strip: readonly Pick<StripColumn, "time">[],
@@ -468,15 +562,28 @@ export function withStars<S extends Spot>(
 /**
  * The cards a list comes to: those with at least `stars` stars, the best
  * `cap` of them, in the rider's order. `total` is how many had the stars,
- * before the cap, which is the count the head of the list says.
+ * before the cap, which the note after a capped list says.
+ *
+ * With the best first, the spots in the map's view are arranged by how wide
+ * the view is (`arrangementFor`): `centre` keeps the list's own order (the
+ * nearest the view's middle first, as `spotsInView` gives it) and caps that,
+ * `regional` leads with each county's best (`regionalLead`, the leads
+ * `gapKm` apart). Any other order is the rider's, on the best `cap`.
  */
 export function chooseCards<S extends Spot>(
   list: readonly Listed<S>[],
   order: Order,
   stars: number,
   cap = Infinity,
+  arrange: Arrangement = "best",
+  gapKm = 0,
 ): { cards: Listed<S>[]; total: number } {
   const good = withStars(rankSpots(list), stars);
+  if (order === "best" && arrange !== "best") {
+    const arranged =
+      arrange === "centre" ? withStars(list, stars) : regionalLead(good, gapKm);
+    return { cards: arranged.slice(0, cap), total: good.length };
+  }
   return { cards: orderSpots(good.slice(0, cap), order), total: good.length };
 }
 

@@ -3,9 +3,13 @@ import type { Spot } from "../../force5/src/weather";
 import type { PlaceHour } from "../ratings";
 import { clock, irishDate, irishHour, stripColumns } from "../strip";
 import {
+  CLOSE_KM,
   HOUR,
   IRELAND_CENTRE,
+  LEAD_GAP,
   MAX_CARDS,
+  REGIONAL_KM,
+  arrangementFor,
   NEAREST_COUNT,
   bestStars,
   cardDates,
@@ -15,6 +19,7 @@ import {
   dayOpening,
   dayRow,
   distanceKm,
+  everyThird,
   listFor,
   middayColumn,
   nearSpots,
@@ -25,12 +30,14 @@ import {
   orderSpots,
   pickHour,
   rankSpots,
+  regionalLead,
   scopeAddress,
   scopeInAddress,
   shownColumn,
   spotsInView,
   todayOver,
   todayRow,
+  viewWidthKm,
   withStars,
   type Listed,
 } from "./finder";
@@ -138,18 +145,18 @@ describe("near you", () => {
   });
 });
 
-describe("the tab the finder opens on", () => {
-  it("is Favourites once a place is starred", () => {
+describe("the heart the finder opens with", () => {
+  it("is on, the favourites, for a rider who has saved a place", () => {
     expect(openingScope(["brandon"])).toBe("favourites");
   });
 
-  it("is Near you on a first visit, with nothing starred", () => {
+  it("is off, the spots in view, on a first visit, with nothing saved", () => {
     expect(openingScope([])).toBe("near");
   });
 });
 
-describe("the tab in the address", () => {
-  it("is read from ?tab=, and nothing else is a tab", () => {
+describe("the heart in the address", () => {
+  it("is read from ?tab=: favourites is on, near off, and nothing else is either", () => {
     expect(scopeInAddress("?tab=favourites")).toBe("favourites");
     expect(scopeInAddress("?tab=near&settings")).toBe("near");
     expect(scopeInAddress("")).toBeNull();
@@ -721,5 +728,209 @@ describe("the cards a list comes to", () => {
     expect(names).toEqual(
       [...names].sort((a, b) => a.localeCompare(b, "en-IE")),
     );
+  });
+});
+
+describe("the order of the spots in view, by how wide the view is", () => {
+  it("measures the view across its middle, in kilometres, whatever the zoom", () => {
+    // Ireland from Kerry to Dublin is some 300 km across; Dublin Bay some 20.
+    const ireland = { west: -10.6, south: 51.4, east: -5.9, north: 55.4 };
+    expect(viewWidthKm(ireland)).toBeGreaterThan(290);
+    expect(viewWidthKm(ireland)).toBeLessThan(320);
+    const bay = { west: -6.3, south: 53.25, east: -6.0, north: 53.45 };
+    expect(viewWidthKm(bay)).toBeCloseTo(0.3 * 111.32 * Math.cos(rad(53.35)));
+    // A degree is narrower further north.
+    const north = { west: -8, south: 55, east: -6, north: 55.2 };
+    const south = { west: -8, south: 51.5, east: -6, north: 51.7 };
+    expect(viewWidthKm(north)).toBeLessThan(viewWidthKm(south));
+    expect(viewWidthKm({ ...bay, west: Number.NaN })).toBe(0);
+    expect(viewWidthKm({ ...bay, east: bay.west })).toBe(0);
+  });
+
+  it("leads with each county's best wider than 180 km, is the best first to 120 km, and the nearest the middle closer in", () => {
+    expect(arrangementFor(300)).toBe("regional");
+    expect(arrangementFor(REGIONAL_KM + 1)).toBe("regional");
+    expect(arrangementFor(REGIONAL_KM)).toBe("best");
+    expect(arrangementFor(150)).toBe("best");
+    expect(arrangementFor(CLOSE_KM)).toBe("best");
+    expect(arrangementFor(CLOSE_KM - 1)).toBe("centre");
+    expect(arrangementFor(20)).toBe("centre");
+  });
+
+  const at = (
+    id: string,
+    county: string,
+    lat: number,
+    lon: number,
+    stars: number,
+  ): Listed => ({
+    spot: { ...spot(id, lat, lon), county },
+    km: null,
+    best: { stars, day: stars > 0 ? 0 : null },
+  });
+  // Nearest the view's middle first, as spotsInView gives them.
+  const inView = [
+    at("dollymount", "Dublin", 53.367, -6.145, 2),
+    at("velvet", "Dublin", 53.418, -6.125, 4),
+    at("bray", "Wicklow", 53.2, -6.095, 3),
+    at("brittas", "Wicklow", 52.88, -6.05, 1),
+    at("rosslare", "Wexford", 52.25, -6.33, 2),
+    at("brandon", "Kerry", 52.276, -10.024, 5),
+    at("inch", "Kerry", 52.13, -9.97, 5),
+    at("nameless", "", 52.5, -9, 5),
+  ];
+  const ids = (l: readonly Listed[]) => l.map((x) => x.spot.id);
+
+  it("leads with the best spot of each county, the leads by their stars, then the rest by theirs", () => {
+    expect(ids(regionalLead(rankSpots(inView)))).toEqual([
+      // The best in Kerry, then Dublin, Wicklow and Wexford.
+      "brandon",
+      "velvet",
+      "bray",
+      "rosslare",
+      // A spot with no county never leads; the rest as they were ranked.
+      "inch",
+      "nameless",
+      "dollymount",
+      "brittas",
+    ]);
+  });
+
+  it("keeps a regional list's leads apart, the next best of a county too close leading in its stead", () => {
+    // Velvet is 24 km from Bray: at 30 km apart, Bray cannot lead, and
+    // Brittas, Wicklow's next, 60 km from Velvet, leads in its stead, in its
+    // own place among the leads by its stars.
+    expect(ids(regionalLead(rankSpots(inView), 30)).slice(0, 5)).toEqual([
+      "brandon",
+      "velvet",
+      "rosslare",
+      "brittas",
+      "inch",
+    ]);
+  });
+
+  it("puts the cards in that order, capped, with the best first asked for", () => {
+    const regional = chooseCards(inView, "best", 0, 4, "regional");
+    expect(ids(regional.cards)).toEqual([
+      "brandon",
+      "velvet",
+      "bray",
+      "rosslare",
+    ]);
+    expect(regional.total).toBe(8);
+    const best = chooseCards(inView, "best", 0, 4, "best");
+    expect(ids(best.cards)).toEqual(["brandon", "inch", "nameless", "velvet"]);
+    // Close in, the nearest the middle, whatever their stars, and the cap
+    // keeps the nearest.
+    const centre = chooseCards(inView, "best", 0, 4, "centre");
+    expect(ids(centre.cards)).toEqual([
+      "dollymount",
+      "velvet",
+      "bray",
+      "brittas",
+    ]);
+    // The fewest stars still holds.
+    expect(ids(chooseCards(inView, "best", 3, 30, "centre").cards)).toEqual([
+      "velvet",
+      "bray",
+      "brandon",
+      "inch",
+      "nameless",
+    ]);
+  });
+
+  it("leaves an order the rider chose as it is, whatever the width", () => {
+    const named = chooseCards(inView, "name", 0, 30, "regional").cards;
+    const names = named.map((card) => card.spot.name);
+    expect(names).toEqual(
+      [...names].sort((a, b) => a.localeCompare(b, "en-IE")),
+    );
+    expect(ids(chooseCards(inView, "name", 0, 30, "centre").cards)).toEqual(
+      ids(named),
+    );
+  });
+
+  it("keeps the leads about a pill apart on the map beside the list", () => {
+    // A 300 km view keeps leads 18 km apart.
+    expect(300 * LEAD_GAP).toBeCloseTo(18);
+  });
+});
+
+describe("the heart on", () => {
+  it("is every favourite wherever the map is, the best first, with no cap", () => {
+    const listed = listFor(
+      "favourites",
+      SPOTS,
+      SPOTS.map((s) => s.id),
+      null,
+    ).map(({ spot, km }, at) => ({
+      spot,
+      km,
+      best: { stars: at === 4 ? 5 : 1, day: 0 },
+    }));
+    const { cards, total } = chooseCards(listed, "best", 0);
+    expect(total).toBe(SPOTS.length);
+    expect(cards[0].spot.id).toBe("brandon");
+    expect(cards).toHaveLength(SPOTS.length);
+  });
+
+  it("with nothing saved, lists nothing", () => {
+    expect(listFor("favourites", SPOTS, [], DUBLIN)).toEqual([]);
+  });
+});
+
+const rad = (d: number) => (d * Math.PI) / 180;
+
+describe("the columns a card writes its figures at", () => {
+  const at = (iso: string) => ({ time: Date.parse(iso) });
+  it("are every third hour on an hourly row, in Irish time", () => {
+    // 05:00 to 10:00 Irish summer time.
+    const row = [4, 5, 6, 7, 8, 9].map((h) =>
+      at(`2026-09-13T${String(h).padStart(2, "0")}:00:00Z`),
+    );
+    expect(everyThird(row)).toEqual([false, true, false, false, true, false]);
+  });
+
+  it("are every step on a three-hourly row, whose steps miss every third hour", () => {
+    // 01:00, 04:00, 07:00 and 10:00 Irish summer time.
+    const row = [0, 3, 6, 9].map((h) => at(`2026-09-16T0${h}:00:00Z`));
+    expect(everyThird(row)).toEqual([true, true, true, true]);
+  });
+
+  it("never crowd: a morning of three-hourly steps beside an hourly afternoon keeps them apart", () => {
+    // 04:00, 07:00 and 10:00 Irish time three-hourly, then 13:00 to 21:00
+    // hourly: twelve columns, so figures stand at least two apart.
+    const row = [
+      "03:00",
+      "06:00",
+      "09:00",
+      ...Array.from(
+        { length: 9 },
+        (_, k) => `${String(12 + k).padStart(2, "0")}:00`,
+      ),
+    ].map((t) => at(`2026-09-13T${t}:00Z`));
+    const marked = everyThird(row);
+    const at_ = marked.flatMap((on, i) => (on ? [i] : []));
+    at_.forEach(
+      (i, k) => k && expect(i - at_[k - 1]).toBeGreaterThanOrEqual(2),
+    );
+    // 04:00 and 10:00, then 15:00, 18:00 and 21:00.
+    expect(at_).toEqual([0, 2, 5, 8, 11]);
+  });
+
+  it("keep every step of a three-hourly day, seven columns", () => {
+    const row = [0, 3, 6, 9, 12, 15, 18].map((h) =>
+      at(`2026-09-16T${String(h).padStart(2, "0")}:00:00Z`),
+    );
+    expect(everyThird(row).every(Boolean)).toBe(true);
+  });
+
+  it("go from hours to steps where the run coarsens", () => {
+    const row = ["16:00", "17:00", "18:00", "21:00"].map((t) =>
+      at(`2026-09-15T${t}:00Z`),
+    );
+    // 17:00, 18:00 and 19:00 hourly (18:00 Irish time is a third hour), then
+    // 22:00 three hours on.
+    expect(everyThird(row)).toEqual([false, true, false, true]);
   });
 });

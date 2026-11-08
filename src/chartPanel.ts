@@ -66,10 +66,19 @@ export function spotsBounds(
 
 /**
  * Room kept clear round the places when the chart is fitted to them: the
- * Full chart button at the top left and the zoom at the top right, and the
- * hour's label at the foot.
+ * zoom and the locate button at the top right, and a margin all round.
  */
 export const fitPadding = { top: 64, bottom: 48, left: 44, right: 64 };
+
+/**
+ * The same, kept clear of the map's dock at its foot too (src/MapDock.tsx):
+ * `dock` is the room the dock takes from the chart's foot, and a fitted place
+ * stands a margin above it.
+ */
+export const fitPaddingOver = (dock: number) => ({
+  ...fitPadding,
+  bottom: Math.max(fitPadding.bottom, dock + 24),
+});
 
 /**
  * Whether a point on the chart (its pixel `x`, `y`) is comfortably inside

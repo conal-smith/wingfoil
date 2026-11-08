@@ -113,6 +113,14 @@ export interface VariablesManifest {
   frames: BundleFrame[];
   /** The subset of `variables` the frames carry, when it is narrower. */
   frameVariables?: string[];
+  /**
+   * Hours between frames, when they are sparser than the series (MI SWAN's
+   * wave height every three hours beside hourly series): the frames then fall
+   * on series steps from the run hour to `horizonHours`, both included.
+   */
+  frameStepHours?: number;
+  /** What a gridded variable is rounded to in the frames, in its own units. */
+  framePrecision?: Record<string, number>;
   /** The spot squares the run publishes. */
   spots: SpotIndex;
   spotSeries?: Record<string, VariableStep[]>;
@@ -179,9 +187,14 @@ export function variablesHours(
   }
   if (!whole(step) || !VARIABLE_STEP_HOURS.includes(step)) fail();
   const frames = manifest.frames;
-  if (Array.isArray(frames) && frames.length)
+  if (
+    Array.isArray(frames) &&
+    frames.length &&
+    manifest.frameStepHours === undefined
+  )
     return frames.map((_, index) => index * step);
-  // Frameless: the horizon is declared rather than implied by a frame count.
+  // Frameless, or framed at a step of its own: the horizon is declared rather
+  // than implied by a frame count.
   const horizon = manifest.horizonHours;
   if (
     !whole(horizon) ||
@@ -191,6 +204,30 @@ export function variablesHours(
   )
     return fail();
   return Array.from({ length: horizon / step + 1 }, (_, index) => index * step);
+}
+
+/**
+ * The hours a bundle's map frames are at — the browser side of `frame_hours`:
+ * the series' own, or every `frameStepHours` from the run hour to the declared
+ * horizon, which must fall on the series' steps.
+ */
+export function variablesFrameHours(
+  manifest: VariablesManifest,
+  kind: VariablesKind = manifest?.kind ?? "wave",
+): number[] {
+  const series = variablesHours(manifest, kind);
+  const step = manifest.frameStepHours;
+  if (step === undefined) return series;
+  const last = series[series.length - 1];
+  if (
+    manifest.stepRanges !== undefined ||
+    !whole(step) ||
+    !VARIABLE_STEP_HOURS.includes(step) ||
+    step % manifest.stepHours ||
+    last % step
+  )
+    return failWith(kind);
+  return Array.from({ length: last / step + 1 }, (_, index) => index * step);
 }
 
 /**
@@ -242,6 +279,7 @@ export function validateVariablesManifest<M extends VariablesManifest>(
       fail();
     if (!Array.isArray(m.frames)) fail();
     const hours = variablesHours(m, kind);
+    const frameHours = m.frames.length ? variablesFrameHours(m, kind) : [];
     const runTime = Date.parse(m.runTime);
     // Compared as instants, not as strings: the importers write "…:00:00Z" and
     // an ISO round-trip would add milliseconds that mean nothing.
@@ -253,13 +291,14 @@ export function validateVariablesManifest<M extends VariablesManifest>(
       fail();
     if (
       m.frames.length &&
-      !m.frames.every(
-        (frame, index) =>
-          frame &&
-          frame.hour === hours[index] &&
-          Date.parse(frame.validTime) === at(hours[index]) &&
-          usableRunPath(frame.url),
-      )
+      (m.frames.length !== frameHours.length ||
+        !m.frames.every(
+          (frame, index) =>
+            frame &&
+            frame.hour === frameHours[index] &&
+            Date.parse(frame.validTime) === at(frameHours[index]) &&
+            usableRunPath(frame.url),
+        ))
     )
       fail();
     const gridded = m.frameVariables;
@@ -269,6 +308,20 @@ export function validateVariablesManifest<M extends VariablesManifest>(
         !gridded.length ||
         new Set(gridded).size !== gridded.length ||
         !gridded.every((name) => name in variables))
+    )
+      fail();
+    const precision = m.framePrecision;
+    if (
+      precision !== undefined &&
+      (!precision ||
+        typeof precision !== "object" ||
+        Array.isArray(precision) ||
+        !Object.entries(precision).every(
+          ([name, value]) =>
+            (gridded ?? Object.keys(variables)).includes(name) &&
+            bounded(value, 1000) &&
+            value > 0,
+        ))
     )
       fail();
     if (!m.spots.keys.includes("spotSeries")) fail();

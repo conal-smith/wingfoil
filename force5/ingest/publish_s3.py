@@ -24,7 +24,9 @@ The per-spot keys below are read from the squares and checked as before.
 - wave  `spotSeries` per riding location plus optional frames of one array per
         gridded variable. `frames` may be empty, and `horizonHours` then declares
         the horizon the series covers; `frameVariables` may narrow the frames to a
-        subset of `variables`.
+        subset of `variables`, `frameStepHours` (with `horizonHours`) space them
+        more widely than the series, and `framePrecision` states what each gridded
+        variable is rounded to in its frames.
 - weather  the same shape as wave, for surface variables (temperature,
         precipitation, cloud, pressure, humidity, visibility, CAPE). A variable
         may declare `"kind": "code"`, making its values whole code-table entries
@@ -62,7 +64,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import sys
-from cadence import expected_hours
+from cadence import expected_hours, frame_hours
 import f5bin
 import f5tile
 from prune import bucket_keys, decode_body, manifest_urls, model_owns
@@ -472,16 +474,21 @@ def validate_variables_bundle(files, model, manifest, run, now):
             raise ValueError(f"The {kind} horizon has already expired")
         return
     grid = manifest["grid"]
-    if len(frames) != len(hours):
+    framed = frame_hours(manifest)
+    if len(frames) != len(framed):
         raise ValueError(f"Empty {kind} forecast or unsupported cadence")
     # Frames may carry a declared subset: a map needs fewer fields than a spot series.
     gridded = manifest.get("frameVariables", list(variables))
     if (not isinstance(gridded, list) or not gridded or len(set(gridded)) != len(gridded)
             or not set(gridded) <= set(variables)):
         raise ValueError("Frame variables must be a distinct subset of the declared variables")
+    precision = manifest.get("framePrecision", {})
+    if (not isinstance(precision, dict) or not set(precision) <= set(gridded)
+            or not all(number(value, 1000) and value > 0 for value in precision.values())):
+        raise ValueError("Frame precision must be a positive step for gridded variables")
     count = grid_count(grid)
     for index, info in enumerate(frames):
-        hour = hours[index]
+        hour = framed[index]
         frame = json.loads(frame_file(files, info, hour, "json"))
         valid = valid_time(run, hour)
         if (info["hour"], info["validTime"]) != (hour, valid):
@@ -495,9 +502,16 @@ def validate_variables_bundle(files, model, manifest, run, now):
             if not isinstance(values, list) or len(values) != count or not all(
                     variable_value(value, name, codes, limit) for value in values):
                 raise ValueError(f"Invalid {name} field")
+            if name in precision and not all(on_step(value, precision[name]) for value in values):
+                raise ValueError(f"{name} frame values are finer than their declared precision")
     validate_spot_series(manifest.get("spotSeries"), variables, hours, run, codes, limit)
     if datetime.fromisoformat(frames[-1]["validTime"].replace("Z", "+00:00")) <= now:
         raise ValueError(f"The {kind} horizon has already expired")
+
+
+def on_step(value, step):
+    """Whether a frame value is a whole number of its declared precision (or null)."""
+    return value is None or abs(value / step - round(value / step)) < 1e-6
 
 
 def validate_spot_series(series, variables, hours, run, codes=frozenset(), limit=1000):

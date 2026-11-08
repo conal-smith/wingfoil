@@ -134,9 +134,12 @@ timeout_seconds = 2400      # at once when :05 has published. ~13 MB a run from 
 [[jobs]]
 id = "mi-swan"
 models = ["mi-swan"]
+args = ["--frames", "--frame-step", "3"]
 hours = [10, 14, 18]        # One SWAN run a day, published around 09 UTC, sometimes late.
-minutes = [15]
-timeout_seconds = 1800
+minutes = [15]              # Hourly spot series and a wave-height map frame every 3 h:
+timeout_seconds = 1200      # ~23 MB from ERDDAP, ~1 min a run (7 November 2026), ~10 MB
+                            # of frames. The 14:15 and 18:15 retries stop at once when
+                            # 10:15 has published.
 
 [[jobs]]
 id = "ibi-wave"

@@ -925,7 +925,7 @@
         },
         "timeouts": {
           "queueSeconds": 3600,
-          "totalSeconds": 6000
+          "totalSeconds": 5400
         },
         "entrypoint": [
           "python",
@@ -933,7 +933,10 @@
         ],
         "parameters": [
           "--models",
-          "mi-swan"
+          "mi-swan",
+          "--frames",
+          "--frame-step",
+          "3"
         ],
         "report": {
           "format": "json-lines",

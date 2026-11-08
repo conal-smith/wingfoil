@@ -16,7 +16,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { CloudOff, Maximize2, X } from "lucide-react";
+import { CloudOff, LocateFixed, X } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Empty } from "../ui/Empty";
 import { SpotSearch } from "../ui/SpotSearch";
@@ -123,12 +123,12 @@ import {
   openingColumn,
   stripColumns,
 } from "./strip";
-import { nearSpots } from "./finder/finder";
+import { nearSpots, nearestSpots } from "./finder/finder";
 import { ridingLocations } from "./locations";
 import { openingSpot, spotAddress } from "./openingSpot";
 import {
   clipTo,
-  fitPadding,
+  fitPaddingOver,
   inView,
   panelRect,
   spotsBounds,
@@ -424,10 +424,12 @@ export default function App() {
   /** The time the cards show, which the lights beside them show too. */
   const [finderShown, setFinderShown] = useState<number | null>(null);
   /**
-   * The hour picked on the finder's day, by a card or by the hour bar on the
-   * map beside the list; null is the hour the day stands at (now, today).
+   * The hour picked on the cards' bars, or null for the hour the day stands
+   * at: one time for the page, kept here so all that picks an hour shares it.
    */
   const [finderPicked, setFinderPicked] = useState<number | null>(null);
+  /** Presses of the locate button on the map beside the list. */
+  const [locatePresses, setLocatePresses] = useState(0);
   /** Where the rider is, once their browser has said: the blue dot. */
   const [riderAt, setRiderAt] = useState<{ lat: number; lon: number } | null>(
     null,
@@ -1872,9 +1874,11 @@ export default function App() {
    * the map: only `fitKey` starts one. Near you, with the rider's place, it
    * opens round them instead, at the zoom their own coast's tidal depth is at
    * full strength, if any spot is round them; the spots further out are a pan
-   * away. Without their place, Near you is fitted only as the chart opens.
+   * away; with no spot round them, round them and the few spots nearest. A
+   * press of the locate button fits it round them again. Without their place,
+   * Near you is fitted only as the chart opens.
    */
-  const fitKey = `${finderScope}|${riderAt ? "rider" : ""}`;
+  const fitKey = `${finderScope}|${riderAt ? "rider" : ""}|${locatePresses}`;
   const fitted = useRef<string | null>(null);
   const fitList = (duration: number) => {
     const map = controls.current?.map;
@@ -1882,18 +1886,26 @@ export default function App() {
     const bounds = round
       ? nearSpots(spots, round).length
         ? spotsBounds([round])
-        : null
+        : spotsBounds([
+            round,
+            ...nearestSpots(spots, round, 3).map(({ spot }) => spot),
+          ])
       : spotsBounds(listedSpots);
     if (!map || !bounds) return;
     map.fitBounds(bounds, {
-      padding: fitPadding,
+      // Clear of the dock at the map's foot: a fitted spot never under it.
+      padding: fitPaddingOver(dockRoom),
       maxZoom: round ? FOIL_FULL_ZOOM : 11,
       duration: reducedMotion ? 0 : duration,
     });
   };
+  const locateSeen = useRef(0);
   useEffect(() => {
     if (!mapReady || page !== "finder" || !split || !finderScope) return;
     const near = finderScope === "near";
+    // The locate button turns the heart off: the fit waits for the list.
+    if (!near && locatePresses !== locateSeen.current) return;
+    locateSeen.current = locatePresses;
     if (!near && !listedSpots.length) return;
     if (fitted.current === fitKey) return;
     const first = fitted.current === null;
@@ -2313,9 +2325,9 @@ export default function App() {
 
   /* ---- the ways between the list and the full chart ---- */
   /**
-   * The full chart, from the list: the Full chart button, the Map button,
-   * the menu's Chart. A step in the history, so Back is the list again. It
-   * opens at the hour the cards showed, as the lights beside them did.
+   * The full chart, from the list: the top bar's Chart, the menu's Chart. A
+   * step in the history, so Back is the list again. It opens at the hour the
+   * cards showed, as the lights beside them did.
    */
   const openChart = () => {
     if (pageRef.current === "chart") return;
@@ -2477,7 +2489,6 @@ export default function App() {
   const lightWhen = lightColumn
     ? `at ${clock(lightColumn.time)} ${onDay(lightColumn.time, clockNow)}`
     : null;
-  const panelWhen = lightWhen && `Stars ${lightWhen}`;
   const lightLink = (spot: Spot) => spotHref(spot.id, lightColumn?.validTime);
   const leaveTour = () => {
     tourSeen();
@@ -2614,7 +2625,8 @@ export default function App() {
                   onHover={hoverCard}
                   onShown={setFinderShown}
                   picked={finderPicked}
-                  onPicked={setFinderPicked}
+                  onPick={setFinderPicked}
+                  locate={locatePresses}
                   onPlace={setRiderAt}
                   onDrawn={onFinderDrawn}
                   onScreen={!onChart}
@@ -2640,21 +2652,6 @@ export default function App() {
             >
               {!onChart && (
                 <div className="panel-tools">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="panel-open"
-                    onClick={openChart}
-                    title="Open the full chart"
-                    data-open-chart
-                  >
-                    <Maximize2
-                      size={15}
-                      strokeWidth={1.75}
-                      aria-hidden="true"
-                    />
-                    Full chart
-                  </Button>
                   <div
                     className="zbox chart-box"
                     role="group"
@@ -2682,13 +2679,23 @@ export default function App() {
                     </Button>
                   </div>
                   {mapDock(true)}
-                  {panelWhen && (
-                    <div className="panel-foot">
-                      <span data-panel-when>{panelWhen}</span>
-                      <span className="panel-key">
-                        <i aria-hidden="true" />
-                        Measured wind
-                      </span>
+                  {"geolocation" in navigator && (
+                    <div className="zbox chart-box panel-locate">
+                      <Button
+                        variant="quiet"
+                        size="sm"
+                        icon
+                        aria-label="Use my location"
+                        title="Use my location"
+                        onClick={() => setLocatePresses((n) => n + 1)}
+                        data-locate
+                      >
+                        <LocateFixed
+                          size={16}
+                          strokeWidth={1.75}
+                          aria-hidden="true"
+                        />
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -2768,10 +2775,7 @@ export default function App() {
                     reducedMotion={reducedMotion}
                     // Clear of the scrub bar and of the map's dock over it,
                     // so a fitted spot never lands under either.
-                    bottomInset={Math.max(
-                      barShown ? dockHeight : 0,
-                      dockRoom,
-                    )}
+                    bottomInset={Math.max(barShown ? dockHeight : 0, dockRoom)}
                     phone={phone}
                     onSelect={(spot) =>
                       pageRef.current === "chart"

@@ -36,10 +36,11 @@ const RAMPS: Record<Exclude<MapField, "none">, () => Ramp> = {
     spoken:
       "Wind in knots: blue under 10, green 10 to 20, yellow by 30, red by 40",
   }),
-  // The wave height's own ramp (ui/theme.css, `--map-wave-*`), a stop a mark.
+  // The wave height's own ramp, the one the finder's cards draw
+  // (ui/theme.css, `--color-waves-m*`), a stop a mark.
   waves: () => ({
     unit: "Metres",
-    stops: even([0, 1, 2, 3, 5].map((m) => `var(--map-wave-${m})`)),
+    stops: even([0, 1, 2, 3, 5].map((m) => `var(--color-waves-m${m})`)),
     marks: ["0", "1", "2", "3", "5+"],
     spoken: "Wave height in metres: 0, 1, 2, 3, and 5 and over",
   }),
