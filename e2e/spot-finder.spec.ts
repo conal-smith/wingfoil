@@ -81,7 +81,7 @@ const later = (page: Page) =>
  * screen reader ("Brandon Bay, Kerry: 13:00 3 stars, …"); null before any.
  */
 const mapHour = (page: Page) =>
-  page.locator(".spot-marker:not(.lt-dot)").evaluateAll((els) => {
+  page.locator(".spot-marker.lt-pilled").evaluateAll((els) => {
     for (const el of els) {
       const hour = /: (\d\d:\d\d) /.exec(el.getAttribute("aria-label") ?? "");
       if (hour) return hour[1];

@@ -98,7 +98,7 @@ describe("thinLights", () => {
   });
 });
 
-describe("a press among pills and muted dots", () => {
+describe("a press among pills and beads", () => {
   // A pill, wide enough that a press on its end is far from its centre, with
   // a dot just past that end.
   const marks = [

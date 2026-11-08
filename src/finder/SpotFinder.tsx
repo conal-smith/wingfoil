@@ -20,7 +20,7 @@
  * none it asks them to save one. Off, it is the spots in the map's view
  * (finder.ts `spotsInView`), read as the camera settles and never through a
  * pan: at most `MAX_CARDS` of them, with a quiet line after the list to zoom
- * in for the rest, which stand on the map as muted dots. With the best first,
+ * in for the rest, which stand on the map as beads. With the best first,
  * how they are ordered goes by how wide the view is (finder.ts
  * `arrangementFor`): over about 180 km across the best spot in each county
  * leads, then the rest by their stars; down to about 120 km by their stars;
@@ -40,9 +40,11 @@
  *
  * The home page (since 26 October 2026). On a wide screen the chart stands
  * beside the list, drawn by src/App.tsx over the room the list leaves it
- * (`beside`); the list tells it which places it shows as pills, at which
- * hour, which card is under the pointer and where the rider is, and it tells
- * the list what it shows (`view`). Under that width the list is alone. The
+ * (`beside`); the list tells it which places it lists, which of their cards
+ * the rider can see (`onInView`: a pill each on the map, the rest beads),
+ * what each reads (`onReadings`), at which hour, which card is under the
+ * pointer and where the rider is, and it tells the list what it shows
+ * (`view`). Under that width the list is alone. The
  * cards keep one time between them, as a dashboard's charts do: the day
  * stepped to is the day on every card, and an hour picked on one card's bars
  * is picked on every card, its rose turned to it, and on the chart beside
@@ -60,7 +62,7 @@
  * first. Their sky, air, sea and tide it reads itself, as the dock reads a
  * place's (src/finder/useReadings.ts).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ViewBounds } from "../../force5/src/squares";
 import type { Rider } from "../../force5/src/stars";
 import type { Units } from "../../force5/src/units";
@@ -107,13 +109,31 @@ import { DaySteps } from "./DaySteps";
 import { HoverContext, hoverStore } from "./hover";
 import { knownBefore, useRiderPlace } from "./location";
 import { CardSkeleton, SpotCard, type SpotCardProps } from "./SpotCard";
-import { NO_READINGS, useReadings } from "./useReadings";
+import { NO_READINGS, useReadings, type Readings } from "./useReadings";
 import {
   isStale,
   latestReading,
   pairStation,
   type WindStation,
 } from "../../force5/src/windObs";
+
+/** How long the list rests after a scroll before its cards in view are read. */
+export const SCROLL_SETTLE_MS = 150;
+
+/**
+ * The cards at least half in the list's view, in the list's order: the cards
+ * the rider can see, whose spots stand as pills on the map beside the list.
+ */
+export function cardsInView(list: HTMLElement): string[] {
+  const view = list.getBoundingClientRect();
+  const out: string[] = [];
+  for (const card of list.querySelectorAll<HTMLElement>("[data-spot-card]")) {
+    const r = card.getBoundingClientRect();
+    const seen = Math.min(r.bottom, view.bottom) - Math.max(r.top, view.top);
+    if (r.height > 0 && seen >= r.height / 2) out.push(card.dataset.spotCard!);
+  }
+  return out;
+}
 
 const styles = tv({
   slots: {
@@ -193,6 +213,14 @@ export interface FinderProps {
   view?: ViewBounds | null;
   /** A mouse comes onto a place's card, or leaves it (null). */
   onHover?: (id: string | null) => void;
+  /**
+   * Beside the chart: the places whose cards are at least half in the list's
+   * view, in its order, read again once a scroll has rested (never in the
+   * middle of one) and whenever the cards change.
+   */
+  onInView?: (ids: readonly string[]) => void;
+  /** Each listed place's sky, air and sea, as they are read (./useReadings.ts). */
+  onReadings?: (readings: ReadonlyMap<string, Readings>) => void;
   /** The time every card shows, as it changes. */
   onShown?: (time: number) => void;
   /** Where the rider is, once their browser has said; else null. */
@@ -245,6 +273,8 @@ export default function SpotFinder(props: FinderProps) {
     beside = false,
     view = null,
     onHover,
+    onInView,
+    onReadings,
     onShown,
     onPlace,
     onDrawn,
@@ -446,6 +476,7 @@ export default function SpotFinder(props: FinderProps) {
 
   const axis = useMemo(() => strip.map((c) => c.validTime), [strip]);
   const readings = useReadings(listedSpots, axis);
+  useEffect(() => onReadings?.(readings), [readings]);
   // Each listed place's nearest station, and its latest reading while it is
   // fresh enough to be the wind now: a card on today says it.
   const stations = props.stations ?? null;
@@ -502,6 +533,40 @@ export default function SpotFinder(props: FinderProps) {
     place.locates;
   const grid = s.cards({ class: beside ? undefined : s.cardsAlone() });
 
+  // The cards the rider can see beside the chart: read as the cards change,
+  // and once a scroll or a resize has rested, never in the middle of one.
+  const listRef = useRef<HTMLElement>(null);
+  const seenKey = useRef<string | null>(null);
+  const cardsKey = ranked.map((l) => l.spot.id).join(",");
+  useEffect(() => {
+    const list = listRef.current;
+    if (!beside || !onInView || !list) return;
+    const read = () => {
+      const ids = cardsInView(list);
+      const key = ids.join(",");
+      if (key === seenKey.current) return;
+      seenKey.current = key;
+      onInView(ids);
+    };
+    let timer = 0;
+    const later = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(read, SCROLL_SETTLE_MS);
+    };
+    read();
+    list.addEventListener("scroll", later, { passive: true });
+    // The list's box, and its cards as their rows come in and grow.
+    const resized = new ResizeObserver(later);
+    resized.observe(list);
+    const cards = list.querySelector("[data-finder-cards]");
+    if (cards) resized.observe(cards);
+    return () => {
+      window.clearTimeout(timer);
+      list.removeEventListener("scroll", later);
+      resized.disconnect();
+    };
+  }, [beside, cardsKey, placesDue]);
+
   return (
     <div
       className={s.root({ class: beside ? s.split() : s.page() })}
@@ -511,6 +576,7 @@ export default function SpotFinder(props: FinderProps) {
     >
       <div className={s.body()}>
         <section
+          ref={listRef}
           className={s.list({ class: beside ? s.scroller() : s.alone() })}
           aria-labelledby={headId}
           aria-busy={waiting || placesDue || undefined}

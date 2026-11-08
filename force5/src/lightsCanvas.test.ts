@@ -18,7 +18,7 @@ describe("shadows", () => {
   });
 });
 
-describe("a muted dot's picture", () => {
+describe("a dot's picture, on the chart", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   /** An element as `lookOf` reads one: its styles by name, and what it holds. */
@@ -101,5 +101,74 @@ describe("a muted dot's picture", () => {
     expect(look.label).toBeNull();
     expect(look.ring.w).toBeLessThan(10);
     expect(fills).toEqual(["rgb(139, 139, 148)"]);
+  });
+
+  it("is the bead beside the list: its dot and its halo as a ring round it", () => {
+    const fills: string[] = [];
+    const arcs: number[] = [];
+    const drawing = {
+      setTransform() {},
+      beginPath() {},
+      arc(_x: number, _y: number, r: number) {
+        arcs.push(r);
+      },
+      set fillStyle(colour: string) {
+        fills.push(colour);
+      },
+      fill() {},
+    };
+    vi.stubGlobal(
+      "OffscreenCanvas",
+      class {
+        width: number;
+        height: number;
+        constructor(width: number, height: number) {
+          this.width = width;
+          this.height = height;
+        }
+        getContext = () => drawing;
+        transferToImageBitmap = () => ({});
+      },
+    );
+    vi.stubGlobal(
+      "getComputedStyle",
+      (el: { style: Record<string, string> }) => el.style,
+    );
+    const bead = part(
+      {
+        display: "block",
+        backgroundColor: "rgba(242, 242, 244, 0.42)",
+        boxShadow: "rgba(10, 10, 12, 0.55) 0px 0px 0px 1.2px",
+      },
+      {
+        getBoundingClientRect: () => ({
+          left: -2.25,
+          top: -2.25,
+          width: 4.5,
+          height: 4.5,
+        }),
+      },
+    );
+    const el = part(
+      {},
+      {
+        querySelector: (at: string) =>
+          ({
+            ".lt-lab": part({ display: "none" }),
+            ":scope > .lt-pill": part({ display: "none" }),
+            ":scope > .lt-bead-dot": bead,
+          })[at],
+      },
+    );
+    const look = lookOf(el as unknown as HTMLElement, { x: 0, y: 0 }, 2, true);
+    expect(look.arrow).toBeNull();
+    expect(look.label).toBeNull();
+    // The halo first, a ring from the dot's edge out, then the dot.
+    expect(fills).toEqual([
+      "rgba(10, 10, 12, 0.55)",
+      "rgba(242, 242, 244, 0.42)",
+    ]);
+    expect(arcs).toEqual([2.25 + 1.2, 2.25, 2.25]);
+    expect(look.ring.w).toBeLessThan(10);
   });
 });

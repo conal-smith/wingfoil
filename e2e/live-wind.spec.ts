@@ -4,11 +4,11 @@ import { SAMPLE_WEATHER } from "./sample";
 
 /**
  * The plain map beside the Spot finder's list, and the Live wind layer
- * (force5/src/lights.ts, force5/src/readingPills.ts): each listed spot a pill
- * with its wind and gust in its stars' colour, and each weather station and
- * buoy a gold pill at the wind it last measured, with a card under the
- * pointer or a tap. On by default beside the list; on the full chart, a
- * switch in Layers under Wind, off until asked for.
+ * (force5/src/lights.ts, force5/src/readingPills.ts): each card in view a
+ * neutral pill with its wind, and each weather station and buoy a gold-edged
+ * tag at the wind it last measured. On by default beside the list, with no
+ * card over the map there; on the full chart, a switch in Layers under Wind,
+ * off until asked for, with a card under the pointer or a tap.
  *
  * The readings are the e2e site's synthetic ones (scripts/sample-weather.mjs
  * `windObservations`), ending at SAMPLE_CLOCK, 21:00 UTC (22:00 in Ireland):
@@ -34,8 +34,8 @@ const star = (page: Page, ids: string[]) =>
 
 const cards = (page: Page) => page.locator("[data-spot-card]");
 const lights = (page: Page) => page.locator(".spot-marker");
-/** The spots on the list, as pills; the rest are muted dots. */
-const pills = (page: Page) => page.locator(".spot-marker:not(.lt-dot)");
+/** The cards in view, as pills; the rest are beads. */
+const pills = (page: Page) => page.locator(".spot-marker.lt-pilled");
 const readings = (page: Page) => page.locator(".obs");
 const card = (page: Page) => page.locator(".obs-card");
 const reading = (page: Page, id: string) =>
@@ -51,20 +51,23 @@ async function openHome(page: Page, ids = ["brandon", "dollymount", "keel"]) {
 test.describe("beside the list", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("each listed spot is a pill with its wind, in place of a ring, and keeps its hover and click", async ({
+  test("each card in view is a neutral pill with its wind, in place of a ring, and keeps its hover and click", async ({
     page,
   }) => {
     await openHome(page);
     await expect(page.locator(".map-canvas.is-plain")).toHaveCount(1);
-    await expect(page.locator(".spot-marker.pending:not(.lt-dot)")).toHaveCount(
+    await expect(page.locator(".spot-marker.lt-pilled.pending")).toHaveCount(
       0,
       { timeout: 30000 },
     );
+    const fills = new Set<string>();
     for (const light of await pills(page).all()) {
       await expect(light.locator(".lt-pill")).toBeVisible();
       await expect(light.locator(":scope > svg")).toBeHidden();
-      // The wind in the rider's units, a whole number; an arrow downwind.
+      // The wind in the rider's units, a whole number and its unit; an arrow
+      // downwind.
       await expect(light.locator(".lt-kn")).toHaveText(/^\d+$/);
+      await expect(light.locator(".lt-u")).toHaveText("kn");
       await expect(light.locator(".lt-pa g")).toHaveAttribute(
         "transform",
         /^rotate\(-?\d+\)$/,
@@ -73,9 +76,15 @@ test.describe("beside the list", () => {
       const box = (await light.boundingBox())!;
       expect(box.width).toBeGreaterThan(box.height);
       expect([22, 26]).toContain(Math.round(box.height));
+      fills.add(
+        await light
+          .locator(".lt-pill")
+          .evaluate((el) => getComputedStyle(el).backgroundColor),
+      );
     }
-    // A card under the pointer lights its pill; a click on the pill brings
-    // its card into view.
+    // Neutral, whatever the stars: one dark fill for every pill.
+    expect([...fills]).toEqual(["rgb(12, 12, 14)"]);
+    // A card under the pointer lights its pill; a pill pressed opens its spot.
     await cards(page).filter({ hasText: "Keel Beach" }).hover();
     await expect(page.locator('.spot-marker[data-spot-id="keel"]')).toHaveClass(
       /\blit\b/,
@@ -84,12 +93,10 @@ test.describe("beside the list", () => {
     await expect(page.locator(".map-lights.is-moving")).toHaveCount(0);
     await page.waitForTimeout(400);
     await page.locator('.spot-marker[data-spot-id="brandon"]').click();
-    await expect(
-      cards(page).filter({ hasText: "Brandon Bay" }),
-    ).toBeInViewport();
+    await expect(page).toHaveURL(/\/spot\/brandon/);
   });
 
-  test("the stations and buoys are gold-edged tags at their last reading, and a card says whose, what and when", async ({
+  test("the stations and buoys are gold-edged tags at their last reading, with no card over the map", async ({
     page,
   }) => {
     await openHome(page);
@@ -122,61 +129,87 @@ test.describe("beside the list", () => {
       /M6 Atlantic buoy, Marine Institute: .+, measured 17:00, over 3 hours ago$/,
     );
 
-    // Under the pointer: the card, beside the pill.
+    // No card opens over the map beside the list, under the pointer or the
+    // keys: the reading says itself to a screen reader. (Forced: a reading
+    // a spot's pill or another reading stands on gives it the place.)
+    await pill.hover({ force: true });
+    await pill.dispatchEvent("pointerenter", { pointerType: "mouse" });
+    await page.waitForTimeout(300);
     await expect(card(page)).toBeHidden();
-    await pill.hover();
-    await expect(card(page)).toBeVisible();
-    await expect(card(page).locator(".map-card-name")).toHaveText("Mace Head");
-    await expect(card(page).locator(".map-card-net")).toHaveText(
-      "Met Éireann · Weather station",
-    );
-    await expect(card(page).locator(".map-card-speed")).toHaveText(
-      kn(mace.speed),
-    );
-    await expect(card(page).locator(".map-card-gust")).toHaveText(
-      `g${kn(mace.gust)}`,
-    );
-    await expect(card(page).locator(".map-card-unit")).toHaveText("kn");
-    await expect(card(page).locator(".map-card-from")).toHaveText(
-      /^[NESW]{1,3}$/,
-    );
-    await expect(card(page).locator(".map-card-when")).toHaveText(
-      "Measured 22:00",
-    );
-    await expect(card(page).locator(".map-card-credit")).toHaveText(
-      "Contains Met Éireann data, CC BY 4.0",
-    );
-    await expect(pill).toHaveAttribute(
-      "aria-describedby",
-      (await card(page).getAttribute("id"))!,
-    );
-    const p = (await pill.boundingBox())!;
-    const c = (await card(page).boundingBox())!;
-    expect(Math.abs(c.x + c.width / 2 - (p.x + p.width / 2))).toBeLessThan(
-      c.width / 2 + 1,
-    );
-    // Off the pill, the card goes.
-    await page.mouse.move(5, 5);
-    await expect(card(page)).toBeHidden();
-
-    // A buoy's card credits the Marine Institute; the keys open it too.
-    await reading(page, "MI_M2").focus();
-    await expect(card(page).locator(".map-card-net")).toHaveText(
-      "Marine Institute · Weather buoy",
-    );
-    await expect(card(page).locator(".map-card-credit")).toHaveText(
-      "Weather buoy data © Marine Institute, CC BY 4.0",
-    );
-    await reading(page, "MI_M6").focus();
-    await expect(card(page).locator(".map-card-name")).toHaveText(
-      "M6 Atlantic buoy",
-    );
-    await expect(card(page).locator(".map-card-when")).toHaveText(
-      "Measured 17:00, over 3 hours ago",
-    );
-    await page.keyboard.press("Escape");
+    await reading(page, "MI_M2").dispatchEvent("focus");
     await expect(card(page)).toBeHidden();
   });
+});
+
+test("on the full chart a reading's card says whose, what and when", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "wingfoil.map.layers.v1",
+      JSON.stringify({ live: true }),
+    ),
+  );
+  await page.goto("/?map");
+  await expect(readings(page)).toHaveCount(STATIONS, { timeout: 30000 });
+  await page.waitForTimeout(1000);
+  const mace = OBS.stations.ME_03963.latest;
+  const pill = reading(page, "ME_03963");
+  // Under the pointer: the card, beside the pill.
+  await expect(card(page)).toBeHidden();
+  await pill.hover();
+  await expect(card(page)).toBeVisible();
+  await expect(card(page).locator(".map-card-name")).toHaveText("Mace Head");
+  await expect(card(page).locator(".map-card-net")).toHaveText(
+    "Met Éireann · Weather station",
+  );
+  await expect(card(page).locator(".map-card-speed")).toHaveText(
+    kn(mace.speed),
+  );
+  await expect(card(page).locator(".map-card-gust")).toHaveText(
+    `g${kn(mace.gust)}`,
+  );
+  await expect(card(page).locator(".map-card-unit")).toHaveText("kn");
+  await expect(card(page).locator(".map-card-from")).toHaveText(
+    /^[NESW]{1,3}$/,
+  );
+  await expect(card(page).locator(".map-card-when")).toHaveText(
+    "Measured 22:00",
+  );
+  await expect(card(page).locator(".map-card-credit")).toHaveText(
+    "Contains Met Éireann data, CC BY 4.0",
+  );
+  await expect(pill).toHaveAttribute(
+    "aria-describedby",
+    (await card(page).getAttribute("id"))!,
+  );
+  const p = (await pill.boundingBox())!;
+  const c = (await card(page).boundingBox())!;
+  expect(Math.abs(c.x + c.width / 2 - (p.x + p.width / 2))).toBeLessThan(
+    c.width / 2 + 1,
+  );
+  // Off the pill, the card goes.
+  await page.mouse.move(5, 5);
+  await expect(card(page)).toBeHidden();
+
+  // A buoy's card credits the Marine Institute; the keys open it too.
+  await reading(page, "MI_M2").focus();
+  await expect(card(page).locator(".map-card-net")).toHaveText(
+    "Marine Institute · Weather buoy",
+  );
+  await expect(card(page).locator(".map-card-credit")).toHaveText(
+    "Weather buoy data © Marine Institute, CC BY 4.0",
+  );
+  await reading(page, "MI_M6").focus();
+  await expect(card(page).locator(".map-card-name")).toHaveText(
+    "M6 Atlantic buoy",
+  );
+  await expect(card(page).locator(".map-card-when")).toHaveText(
+    "Measured 17:00, over 3 hours ago",
+  );
+  await page.keyboard.press("Escape");
+  await expect(card(page)).toBeHidden();
 });
 
 test("on the full chart the Live wind layer is a switch under Wind, off until asked for", async ({

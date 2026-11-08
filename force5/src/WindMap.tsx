@@ -182,10 +182,6 @@ type Props = {
   /** Places whose names stay up at any zoom: the starred ones. */
   named: ReadonlySet<string>;
   lightLabel: (spot: Spot, state: LightState | undefined) => string;
-  /** The hour the lights stand at, in words ("at 13:00 today"), for a dot's card. */
-  lightWhen?: string | null;
-  /** A spot's own page, for the link on a dot's card a tap has pinned. */
-  lightLink?: (spot: Spot) => string;
   selectedId: string | null;
   /** Where the loupe or the range ring is laid (a spot or a tapped point), or null. */
   focus: { lon: number; lat: number } | null;
@@ -218,7 +214,8 @@ type Props = {
   /** The dock's height: what a camera move keeps the spot above. */
   bottomInset: number;
   phone: boolean;
-  onSelect: (spot: Spot) => void;
+  /** A light pressed, and whether it was a bead beside the list (./lights.ts). */
+  onSelect: (spot: Spot, bead: boolean) => void;
   /** A mouse comes onto a light (its place), or leaves it (null). */
   onHoverSpot?: (spot: Spot | null) => void;
   /**
@@ -229,8 +226,8 @@ type Props = {
   /** Where the rider is, drawn as a blue dot, or null where it is not known. */
   you?: { lon: number; lat: number } | null;
   /**
-   * The plain map beside the Spot finder's list: each spot a pill with its
-   * wind (./lights.ts), not a ring.
+   * The plain map beside the Spot finder's list: the cards in view as pills,
+   * every other spot a bead (./lights.ts), not rings.
    */
   plain?: boolean;
   /**
@@ -1386,10 +1383,9 @@ export default function WindMap(props: Props) {
     lightsRef.current = createLights(
       map,
       spots,
-      (spot) => latest.current.onSelect(spot),
+      (spot, bead) => latest.current.onSelect(spot, bead),
       (spot) => latest.current.onHoverSpot?.(spot),
       (spot) => latest.current.onOpenPage?.(spot),
-      (spot) => latest.current.lightLink?.(spot) ?? "",
     );
     lightsRef.current.light(lit.current);
     return () => {
@@ -1404,18 +1400,8 @@ export default function WindMap(props: Props) {
       named,
       props.lightLabel,
       units,
-      props.lightWhen,
     );
-  }, [
-    ready,
-    spots,
-    lights,
-    selectedId,
-    named,
-    units,
-    props.lightLabel,
-    props.lightWhen,
-  ]);
+  }, [ready, spots, lights, selectedId, named, units, props.lightLabel]);
 
   // The plain map's pills, from the map box's class (src/map.css).
   const plain = !!props.plain;
@@ -1423,7 +1409,8 @@ export default function WindMap(props: Props) {
     const map = mapRef.current;
     if (!ready || !map) return;
     map.getContainer().classList.toggle("is-plain", plain);
-    // Beside the list only the cities are named: the spots carry the names.
+    // Beside the list only the cities are named, and no spot is: its card
+    // says its name.
     if (map.getLayer("places"))
       map.setFilter(
         "places",

@@ -835,17 +835,6 @@
   .lt:is(.s0, .pending, .dark, .off):not(.sel, .lit) {
   z-index: 2;
 }
-/* Beside the list a thinned spot is the same dot in place of its pill. */
-.map-canvas.is-plain .lt.lt-thin:not(.sel, .lit, :focus-visible) {
-  width: 20px;
-  height: 20px;
-}
-.map-canvas.is-plain .lt.lt-thin:not(.sel, .lit, :focus-visible) > svg {
-  display: block;
-}
-.map-canvas.is-plain .lt.lt-thin:not(.sel, .lit, :focus-visible) .lt-pill {
-  display: none;
-}
 @media (hover: hover) and (pointer: fine) {
   .map-canvas.z-lo:not(.is-plain) .lt:hover .lt-lab,
   .map-canvas .lt.lt-thin:hover .lt-lab {
@@ -916,8 +905,9 @@
   display: none;
 }
 /* A card for this place under the pointer, beside the chart: its light in
-   ink, larger, with its name on an ink label, and the others fainter. */
-.map-lights.has-lit .lt:not(.lit) {
+   ink, larger, with its name on an ink label, and the others fainter. Not
+   beside the list, where its pill turns light and nothing else changes. */
+.map-canvas:not(.is-plain) .map-lights.has-lit .lt:not(.lit) {
   opacity: 0.45;
 }
 .map-canvas .lt.lit {
@@ -962,54 +952,81 @@
 .lt:focus-visible .lt-lab i {
   color: var(--color-ink-inverse);
 }
-/* ---------- the plain map's pills ---------- */
-/* On the Spot finder's plain map (force5/src/lights.ts, `is-plain` on the
-   map's box) a spot is a pill in place of a ring: an arrow blowing downwind,
-   the wind at the cards' hour, and its gust raised beside it, filled in the
-   stars' own colours as the ring was, dashed at no stars, and with a red
-   arrow offshore. The button is the pill's box; the pill inside it is what
-   scales, so the light's own place (its transform) is never touched. */
-.lt-pill {
+/* ---------- the finder's pills and beads ---------- */
+/* On the Spot finder's plain map beside the list (force5/src/lights.ts,
+   `is-plain` on the map's box) a spot is a pill or a bead, and no spot's name
+   stands on the map. A pill's button is the pill, moved off its spot with it
+   where it was placed clear of another; a bead's is a small square on its
+   spot, and its light pill, under the pointer, stands centred over it. */
+.lt-pill,
+.lt-bead-dot {
   display: none;
 }
 .map-canvas.is-plain .lt {
+  width: 20px;
+  height: 20px;
+  border-radius: 0;
+}
+.map-canvas.is-plain .lt.lt-pilled {
   width: auto;
   height: auto;
   border-radius: var(--radius-pill);
 }
 .map-canvas.is-plain .lt > svg,
-.map-canvas.is-plain .lt .lt-pulse {
-  display: none;
+.map-canvas.is-plain .lt .lt-pulse,
+.map-canvas.is-plain .lt .lt-lab {
+  /* Over every rule that shows a ring's name: none beside the list. */
+  display: none !important;
 }
+/* A pill: neutral, dark with light words in either theme, whatever the map
+   shows (force5/src/pillContent.ts). Laid out even while hidden, so its size
+   can be read to place it. */
 .map-canvas.is-plain .lt .lt-pill {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   display: inline-flex;
   align-items: center;
   gap: 3px;
   box-sizing: border-box;
   height: 26px;
-  padding: 0 9px 0 7px;
-  border: 1px solid var(--color-line-strong);
+  padding: 0 7px;
+  border: 1px solid var(--map-pill-edge);
   border-radius: var(--radius-pill);
-  background: var(--color-ground);
-  color: var(--color-ink);
+  background: var(--map-pill);
+  color: var(--map-pill-ink);
   font: 600 12px/1 var(--font-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   box-shadow: var(--shadow-marker);
+  visibility: hidden;
+  transform: translate(-50%, -50%);
   transition:
-    transform 0.2s,
-    background-color 0.2s;
+    background-color 0.12s,
+    color 0.12s;
 }
-.map-canvas.is-plain .lt .lt-pill svg.lt-pa {
+.map-canvas.is-plain .lt.lt-pilled .lt-pill,
+.map-canvas.is-plain .lt.lit .lt-pill,
+.map-canvas.is-plain .lt:focus-visible .lt-pill {
+  visibility: visible;
+}
+/* Placed, the pill is its button's box. */
+.map-canvas.is-plain .lt.lt-pilled .lt-pill {
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+}
+.map-canvas.is-plain .lt .lt-pill svg {
   position: static;
   flex: none;
   width: 12px;
   height: 12px;
   overflow: visible;
-  border-radius: 50%;
   transform: none;
   filter: none;
   transition: none;
+  pointer-events: none;
 }
 .lt-pa path {
   fill: none;
@@ -1018,173 +1035,184 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* Offshore: the arrow alone in the pen's red. */
+.map-canvas.is-plain .lt:is(.off, .xoff) .lt-pa path {
+  stroke: var(--map-pill-off);
+}
 .lt-kn {
   font-weight: 600;
 }
-/* The gust, raised: smaller, and a step quieter than the wind. */
+/* The unit, small, after the figure. */
+.lt-u {
+  margin: 0 1px 0 -1px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--map-pill-ink-2);
+}
+/* The gust, the period or the rain, raised: smaller, and a step quieter. */
 .lt-gu {
   align-self: flex-start;
   margin: 5px 0 0 -1px;
   font-size: 9px;
   font-weight: 500;
   line-height: 1;
-  vertical-align: baseline;
-  color: color-mix(in srgb, currentColor 78%, transparent);
+  color: var(--map-pill-ink-2);
 }
-.lt-gu:empty {
-  display: none;
+/* The sky, from the glyph set (shared/web/glyphSet.ts): its outline in the
+   pill's ink, its colour inside. */
+.map-canvas.is-plain .lt .lt-pill svg.lt-sky {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.map-canvas.is-plain .lt.s0 .lt-pill {
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--color-ink) 50%, transparent);
-  color: var(--color-ink-muted);
+.lt-sky .f-ink {
+  fill: currentColor;
 }
-.map-canvas.is-plain .lt.pending .lt-pill {
-  border-style: dotted;
-  border-color: color-mix(in srgb, var(--color-ink) 35%, transparent);
-  color: var(--color-ink-muted);
-  min-width: 34px;
+.lt-sky .f-sun {
+  fill: var(--color-weather-sun);
 }
-.map-canvas.is-plain .lt.s1 .lt-pill {
-  background: var(--color-stars-1);
-  border-color: var(--color-stars-2);
+.lt-sky .f-cloud {
+  fill: var(--map-pill-cloud);
 }
-.map-canvas.is-plain .lt.s2 .lt-pill {
-  background: var(--color-stars-2);
-  border-color: var(--color-stars-3);
+.lt-sky .f-night {
+  fill: var(--map-pill-night);
 }
-.map-canvas.is-plain .lt.s3 .lt-pill {
-  background: var(--color-stars-3);
-  border-color: var(--color-stars-4);
-  color: var(--color-ground);
+.lt-sky .f-rain {
+  fill: var(--color-weather-rain);
 }
-.map-canvas.is-plain .lt.s4 .lt-pill {
-  background: var(--color-stars-4);
-  border-color: var(--color-stars-5);
-  color: var(--color-ground);
+.lt-sky .s-rain {
+  stroke: var(--color-weather-rain);
 }
-.map-canvas.is-plain .lt.s5 .lt-pill {
-  background: var(--color-stars-5);
-  border-color: var(--color-ink);
-  color: var(--color-ground);
+.lt-sky .s-none {
+  stroke: none;
 }
-/* A dark hour: the spot still there, in grey, with its wind. */
-.map-canvas.is-plain .lt.dark .lt-pill {
-  background: color-mix(in srgb, var(--color-ink) 16%, var(--color-ground));
-  border-color: color-mix(in srgb, var(--color-ink) 40%, transparent);
-  color: var(--color-ink-2);
+/* A pill moved off its spot: a notch on the edge facing it, pointing at it
+   (force5/src/pillPlace.ts). Drawn the same on the canvas through a move
+   (force5/src/lightsCanvas.ts). */
+.map-canvas.is-plain .lt .lt-pill[data-n]::after {
+  content: "";
+  position: absolute;
+  box-sizing: border-box;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--map-pill-edge);
+  background: inherit;
+  transform: rotate(45deg);
 }
-/* Offshore: the red arrow, on a small disc of the ground so it reads on any
-   of the stars' fills; a true offshore hour takes the pill to the pen. */
-.map-canvas.is-plain .lt.off .lt-pill svg.lt-pa,
-.map-canvas.is-plain .lt.xoff .lt-pill svg.lt-pa {
-  background: var(--color-ground);
-  box-shadow: 0 0 0 1.5px var(--color-ground);
+.map-canvas.is-plain .lt .lt-pill[data-n="b"]::after {
+  bottom: -4.5px;
+  left: calc(var(--n) - 4.5px);
+  border-top: 0;
+  border-left: 0;
 }
-.map-canvas.is-plain .lt.off .lt-pa path,
-.map-canvas.is-plain .lt.xoff .lt-pa path {
-  stroke: var(--color-pen);
+.map-canvas.is-plain .lt .lt-pill[data-n="t"]::after {
+  top: -4.5px;
+  left: calc(var(--n) - 4.5px);
+  border-bottom: 0;
+  border-right: 0;
 }
-.map-canvas.is-plain .lt.off .lt-pill {
-  background: var(--color-ground);
-  border-color: var(--color-pen);
-  color: var(--color-pen-ink);
+.map-canvas.is-plain .lt .lt-pill[data-n="r"]::after {
+  right: -4.5px;
+  top: calc(var(--n) - 4.5px);
+  border-bottom: 0;
+  border-left: 0;
 }
-@media (hover: hover) and (pointer: fine) {
-  .map-canvas.is-plain .lt:hover .lt-pill {
-    transform: scale(1.08);
-  }
+.map-canvas.is-plain .lt .lt-pill[data-n="l"]::after {
+  left: -4.5px;
+  top: calc(var(--n) - 4.5px);
+  border-top: 0;
+  border-right: 0;
 }
+/* Under the pointer, the keys, or its card: the pill turns light, with dark
+   words, in either theme, and stands over the rest. No ring, no growth. */
+.map-canvas.is-plain .lt.lit,
 .map-canvas.is-plain .lt:focus-visible {
-  outline-offset: 3px;
+  z-index: 6;
 }
-/* A card for this place under the pointer: its pill in ink, a size up. */
-.map-canvas.is-plain .lt.lit .lt-pill {
-  transform: scale(1.12);
-  background: var(--color-ink);
-  border-color: var(--color-ink);
-  border-style: solid;
-  color: var(--color-ink-inverse);
+.map-canvas.is-plain .lt.lit .lt-pill,
+.map-canvas.is-plain .lt:focus-visible .lt-pill {
+  background: var(--map-pill-lit);
+  border-color: var(--map-pill);
+  color: var(--map-pill-lit-ink);
+}
+.map-canvas.is-plain .lt.lit .lt-pill[data-n]::after,
+.map-canvas.is-plain .lt:focus-visible .lt-pill[data-n]::after {
+  border-color: var(--map-pill);
+}
+.map-canvas.is-plain .lt:is(.lit, :focus-visible) :is(.lt-u, .lt-gu) {
+  color: var(--map-pill-lit-ink-2);
+}
+.map-canvas.is-plain .lt:is(.lit, :focus-visible) .lt-sky .f-cloud {
+  fill: var(--map-pill-lit-cloud);
+}
+.map-canvas.is-plain .lt:is(.lit, :focus-visible) .lt-sky .f-night {
+  fill: var(--map-pill-lit-night);
+}
+.map-canvas.is-plain .lt:is(.off, .xoff):is(.lit, :focus-visible) .lt-pa path {
+  stroke: var(--map-pill-lit-off);
+}
+/* The keys' ring on the pill, where the eye is, not on the point under it. */
+.map-canvas.is-plain .lt:focus-visible {
+  outline: none;
+}
+.map-canvas.is-plain .lt:focus-visible .lt-pill {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 /* Further out, a size down. */
 .map-canvas.is-plain.z-lo .lt .lt-pill {
   height: 22px;
-  padding: 0 7px 0 5px;
+  padding: 0 6px;
   font-size: 11px;
 }
 .map-canvas.is-plain.z-lo .lt .lt-gu {
   margin-top: 4px;
   font-size: 8.5px;
 }
-/* The name beside its pill, on either side, and the line under it left to
-   the pill: it says the wind already. */
-.map-canvas.is-plain .lt .lt-lab,
-.map-canvas.is-plain.z-lo .lt .lt-lab {
-  left: calc(100% + 6px);
-  right: auto;
-  top: 50%;
-  transform: translateY(-50%);
+.map-canvas.is-plain.z-lo .lt .lt-pill svg.lt-sky {
+  width: 14px;
+  height: 14px;
 }
-.map-canvas.is-plain .lt .lt-lab i {
+/* A pill is the one under the pointer: no reach beyond it. */
+.map-canvas.is-plain .lt.lt-pilled::before {
   display: none;
 }
-/* Beside the list the map shows the list's few spots alone: their names
-   from the regional zoom in, where the label pass (force5/src/lights.ts)
-   finds them room, and none at the national zoom. */
-.map-canvas.is-plain:not(.z-lo) .lt:not(.lab-hide) .lt-lab {
-  display: block;
-}
-.map-canvas.is-plain:not(.z-lo) .lt.lt-thin:not(.sel, .lit) .lt-lab {
-  display: none;
-}
-.map-canvas.is-plain .lt.lab-left .lt-lab,
-.map-canvas.is-plain.z-lo .lt.lab-left .lt-lab {
-  left: auto;
-  right: calc(100% + 6px);
-}
-.map-canvas.is-plain .lt.lit .lt-lab,
-.map-canvas.is-plain .lt:focus-visible .lt-lab,
-.map-canvas.is-plain .lt.lit.lab-hide .lt-lab,
-.map-canvas.is-plain.no-names .lt.lit .lt-lab {
-  left: calc(100% + 10px);
-  right: auto;
-  top: 50%;
-}
-/* A spot beside the list that is not on it (force5/src/lights.ts): a small
-   muted dot, in no stars' colour and no offshore red, under everything. Its
-   reading is in its card, under the pointer or the keys. */
-.map-canvas.is-plain .lt.lt-dot {
-  width: 20px;
-  height: 20px;
+/* A bead: every spot whose card is not in view, the same whatever the map
+   shows. A small off-white dot at low strength, a thin dark halo round it,
+   and a finger's reach all round, where the nearest bead is the one meant
+   (force5/src/lights.ts). Under the pointer or the keys it is its light pill. */
+.map-canvas.is-plain .lt.lt-bead:not(.lit, :focus-visible) {
   z-index: 1;
 }
-.map-canvas.is-plain .lt.lt-dot > svg {
+.map-canvas.is-plain .lt .lt-bead-dot {
+  position: absolute;
+  left: calc(50% - 2.25px);
+  top: calc(50% - 2.25px);
   display: block;
-  transform: scale(0.34);
+  width: 4.5px;
+  height: 4.5px;
+  border-radius: 50%;
+  background: var(--map-bead);
+  box-shadow: 0 0 0 1.2px var(--map-bead-halo);
+  pointer-events: none;
 }
-.map-canvas.is-plain .lt.lt-dot .lt-ring {
-  fill: var(--color-line-strong);
-  stroke: var(--color-ground);
-  stroke-width: 3;
-  stroke-dasharray: none;
-}
-.map-canvas.is-plain .lt.lt-dot :is(.lt-n, .lt-strike, .lt-wind),
-.map-canvas.is-plain .lt.lt-dot .lt-pill,
-.map-canvas.is-plain .lt.lt-dot .lt-lab {
+.map-canvas.is-plain .lt:is(.lt-pilled, .lit, :focus-visible) .lt-bead-dot {
   display: none;
 }
-.map-canvas.is-plain .lt.lt-dot.is-open > svg,
-.map-canvas.is-plain .lt.lt-dot:focus-visible > svg {
-  transform: scale(0.52);
+.map-canvas.is-plain .lt.lt-bead::before {
+  width: 44px;
+  height: 44px;
 }
-@media (hover: hover) and (pointer: fine) {
-  .map-canvas .lt.lt-dot::before {
-    width: 20px;
-    height: 20px;
-  }
-  .map-canvas.is-plain .lt.lt-dot:hover > svg {
-    transform: scale(0.52);
-  }
+/* A bead a pill stands on: under it, and out of reach. */
+.map-canvas.is-plain .lt.lt-under:not(.lit, :focus-visible) {
+  visibility: hidden;
+}
+.map-canvas.is-plain .lt.lt-under::before {
+  display: none;
 }
 
 /* ---------- the Live wind layer ---------- */
@@ -1220,7 +1248,7 @@
     opacity 0.2s;
 }
 /* Beside the list the riding places lead: a station steps back to the ground,
-   with its gold kept as an edge, and the map's foot says what the edge means. */
+   with its gold kept as an edge. No card opens from it there. */
 .map-canvas.is-plain .obs {
   height: 19px;
   border-color: var(--color-line);
@@ -1229,6 +1257,7 @@
   color: var(--color-ink-2);
   font-weight: 500;
   box-shadow: none;
+  cursor: default;
 }
 /* A finger's reach, beyond the pill. */
 .obs::before {
@@ -1267,6 +1296,11 @@
 .obs-mark.is-stale .obs {
   opacity: 0.5;
 }
+/* Beside the list, a reading a spot's pill, a name or another reading stands on
+   gives it the place (force5/src/lights.ts). */
+.obs-mark.obs-under {
+  visibility: hidden;
+}
 /* Further out, a size down and the wind alone: the gust is in its card. */
 .map-canvas.z-lo .obs {
   height: 18px;
@@ -1281,7 +1315,7 @@
   height: 9px;
 }
 @media (hover: hover) and (pointer: fine) {
-  .obs:hover {
+  .map-canvas:not(.is-plain) .obs:hover {
     transform: scale(1.08);
   }
 }
@@ -1901,29 +1935,10 @@
 [data-beside-chart] [data-finder-loading] {
   grid-template-columns: minmax(0, 1fr);
 }
-/* A light under the pointer outlines its place's card; one pressed brings
-   the card into view, its outline drawn in for a moment. */
+/* A pill or a bead under the pointer outlines its place's card, clearly:
+   the card the rider is pointing at on the map (src/App.tsx). */
 [data-spot-card][data-lit] {
-  box-shadow: inset 0 0 0 1.5px var(--color-line-strong);
-}
-[data-spot-card].is-flash {
-  animation: card-flash 1.4s cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-@keyframes card-flash {
-  0%,
-  40% {
-    outline: 2px solid var(--color-chart-magenta);
-    outline-offset: 4px;
-  }
-  100% {
-    outline: 2px solid transparent;
-    outline-offset: 2px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  [data-spot-card].is-flash {
-    animation: none;
-  }
+  box-shadow: inset 0 0 0 2px var(--color-ink);
 }
 /* The chart beside the list: the zoom at the top right, and the locate
    button under it. */

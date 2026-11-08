@@ -831,6 +831,29 @@
   --map-rain-light: rgba(64, 128, 186, 0.32);
   --map-rain-moderate: rgba(38, 98, 170, 0.52);
   --map-rain-heavy: rgba(24, 58, 140, 0.74);
+  /* The finder's pills (force5/src/pillContent.ts): neutral, dark with light
+     words in either theme, so a pill reads the same on the dark map and the
+     white one; under the pointer, light with dark words, in either theme too.
+     The sky inside keeps the weather's colours, its cloud and moon a shade
+     for each. An offshore arrow is the pen's red, a step deeper on the light
+     pill. */
+  --map-pill: #0c0c0e;
+  --map-pill-edge: #6b6b74;
+  --map-pill-ink: #f2f2f4;
+  --map-pill-ink-2: #c9c9cf;
+  --map-pill-cloud: #d4d4da;
+  --map-pill-night: #4a4a55;
+  --map-pill-off: #ff5b4d;
+  --map-pill-lit: #f2f2f4;
+  --map-pill-lit-ink: #111114;
+  --map-pill-lit-ink-2: #3a3a40;
+  --map-pill-lit-cloud: #9a9aa2;
+  --map-pill-lit-night: #6b6b74;
+  --map-pill-lit-off: #d43a2c;
+  /* A spot with no pill beside the list: a bead, a small dot at low strength
+     with a thin halo, dark on the white map and off-white on the dark one. */
+  --map-bead: rgba(58, 58, 64, 0.5);
+  --map-bead-halo: rgba(255, 255, 255, 0.8);
 }
 
 /* ==== spot ===============================================================
@@ -992,6 +1015,8 @@
   --map-sand: #3a362a;
   --map-wetland: #26302a;
   --map-halo: #0c0c0e;
+  --map-bead: rgba(242, 242, 244, 0.42);
+  --map-bead-halo: rgba(10, 10, 12, 0.55);
 }
 
 /* ==== ai =================================================================

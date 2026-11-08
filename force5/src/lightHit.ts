@@ -33,7 +33,7 @@ export function nearestLight(
   return best;
 }
 
-/** A light with whether it is a muted dot (./lights.ts). */
+/** A light with whether it is a bead beside the list (./lights.ts). */
 export interface MarkCentre extends LightCentre {
   dot: boolean;
 }
