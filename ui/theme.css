@@ -856,6 +856,27 @@
   --color-wave-swan: #22a093;
   --color-wave-gfs: #bb8a2a;
   --color-wave-ecmwf: #9b6be0;
+  /* The waves' height, in metres, as the finder's cards draw it hour by hour
+     (src/finder/SpotCard.tsx): pale sea-green on flat water deepening through
+     blue to indigo at 8 m and over, each step plain against the next. It means
+     the sea's height and nothing else, never the wind's knots. Re-themed, as
+     the stars are, so the high end stays the strongest on either ground. */
+  --color-waves-m0: #c9ece4;
+  --color-waves-m05: #86d8cb;
+  --color-waves-m1: #3fb6b4;
+  --color-waves-m2: #1f83a8;
+  --color-waves-m3: #2a55a3;
+  --color-waves-m5: #3b2c8e;
+  --color-waves-m8: #27105e;
+  /* The sky by its cloud, per cent: the sun's yellow at a clear sky, paling
+     through a hazy cream to grey under a full cover. The weather's meaning,
+     so, like the weather's marks, it does not re-theme; ink reads on every
+     step of it. */
+  --color-sky-c0: #e9b200;
+  --color-sky-c30: #f0d060;
+  --color-sky-c55: #ddd6b8;
+  --color-sky-c78: #bdbdc2;
+  --color-sky-c100: #8f9096;
   --container-loupe: 420px;
   --container-side: 300px;
   --text-big: 40px;
@@ -943,6 +964,13 @@
   --color-stars-3: #cc4796;
   --color-stars-4: #ee62b0;
   --color-stars-5: #ff9ad3;
+  --color-waves-m0: #12303a;
+  --color-waves-m05: #0e4f60;
+  --color-waves-m1: #0c6c80;
+  --color-waves-m2: #1b88a0;
+  --color-waves-m3: #4a98d8;
+  --color-waves-m5: #8f96f0;
+  --color-waves-m8: #d9c4ff;
   --shadow-card: 0 1px 2px #00000066;
   --shadow-float: 0 1px 2px #00000066, 0 14px 28px -12px #000000b3;
   --shadow-sheet: 0 1px 2px #00000066, 0 24px 48px -16px #000000cc;

@@ -1,8 +1,9 @@
 /**
  * A place on the spot finder, a row: its picture from above, small and
  * square, with the ride rose on it; beside it the name and county with the
- * star a rider keeps it by, and the day shown (today, or the day stepped to)
- * hour by hour as two bars, the wind and the stars (`DayBars`).
+ * heart a rider keeps it by, and the day shown (today, or the day stepped to)
+ * hour by hour as four bars, the wind, the waves, the sky and the stars
+ * (`DayBars`), whatever the map beside the list shows.
  *
  * Pressing the card, its picture too, opens the place's own page (the
  * owner's ruling of 2026-11-02: the chart is a button away in the top bar);
@@ -48,14 +49,14 @@ import {
 } from "../../spot/web/satellite";
 import type { PlaceHour } from "../ratings";
 import { clock, type StripColumn } from "../strip";
-import { HOUR, type Best, type DayRow } from "./finder";
+import { HOUR, everyThird, type Best, type DayRow } from "./finder";
 import type { Readings } from "./useReadings";
 
 export const cardStyles = tv({
   slots: {
-    // A row on a quiet card (the Spot finder mock-up, 2026-10-31): the
-    // picture small and square, so the 10 m satellite stays sharp, beside the
-    // name and today's wind and stars as two gradients.
+    // A row on a quiet card: the picture small and square, so the 10 m
+    // satellite stays sharp, beside the name and the day's wind, waves, sky
+    // and stars as four gradients.
     card: [
       "group/card relative grid min-w-0 cursor-pointer grid-cols-card gap-x-3.5 rounded-surface bg-sunken p-2.5",
       "transition duration-fast motion-reduce:transition-none hover:inset-ring-1 hover:inset-ring-line-strong",
@@ -82,10 +83,23 @@ export const cardStyles = tv({
     star: "self-start",
     bars: "grid grid-cols-bars items-center gap-x-1.5 gap-y-1",
     barName: "font-body text-caption font-medium text-ink-muted",
-    bar: "relative h-2.5 cursor-pointer rounded-full",
-    windBar: "h-4.5",
+    // The wind, the waves and the sky each a bar with figures in it; the
+    // stars a thin one under them.
+    bar: "relative h-3.5 cursor-pointer rounded-full",
+    starsBar: "h-1.5",
+    // Water the open sea's waves do not reach: the row kept, empty.
+    noBar: "bg-line",
     barNum:
-      "pointer-events-none absolute top-1/2 -translate-x-1/2 -translate-y-1/2 font-body text-caption font-semibold text-photo-shade",
+      "pointer-events-none absolute top-1/2 -translate-x-1/2 -translate-y-1/2 font-body text-caption leading-none font-semibold text-photo-shade",
+    // A figure at either end of a bar, held inside it rather than centred
+    // over the rounded end.
+    barNumFirst: "left-1 translate-x-0",
+    barNumLast: "right-1 left-auto translate-x-0",
+    // A wave's figure on the deep end of the ramp, which is the light theme's
+    // high seas and the dark theme's flat ones.
+    barNumLight: "text-photo-line",
+    barNumDarkLight: "dark:text-photo-line",
+    barNumDarkShade: "dark:text-photo-shade",
     // A notch over the bar, clear of the figures in it: ink for the hour now,
     // magenta for the day's best on a day ahead.
     tick: "pointer-events-none absolute -top-1 h-1 w-0.5 -translate-x-1/2 rounded-t-full",
@@ -100,8 +114,8 @@ export const cardStyles = tv({
     ghostWords: "m-0 font-body text-prose text-ink-muted",
     ghostMeta: "w-24",
     ghostStar: "size-control-sm shrink-0 pointer-coarse:size-touch",
-    ghostBar: "h-4.5 min-h-0 w-full rounded-full",
-    ghostThin: "h-2.5 min-h-0 w-full rounded-full",
+    ghostBar: "h-3.5 min-h-0 w-full rounded-full",
+    ghostThin: "h-1.5 min-h-0 w-full rounded-full",
   },
 });
 
@@ -394,6 +408,7 @@ export function SpotCard(props: SpotCardProps) {
           <DayBars
             day={day}
             row={row}
+            readings={props.readings}
             shown={shown}
             isToday={isToday}
             units={units}
@@ -414,17 +429,71 @@ const STARS_CSS = [
   "var(--color-stars-5)",
 ];
 
+/** A value on a ramp of tokens, between the two stops either side of it. */
+function rampCss(stops: readonly (readonly [number, string])[], v: number) {
+  if (v <= stops[0][0]) return `var(${stops[0][1]})`;
+  for (let i = 1; i < stops.length; i++) {
+    const [to, name] = stops[i];
+    if (v > to) continue;
+    const [from, below] = stops[i - 1];
+    const share = Math.round(((v - from) / (to - from)) * 100);
+    return `color-mix(in oklab, var(${name}) ${share}%, var(${below}))`;
+  }
+  return `var(${stops[stops.length - 1][1]})`;
+}
+
+/** The waves' height ramp, metres (ui/theme.css `--color-waves-*`). */
+const WAVES: readonly (readonly [number, string])[] = [
+  [0, "--color-waves-m0"],
+  [0.5, "--color-waves-m05"],
+  [1, "--color-waves-m1"],
+  [2, "--color-waves-m2"],
+  [3, "--color-waves-m3"],
+  [5, "--color-waves-m5"],
+  [8, "--color-waves-m8"],
+];
+
+/** The sky by its cloud, per cent (ui/theme.css `--color-sky-*`). */
+const SKY: readonly (readonly [number, string])[] = [
+  [0, "--color-sky-c0"],
+  [30, "--color-sky-c30"],
+  [55, "--color-sky-c55"],
+  [78, "--color-sky-c78"],
+  [100, "--color-sky-c100"],
+];
+
+export const wavesCss = (metres: number) => rampCss(WAVES, metres);
+export const skyCss = (cloud: number) => rampCss(SKY, cloud);
+
 /**
- * The day's hours, first light to last, as two gradients: the wind in its
- * own colours with its speed every three hours, and the stars in theirs. A
- * notch marks the hour shown, where it is on the row: none for an hour
- * off either end (today after dark, or before first light), never the last
- * hour standing in for it. A press on either bar picks the hour under it, of
- * this day's, on every card.
+ * The rain in an hour as a strip under the sky: none under 0.1 mm, then the
+ * weather's rain blue, stronger as it gets heavier (light under 0.5 mm,
+ * moderate under 2 mm, then heavy).
+ */
+export function rainCss(mm: number | null | undefined): string {
+  if (mm == null || mm < 0.1) return "transparent";
+  const share = mm < 0.5 ? 45 : mm < 2 ? 70 : 100;
+  return `color-mix(in srgb, var(--color-weather-rain) ${share}%, transparent)`;
+}
+
+/** How tall the rain's strip is, under the sky's bar. */
+const RAIN_STRIP = "4px";
+
+/**
+ * The day's hours, first light to last, as four bars: the wind in its own
+ * colours with its speed every three hours; the waves' height in theirs, with
+ * the metres, kept empty on water the open sea's waves do not reach; the sky,
+ * yellow for a clear sky to grey under cloud, with the air's temperature and
+ * the rain as a blue strip along its foot; and the stars in theirs. A notch
+ * marks the hour shown, where it is on the row: none for an hour off either
+ * end (today after dark, or before first light), never the last hour standing
+ * in for it. A press on any bar picks the hour under it, of this day's, on
+ * every card.
  */
 function DayBars({
   day,
   row,
+  readings,
   shown,
   isToday,
   units,
@@ -432,6 +501,7 @@ function DayBars({
 }: {
   day: DayRow;
   row: readonly PlaceHour[] | undefined;
+  readings: Readings;
   shown: number;
   isToday: boolean;
   units: Units;
@@ -446,15 +516,31 @@ function DayBars({
     const k = hours[i].at;
     return k === null ? null : (row?.[k] ?? null);
   };
-  const wind = `linear-gradient(90deg, ${hours
-    .map((_, i) => {
-      const h = at(i);
-      return `${h?.windKn == null ? "var(--color-line)" : windCss(h.windKn)} ${pos(i)}`;
-    })
-    .join(", ")})`;
-  const stars = `linear-gradient(90deg, ${hours
-    .map((_, i) => `${STARS_CSS[at(i)?.rating?.stars ?? 0]} ${pos(i)}`)
-    .join(", ")})`;
+  /** A reading at the row's `i`th hour, or null. */
+  const read = <T,>(values: readonly (T | null)[], i: number): T | null => {
+    const k = hours[i].at;
+    return k === null ? null : (values[k] ?? null);
+  };
+  const gradient = (colour: (i: number) => string) =>
+    `linear-gradient(90deg, ${hours.map((_, i) => `${colour(i)} ${pos(i)}`).join(", ")})`;
+  const wind = gradient((i) => {
+    const h = at(i);
+    return h?.windKn == null ? "var(--color-line)" : windCss(h.windKn);
+  });
+  const waves = gradient((i) => {
+    const sea = read(readings.sea, i);
+    return sea ? wavesCss(sea.height) : "var(--color-line)";
+  });
+  const sky = gradient((i) => {
+    const cloud = read(readings.cloud, i);
+    return cloud === null ? "var(--color-line)" : skyCss(cloud);
+  });
+  const raining = hours.some((_, i) => (read(readings.rain, i) ?? 0) >= 0.1);
+  const skyLayers = raining
+    ? `${gradient((i) => rainCss(read(readings.rain, i)))} bottom / 100% ${RAIN_STRIP} no-repeat, ${sky}`
+    : sky;
+  const stars = gradient((i) => STARS_CSS[at(i)?.rating?.stars ?? 0]);
+  const marked = everyThird(hours);
   // The column whose hour (or step, where the run is coarser) holds it.
   const shownAt = hours.findIndex(
     (h, i) => h.time <= shown && shown < (hours[i + 1]?.time ?? h.time + HOUR),
@@ -476,6 +562,23 @@ function DayBars({
         data-shown-tick
       />
     );
+  /** A figure every three hours, where `say` has one for the hour. */
+  const figures = (
+    say: (i: number) => { text: string; className?: string } | null,
+  ) =>
+    hours.map((h, i) => {
+      const figure = marked[i] ? say(i) : null;
+      const end = i === 0 ? s.barNumFirst() : i === n - 1 ? s.barNumLast() : "";
+      return figure ? (
+        <b
+          key={h.time}
+          className={s.barNum({ className: [figure.className, end].join(" ") })}
+          style={end ? undefined : { left: pos(i) }}
+        >
+          {figure.text}
+        </b>
+      ) : null;
+    });
   return (
     <div
       className={s.bars()}
@@ -484,24 +587,69 @@ function DayBars({
     >
       <span className={s.barName()}>Wind</span>
       <div
-        className={s.bar({ className: s.windBar() })}
+        className={s.bar()}
         style={{ background: wind }}
         onClick={pick}
         data-bar="wind"
       >
-        {hours.map((h, i) => {
+        {figures((i) => {
           const p = at(i);
-          return hourOfDay(h.time) % 3 === 0 && p?.windKn != null ? (
-            <b key={h.time} className={s.barNum()} style={{ left: pos(i) }}>
-              {speedShort(p.windKn, units)}
-            </b>
-          ) : null;
+          return p?.windKn == null
+            ? null
+            : { text: speedShort(p.windKn, units) };
+        })}
+        {tick}
+      </div>
+      <span className={s.barName()}>Waves</span>
+      {readings.inland ? (
+        <div
+          className={s.bar({ className: s.noBar() })}
+          onClick={pick}
+          title="The open sea's waves do not reach this water"
+          data-bar="waves"
+          data-inland
+        >
+          {tick}
+        </div>
+      ) : (
+        <div
+          className={s.bar()}
+          style={{ background: waves }}
+          onClick={pick}
+          data-bar="waves"
+        >
+          {figures((i) => {
+            const sea = read(readings.sea, i);
+            if (!sea) return null;
+            const h = sea.height;
+            return {
+              text: h.toFixed(1),
+              className: [
+                h >= 2.2 ? s.barNumLight() : "",
+                h >= 1.6 ? s.barNumDarkShade() : s.barNumDarkLight(),
+              ].join(" "),
+            };
+          })}
+          {tick}
+        </div>
+      )}
+      <span className={s.barName()}>Sky</span>
+      <div
+        className={s.bar()}
+        style={{ background: skyLayers }}
+        onClick={pick}
+        data-bar="sky"
+        data-rain={raining || undefined}
+      >
+        {figures((i) => {
+          const air = read(readings.air, i);
+          return air === null ? null : { text: `${Math.round(air)}°` };
         })}
         {tick}
       </div>
       <span className={s.barName()}>Stars</span>
       <div
-        className={s.bar()}
+        className={s.bar({ className: s.starsBar() })}
         style={{ background: stars }}
         onClick={pick}
         data-bar="stars"
@@ -511,7 +659,7 @@ function DayBars({
       <span />
       <div className={s.hours()} aria-hidden="true">
         {hours.map((h, i) =>
-          hourOfDay(h.time) % 3 === 0 ? (
+          marked[i] ? (
             <span key={h.time} className={s.hour()} style={{ left: pos(i) }}>
               {clock(h.time).slice(0, 2)}
             </span>
@@ -521,9 +669,6 @@ function DayBars({
     </div>
   );
 }
-
-/** The Irish hour of a moment, 0 to 23. */
-const hourOfDay = (time: number) => Number(clock(time).slice(0, 2));
 
 /**
  * A card's shape while the places themselves are read, with what is loading
@@ -553,6 +698,10 @@ export function CardSkeleton({ words }: { words?: string }) {
         </div>
         <div className={s.bars()}>
           <span className={s.barName()}>Wind</span>
+          <Skeleton shape="block" className={s.ghostBar()} />
+          <span className={s.barName()}>Waves</span>
+          <Skeleton shape="block" className={s.ghostBar()} />
+          <span className={s.barName()}>Sky</span>
           <Skeleton shape="block" className={s.ghostBar()} />
           <span className={s.barName()}>Stars</span>
           <Skeleton shape="block" className={s.ghostThin()} />

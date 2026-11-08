@@ -551,8 +551,9 @@ addresses are put right: `/spots` is the root, and `/?chart` is `/?map`. The
 root is always the list.
 
 **2026-10-26 — A first visit opens on Near you, and it is never empty.**
-The finder opens on Favourites once the rider has starred a spot, and on Near
-you before that. Round the rider's own place Near you is every spot within
+The finder opens on the rider's favourites once they have saved a spot (the
+heart on, since 2026-11-07), and on the spots round them before that. Round
+the rider's own place Near you is every spot within
 30 km, and says "No spots within 30 km of you." when there are none. Without
 the rider's place it lists the 12 spots nearest where the chart was last
 looked at, or the middle of Ireland, however far, with no distances on the
@@ -569,12 +570,13 @@ are rated from. Each has four or fewer short options, so they are segmented
 controls and a row of chips rather than closed selects, one tap to change
 (2026-11-01). The model is
 the rider's own, the one the display options and the spot page set. The tab
-is in the address once one is chosen (`/?tab=favourites`, `/?tab=near`). An
-empty Favourites points to the search, Near you and every spot's page. Near
-you does not ask the browser as it opens: without the rider's place it says
-why the place is wanted, with a "Use my location" button, over the spots
-nearest where the chart was, which give no distances. A place kept from an
-earlier yes is read again quietly, and a no is never asked again.
+is in the address once one is chosen (`/?tab=favourites`, `/?tab=near`; the
+heart since 2026-11-07). An empty list of favourites points to the search,
+the spots nearby and every spot's page. The finder does not ask the browser
+as it opens: without the rider's place it lists the spots nearest where the
+chart was, which give no distances, and asks only when the rider presses the
+locate button (2026-11-07). A place kept from an earlier yes is read again
+quietly, and a no is not asked again unless the rider presses it.
 
 **2026-10-27 — A phone's sheet names its rows in words.** On a phone the
 dock's rows were glyphs alone, labels at 8.5px and units at 8px, figures at
@@ -729,9 +731,9 @@ so it stands whole in a column on a phone: the chart's own parts (depth
 tints, contours, relief, names) are always drawn, the satellite is one button
 from high tide to low to none, and the loupe is on or off, the range ring in
 its stead. On the spot finder a card opens its spot's page wherever it is
-pressed, its picture too; the list's head is one row, Favourites or Nearby, how
-many and a filter button that opens the stars, the order and the model in a
-sheet. Light, dark or auto left the foot of the site menu for the first part
+pressed, its picture too; the list's head is one row (since 2026-11-07 the
+day, the heart and a filter button) and the filter opens the stars, the order
+and the model in a sheet. Light, dark or auto left the foot of the site menu for the first part
 of Settings.
 
 **2026-11-02 — A spot card in the AI apps.** An AI app that supports MCP
@@ -764,13 +766,13 @@ mark.
 **2026-11-03 — The spot finder steps through the days, and after dark opens
 on tomorrow.** The owner, at 19:59 on a November evening: every card's tick
 sat on 18:00, the map said "Stars at 19:00 today", and there was no way to
-look at tomorrow, so the page was no use once the day was over. Under the
-list's head is the day, ‹ Today ›: an arrow either side steps a day at a
+look at tomorrow, so the page was no use once the day was over. The list's
+head leads with the day, ‹ Today ›: an arrow either side steps a day at a
 time through today and the five days after it, each arrow off at its end,
 the arrow keys stepping too, and the day said as Today, Tomorrow, then the
 weekday, with its date in grey. Every card's bars, the list's order and the
 fewest stars its filter asks for are the day's, and so are the chart's
-lights and pill beside it ("Stars at 13:00 tomorrow"). Once the hour now is
+lights beside it. Once the hour now is
 past the end of today's rows (the hour after last light) at every spot
 listed, the finder opens on tomorrow, at its early afternoon. Today, the
 hour now is the nearest hour, as a clock is read (19:59 is 20:00), on the
@@ -957,8 +959,9 @@ either on turns the other off.
 The owner on the line over the cards: "I just want the list of nearby
 locations... simpler, more clean." So the finder has neither the day's best
 hour over its cards nor the line saying where the list is measured from, which
-replaces both in 2026-10-26 and 2026-10-27; the spots are simply listed. "Use my
-location" stays, in the filter sheet, the one way the browser is asked. On the
+replaces both in 2026-10-26 and 2026-10-27; the spots are simply listed. The
+browser is asked only on the rider's word (the locate button on the map, since
+the later entry of this date). On the
 glow: "It's only meant to show essentially the really shallow parts of the
 water, so it should only be a very subtle little glow around the coastline until
 you zoom in and then you see the real data." It is drawn on the shallows and
@@ -968,8 +971,8 @@ reaches a few hundred metres past them, not out over the sea.
 the rider.** The ruling of 2026-10-25 reaches the spot page: its graph and table
 start at Irish midnight, and it still opens on the hour now. It reads the
 models' own runs, so a morning hour can differ from the chart's, which carries
-the finest run forward in the blend. With the rider's place known, Near you's
-map opens round them at `FOIL_FULL_ZOOM`, where the tidal depth is at full
+the finest run forward in the blend. With the rider's place known, the map
+beside the list opens round them at `FOIL_FULL_ZOOM`, where the tidal depth is at full
 strength, not fitted to every spot within 30 km.
 
 **2026-11-07 — Every wind visual shows where the rider goes.** The owner:
@@ -1003,18 +1006,18 @@ what they can see." And: "Even if we show them just as little muted dots, that
 would be better because then I can hover over it and then I can see the spot
 information. Like I can see that there's no wind."
 
-On a wide screen, Nearby is the spots in the map's view, read when the camera
-settles and never through a pan, in the list's usual order, its sort and filter
-kept, and with distances where the rider's place is known. At most 30 cards, the
-best of the spots in view; the count at the head stays true, and a quiet line
-after the list says to zoom in for the rest. An empty view says so. Before the
+On a wide screen, with the heart off, the list is the spots in the map's view,
+read when the camera settles and never through a pan, its sort and filter kept,
+and with distances where the rider's place is known. At most 30 cards, and a
+quiet line after the list says how many are in view and to zoom in for the
+rest; their order goes by how wide the view is (the later entry of this date). An empty view says so. Before the
 map has a view the list is the one 2026-10-26 gives, and the map opens as it
 did: fitted to that list, or round the rider. It is never fitted because the
 list changed, since a fit moves the map and the map is what the list follows.
-Favourites keeps the rider's own list, fitted as before; under the wide width
-Nearby is as it was. A card under the pointer no longer pans the map on Nearby,
-because its spot is already in view and a pan would change the list under the
-pointer; on Favourites it still does.
+The heart on keeps the rider's own list, fitted as before; under the wide width
+the heart off is as it was. A card under the pointer no longer pans the map with
+the heart off, because its spot is already in view and a pan would change the
+list under the pointer; with the heart on it still does.
 
 Every spot now stands on the finder's map. A listed spot is a pill; any other is
 a small muted dot, with no stars' colour and no offshore red, that never thins a
@@ -1027,7 +1030,51 @@ This replaces, in 2026-10-26, the chart showing only the listed spots and being
 fitted when the list changes, and on a wide screen the 12 spots nearest where
 the chart was and "No spots within 30 km of you.", both of which stay for the
 narrow list and the first paint. It replaces, in 2026-10-27, the spots nearest
-where the chart was as what a wide Near you shows without the rider's place. In
+where the chart was as what a wide list shows without the rider's place. In
 the 2026-11-07 entry on the rider's place, the map still opens round them at
 `FOIL_FULL_ZOOM`, and the list is then what is in view, not every spot within
 30 km.
+
+**2026-11-07 — The list's head is one row with a heart, and every card has
+four rows.** The owner chose the design. The Favourites | Nearby tabs and the
+spot count over the cards go; the head is one row, ‹ Day › ♥ ⚙: the day
+stepper, a heart and the filter. The heart is a toggle that shows when it is on
+(filled in ink, the heart filled). On, the list is every favourite wherever the
+map is, the best first, and pressing it fits the map beside the list to them; a
+rider with favourites opens with it on, and with none saved it says to press
+the heart on a spot's card. Off, the list is the spots in the map's view, at
+most 30, with the quiet line to zoom in. `/?tab=favourites` links open with the
+heart on, and `/?tab=near` with it off.
+
+With the best first asked for, the spots in view are ordered by how wide the
+view is across, in kilometres, not by the zoom: wider than 180 km, the best
+spot in each county leads (each a pill's width apart on the map), then the rest
+by their stars, so the whole country opens on every coast rather than one bay's
+neighbours, which share a forecast; from 120 to 180 km, by their stars; under
+120 km, the nearest the map's middle first, as the rider is looking at one
+stretch of coast. The rider's own order (nearest, A to Z) holds at any width.
+
+"Use my location" leaves the filter sheet for a locate button on the map beside
+the list, under the zoom. A first visit is never asked where the rider is; a
+press asks the browser (again, even after a no, as the rider has now asked),
+turns the heart off and opens the map round them, or round them and the few
+nearest spots where none is within 30 km. Under the wide width, where there is
+no map beside the list, the filter sheet keeps the button until that layout has
+a map of its own. The map beside the list loses its Full chart button (the top
+bar has Chart) and the line at its foot.
+
+Every card shows four rows, whatever the map shows: Wind, Waves, Sky and Stars.
+Waves is the sea's height hour by hour on its own ramp (`--color-waves-*`, pale
+green to indigo, re-themed so the high end stays strongest), its metres every
+three hours. Sky is the cloud, the sun's yellow at a clear sky to grey under a
+full cover (`--color-sky-*`, which mean the weather and do not re-theme), with
+the air's temperature on it and the rain as a strip of the weather's rain blue
+along its foot. Water the open sea's waves do not reach (a lake, a lough, a
+harbour inside its walls: the wave runs are read and none has it) keeps its
+Waves row, empty. The Wind, Waves and Sky bars are one height and the Stars a
+thin one under them. A row's figures and hours stand every third hour where the
+run is hourly and every step where it is three-hourly, never crowded together,
+and a figure at a bar's end is held inside it.
+
+This replaces the head of two tabs and a count (2026-11-02), "Use my location"
+in the filter sheet (the first entry of this date), and the two-bar card.

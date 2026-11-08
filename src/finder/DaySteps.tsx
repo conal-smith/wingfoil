@@ -7,7 +7,8 @@
  * holds the focus, and the focus stays in the control when an end turns its
  * button off.
  *
- * Every card's bars, the list's order and the chart's lights beside it
+ * It leads the list's head, the heart and the filter after it on the same
+ * row. Every card's bars, the list's order and the chart's lights beside it
  * follow the day stepped to (src/finder/SpotFinder.tsx).
  */
 import { useRef, type KeyboardEvent } from "react";
@@ -18,9 +19,9 @@ import { dayLong, dayShort, irishDate, irishTomorrow } from "../strip";
 
 const styles = tv({
   slots: {
-    // Under the list's head, its width: an arrow at either end, the day
-    // between them.
-    base: "flex items-center gap-2 px-0.5 pb-3",
+    // The head's first part, as wide as the heart and the filter leave it:
+    // an arrow at either end, the day between them.
+    base: "flex min-w-0 flex-1 items-center gap-2",
     day: "m-0 flex min-w-0 flex-1 items-baseline justify-center gap-2 truncate text-center font-body",
     name: "text-prose font-semibold text-ink",
     date: "text-body text-ink-muted",

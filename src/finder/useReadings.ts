@@ -1,7 +1,7 @@
 /**
- * What a card says beside the wind and the stars: the sky and the air, the
- * waves, and the tide, for each place listed, on the chart's own strip of
- * columns. All of it is what the dock's rows read (src/ForecastDock.tsx):
+ * What a card says beside the wind and the stars: the sky (its weather, its
+ * cloud and its rain) and the air, the waves, and the tide, for each place
+ * listed, on the chart's own strip of columns. All of it is what the dock's rows read (src/ForecastDock.tsx):
  * the wave and weather runs from the same sweep of the models
  * (`useMarineModels`), each place's square of them read as the dock reads
  * one place's (`useSpotSquares`), the sources handed on from one run to the
@@ -30,10 +30,14 @@ import type { Spot } from "../../force5/src/weather";
 import { useMarineModels, useSpotsTides } from "../useBlend";
 import { useSpotSquares } from "../useSpotSquares";
 
-/** The sea at one column: its height in metres, and its period in seconds. */
+/**
+ * The sea at one column: its height in metres, its period in seconds, and the
+ * way it comes from, in degrees.
+ */
 export interface Sea {
   height: number;
   period: number | null;
+  direction: number | null;
 }
 
 /** One place's readings, a value per strip column (null where none is near). */
@@ -41,12 +45,31 @@ export interface Readings {
   sky: (PresentWeather | null)[];
   /** The air, °C. */
   air: (number | null)[];
+  /** The cloud over the place, its whole cover, per cent. */
+  cloud: (number | null)[];
+  /** The rain in the hour (the step) ending at the column, mm. */
+  rain: (number | null)[];
   sea: (Sea | null)[];
+  /**
+   * The open sea's waves do not reach the place (a lake, a lough, a harbour
+   * inside its walls): the wave runs are read and none of them has it, where
+   * the weather's has. A card keeps its Waves row, empty.
+   */
+  inland: boolean;
   /** High and low waters at the place's nearest station, or none. */
   tides: readonly TideEvent[];
 }
 
-const NONE: Readings = { sky: [], air: [], sea: [], tides: [] };
+/** A place nothing has been read for yet. */
+export const NO_READINGS: Readings = {
+  sky: [],
+  air: [],
+  cloud: [],
+  rain: [],
+  sea: [],
+  inland: false,
+  tides: [],
+};
 
 /** A place's readings from the merged runs, on the strip's axis. */
 export function readingsFor(
@@ -55,7 +78,14 @@ export function readingsFor(
   spotId: string,
   axis: readonly string[],
 ): Omit<Readings, "tides"> {
-  const out: Omit<Readings, "tides"> = { sky: [], air: [], sea: [] };
+  const out: Omit<Readings, "tides"> = {
+    sky: [],
+    air: [],
+    cloud: [],
+    rain: [],
+    sea: [],
+    inland: false,
+  };
   const sky = handedWeatherSource(weatherSources(weather, spotId));
   if (sky) {
     const steps = weatherAtAxis(sky.series, axis);
@@ -63,17 +93,26 @@ export function readingsFor(
       presentWeather(variableValue(step, sky.fields.present)),
     );
     out.air = steps.map((step) => variableValue(step, sky.fields.air));
+    out.cloud = steps.map((step) => variableValue(step, sky.fields.cloud));
+    out.rain = steps.map((step) => variableValue(step, sky.fields.rain));
   }
   const sea = handedWaveSource(waveSources(waves, spotId));
   if (sea) {
-    const { height, period } = sea.fields.total;
+    const { height, period, direction } = sea.fields.total;
     out.sea = waveAtAxis(sea.series, axis).map((step) => {
       const h = variableValue(step, height);
       return h === null
         ? null
-        : { height: h, period: variableValue(step, period) };
+        : {
+            height: h,
+            period: variableValue(step, period),
+            direction: variableValue(step, direction),
+          };
     });
   }
+  // Read where the weather's runs are read: a place whose square is not in
+  // yet is not inland, only not known.
+  out.inland = !sea && !!sky && waves.length > 0;
   return out;
 }
 
@@ -110,7 +149,7 @@ export function useReadings(
         spots.map((spot) => [
           spot.id,
           {
-            ...(read.get(spot.id) ?? NONE),
+            ...(read.get(spot.id) ?? NO_READINGS),
             tides: tides.get(spot.id)?.curve.events ?? [],
           },
         ]),

@@ -1925,8 +1925,8 @@
     animation: none;
   }
 }
-/* The chart beside the list: Full chart at the top left, the zoom at the
-   top right, and the hour its lights are at, at the foot. */
+/* The chart beside the list: the zoom at the top right, and the locate
+   button under it. */
 .panel-tools {
   position: absolute;
   inset: 0;
@@ -1936,42 +1936,11 @@
 .panel-tools > * {
   pointer-events: auto;
 }
-.panel-tools .panel-open {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  gap: 7px;
-  box-shadow: var(--shadow-float);
-}
 .panel-tools .zbox {
   position: absolute;
   top: 12px;
   right: 12px;
 }
-/* The map's two modes at its foot, as the mock-up has them: the plain map
-   with the spots, and the chart, which opens the full chart with its layers. */
-.panel-foot {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--color-ground);
-  box-shadow: var(--shadow-float);
-  font: 500 12px/1.4 var(--font-body);
-  pointer-events: none;
-}
-.panel-key {
-  display: inline-flex;
-  gap: 5px;
-  align-items: center;
-  color: var(--color-ink-muted);
-}
-.panel-key i {
-  width: 3px;
-  height: 12px;
-  background: var(--color-buoy);
+.panel-tools .panel-locate {
+  top: 92px;
 }

@@ -275,7 +275,7 @@ From left to right:
 
 On a phone the search folds into a round button that opens a full-width field
 over the bar, and light or dark moves into the menu. Controls that belong to
-the page stay on the page (the finder's Favourites and Near you head its
+the page stay on the page (the finder's day, heart and filter head its
 list; a spot's Star and Alert me stand by its name; the chart's controls stay
 on the map).
 

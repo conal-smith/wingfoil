@@ -1,52 +1,57 @@
 /**
  * The spot finder, the home page at /: where is good for this rider, on one
- * day at a time. The places (their favourites, or every one round them: it
- * opens on the favourites once there are some, else on the places round the
- * rider, so a first visit is never empty) as cards, the best first: the most
- * stars on the day shown, then the nearest. Each card is the place from
- * above with the ride rose on it, and the day hour by hour from first light
- * to last as two bars, the wind and the stars (src/finder/SpotCard.tsx).
+ * day at a time. The spots as cards: each the place from above with the ride
+ * rose on it, and the day hour by hour from first light to last as four bars,
+ * the wind, the waves, the sky and the stars (src/finder/SpotCard.tsx).
  *
- * Over the cards, one row: Favourites or Nearby, how many spots the list
- * holds, and a filter button. The filter opens a sheet with the fewest stars
- * a place is to have, the list's order (the best first, the nearest, A to Z)
- * and the model the stars are rated from (the rider's own, as the spot page
- * and Settings set it); a dot on the button says the list is narrowed or
- * reordered. Under it, the day: ‹ Today › steps through today and the five
- * days after it (src/finder/DaySteps.tsx). It opens on today, and once
- * today's rows are over (the hour after last light, finder.ts `todayOver`)
- * on tomorrow, at the hour it opens on. A spot is found by name with the top bar's search
- * (ui/SpotSearch.tsx), which goes to its page. The tab is in the
- * address (`/?tab=favourites`, finder.ts `TAB_PARAM`) once one is chosen, so
- * either can be linked to, kept and reloaded.
- * Near you never asks the browser where the rider is unasked: without
- * their place it gives no distances, and nothing over the cards says so.
- * "Use my location" is in the filter sheet.
+ * Over the cards, one row: ‹ Today ›, a heart and a filter button. The day
+ * steps through today and the five days after it (src/finder/DaySteps.tsx). It
+ * opens on today, and once today's rows are over (the hour after last light,
+ * finder.ts `todayOver`) on tomorrow, at the hour it opens on. The filter
+ * opens a sheet with the fewest stars a place is to have, the list's order
+ * (the best first, the nearest, A to Z) and the model the stars are rated
+ * from (the rider's own, as the spot page and Settings set it); a dot on the
+ * button says the list is narrowed or reordered. A spot is found by name with
+ * the top bar's search (ui/SpotSearch.tsx).
  *
- * Nearby follows the map (2026-11-07). On a wide screen it is the spots in the
- * chart's view (finder.ts `spotsInView`), read as the camera settles and never
- * through a pan: at most `MAX_CARDS` of them, the best, with a quiet line
- * after the list saying how many are in view; the count at the head is the
- * true one, and the rest stand on the map as muted dots. An empty view says
- * so. Until the chart has a view, the list is `listFor`'s, so it is never
- * empty on first paint. Under that width there is no map to follow, and it is
- * `listFor`'s always: the spots round the rider, or without their place the
- * spots nearest where the chart was. Favourites never follows the map.
+ * The heart is what the list holds (2026-11-07). On, it is the rider's
+ * favourites, wherever the map is, and pressing it fits the map beside the
+ * list to them (src/App.tsx); a rider with favourites opens on it, and with
+ * none it asks them to save one. Off, it is the spots in the map's view
+ * (finder.ts `spotsInView`), read as the camera settles and never through a
+ * pan: at most `MAX_CARDS` of them, with a quiet line after the list to zoom
+ * in for the rest, which stand on the map as muted dots. With the best first,
+ * how they are ordered goes by how wide the view is (finder.ts
+ * `arrangementFor`): over about 180 km across the best spot in each county
+ * leads, then the rest by their stars; down to about 120 km by their stars;
+ * closer in, the nearest the map's middle first. An empty view says so. Until
+ * the chart has a view, the list is `listFor`'s, so it is never empty on first
+ * paint. Under the wide width there is no map to follow, and it is `listFor`'s
+ * always: the spots round the rider, or without their place the spots nearest
+ * where the chart was. The heart is in the address (`/?tab=favourites`,
+ * finder.ts `TAB_PARAM`) once pressed, so it can be linked to, kept and
+ * reloaded.
+ *
+ * The browser is never asked where the rider is unasked: a first visit is not
+ * asked, and without their place the cards give no distances. The locate
+ * button on the map beside the list asks it (`locate`), and turns the heart
+ * off; with no map beside the list, "Use my location" in the filter sheet
+ * does.
  *
  * The home page (since 26 October 2026). On a wide screen the chart stands
  * beside the list, drawn by src/App.tsx over the room the list leaves it
  * (`beside`); the list tells it which places it shows as pills, at which
  * hour, which card is under the pointer and where the rider is, and it tells
- * the list what it shows (`view`). Under that width the
- * list is alone, with a button to the chart. No timeline at its head, and
- * not tied to the chart's time. The cards keep one time between them, as a
- * dashboard's charts do: the day stepped to is the day on every card, and an
- * hour picked on one card's bars is picked on every card, its rose turned to
- * it, and on the chart beside them. Today, the hour they stand at is the
- * hour now, the nearest one (19:59 is 20:00, finder.ts `nearestHour`); any
- * other day, the hour it opens on. A card opens its spot's page; the chart
- * is a button away in the top bar. No legend: the stars and the wind's
- * colours are the site's own, said once on the Info page.
+ * the list what it shows (`view`). Under that width the list is alone. The
+ * cards keep one time between them, as a dashboard's charts do: the day
+ * stepped to is the day on every card, and an hour picked on one card's bars
+ * is picked on every card, its rose turned to it, and on the chart beside
+ * them. The hour picked is App's (`picked`), so whatever else on the page
+ * picks an hour shares it. Today, the hour they stand at is the hour now, the
+ * nearest one (19:59 is 20:00, finder.ts `nearestHour`); any other day, the
+ * hour it opens on. A card opens its spot's page; the chart is a button away
+ * in the top bar. No legend: the stars and the wind's colours are the site's
+ * own, said once on the Info page.
  *
  * A page of the map's bundle, drawn by src/App.tsx under the chart and
  * loaded as a chunk of its own. Its wind and its
@@ -62,7 +67,7 @@ import type { Units } from "../../force5/src/units";
 import type { Spot } from "../../force5/src/weather";
 import { modelName, STARS_CHOICES } from "../../force5/src/lead";
 import { isChartAddress } from "../../force5/src/siteNav";
-import { MapPin, SlidersHorizontal } from "lucide-react";
+import { Heart, MapPin, SlidersHorizontal } from "lucide-react";
 import { Button } from "../../ui/Button";
 import { Chip } from "../../ui/Chip";
 import { Dialog } from "../../ui/Dialog";
@@ -73,7 +78,9 @@ import type { PlaceHour } from "../ratings";
 import { irishDate, onDay, openingColumn, type StripColumn } from "../strip";
 import {
   HOUR,
+  LEAD_GAP,
   MAX_CARDS,
+  arrangementFor,
   bestStars,
   cardDates,
   chooseCards,
@@ -89,6 +96,7 @@ import {
   scopeInAddress,
   shownColumn,
   spotsInView,
+  viewWidthKm,
   type Listed,
   type Order,
   type Scope,
@@ -99,7 +107,7 @@ import { DaySteps } from "./DaySteps";
 import { HoverContext, hoverStore } from "./hover";
 import { knownBefore, useRiderPlace } from "./location";
 import { CardSkeleton, SpotCard, type SpotCardProps } from "./SpotCard";
-import { useReadings } from "./useReadings";
+import { NO_READINGS, useReadings } from "./useReadings";
 import {
   isStale,
   latestReading,
@@ -125,10 +133,8 @@ const styles = tv({
     scroller: "overflow-y-auto overscroll-contain",
     // Room at the foot of a phone's list.
     alone: "pb-24 max-wide:pb-24",
-    // The list's head, one row: which spots, how many, and the filter.
-    head: "flex items-center gap-2.5 px-0.5 pb-3",
-    title:
-      "m-0 min-w-0 flex-1 truncate text-right font-body text-body font-medium text-ink-muted",
+    // The list's head, one row: the day, the heart and the filter.
+    head: "flex items-center gap-1.5 px-0.5 pb-3",
     filter: "relative shrink-0",
     // On the filter button: the list is narrowed or reordered.
     dot: "pointer-events-none absolute top-1 right-1 size-2 rounded-full bg-pen",
@@ -147,11 +153,6 @@ const styles = tv({
     more: "m-0 px-0.5 pt-3 text-body leading-normal text-ink-muted",
   },
 });
-
-const SCOPES = [
-  { value: "favourites", label: "Favourites" },
-  { value: "near", label: "Nearby" },
-] as const;
 
 /** The fewest stars a place is to have on the day shown, as chips. */
 const FEWEST = [
@@ -213,6 +214,18 @@ export interface FinderProps {
    * or null until read: a card on today says what its nearest one measured.
    */
   stations?: readonly WindStation[] | null;
+  /**
+   * The hour picked on the cards' bars, or null for the hour the day stands
+   * at; App keeps it, so the page shares one time. Kept here when not given.
+   */
+  picked?: number | null;
+  /** An hour is picked on a card, or let go (null). */
+  onPick?: (time: number | null) => void;
+  /**
+   * How many times the rider has pressed the locate button on the map: each
+   * press asks the browser where they are, and turns the heart off.
+   */
+  locate?: number;
 }
 
 export default function SpotFinder(props: FinderProps) {
@@ -238,23 +251,27 @@ export default function SpotFinder(props: FinderProps) {
     onScreen = true,
     model,
     onModel,
+    locate = 0,
   } = props;
   const s = styles();
-  // The tab: the one the address names, else, once the list has been on
-  // the screen, the one it opened on; until then the one it would open on:
-  // Favourites with a place starred, else Near you.
+  // The heart: on or off as the address names it, else, once the list has
+  // been on the screen, as it opened; until then as it would open: on with a
+  // place saved, else off.
   const [kept, setScope] = useState<Scope | null>(() =>
     scopeInAddress(location.search),
   );
   const scope = kept ?? openingScope(starred);
-  // Whether the address is to name the tab: one was chosen, or named.
+  const heart = scope === "favourites";
+  // Whether the address is to name the heart: it was pressed, or named.
   const [named, setNamed] = useState(() => kept !== null);
-  // The browser is asked where the rider is only when they press "Use my
-  // location" in the filter sheet; a place kept from an earlier yes is read
-  // again quietly on Near you.
+  // The browser is asked where the rider is only when they press the locate
+  // button (or "Use my location" in the filter sheet, with no map beside the
+  // list); a place kept from an earlier yes is read again quietly with the
+  // heart off.
   const [asked, setAsked] = useState(false);
   const place = useRiderPlace(
-    asked || (onScreen && scope === "near" && knownBefore()),
+    asked || locate > 0 || (onScreen && scope === "near" && knownBefore()),
+    locate,
   );
   useEffect(() => {
     if (onScreen && kept === null) setScope(scope);
@@ -287,8 +304,10 @@ export default function SpotFinder(props: FinderProps) {
   // finder opens on (today, or tomorrow once today is over).
   const [chosen, setChosen] = useState<string | null>(null);
   // The hour picked on that day's row, for every card; null is the hour the
-  // day stands at (now, today).
-  const [picked, setPicked] = useState<number | null>(null);
+  // day stands at (now, today). App's, where it is handed in.
+  const [ownPick, setOwnPick] = useState<number | null>(null);
+  const picked = props.picked !== undefined ? props.picked : ownPick;
+  const setPicked = props.onPick ?? setOwnPick;
   // The time under a mouse, shared by every card without drawing them again.
   const [hover] = useState(hoverStore);
 
@@ -302,6 +321,10 @@ export default function SpotFinder(props: FinderProps) {
     setScope(next);
     setNamed(true);
   };
+  // The locate button pressed: the spots round the rider, so the heart off.
+  useEffect(() => {
+    if (locate > 0) chooseScope("near");
+  }, [locate]);
 
   // Where "near you" and the distances are measured from: the rider's
   // place once the browser has said. Without it, the places nearest where
@@ -323,9 +346,14 @@ export default function SpotFinder(props: FinderProps) {
   // empty list's words.
   const placesDue =
     spots.length === 0 && !waiting && (scope === "near" || starred.length > 0);
-  // Beside the chart, Nearby is what the chart shows; before it has a view,
-  // and anywhere else, the list as ever.
+  // Beside the chart, the heart off is what the chart shows; before it has a
+  // view, and anywhere else, the list as ever.
   const following = beside && scope === "near" && view !== null && !waiting;
+  // How the spots in view are ordered with the best first, by how wide the
+  // view is; and how far apart a regional list's leads are.
+  const widthKm = following ? viewWidthKm(view!) : 0;
+  const arrange = following ? arrangementFor(widthKm) : "best";
+  const leadGap = widthKm * LEAD_GAP;
   const listed = useMemo(
     () =>
       waiting
@@ -368,8 +396,9 @@ export default function SpotFinder(props: FinderProps) {
     setPicked(null);
   };
   const byTime = useMemo(() => columnsByTime(strip), [strip]);
-  // A tab's places, the best on the day first, then in the order asked; only
-  // the best of them while the list follows the map, and how many there were.
+  // The list's places, the best on the day first, then in the order asked;
+  // only the first `MAX_CARDS` while the list follows the map, arranged by
+  // how wide its view is, and how many there were.
   const { cards: ranked, total } = useMemo(() => {
     const rated: Listed[] = listed.map(({ spot, km }) => ({
       spot,
@@ -378,8 +407,17 @@ export default function SpotFinder(props: FinderProps) {
     }));
     // Nearest first means nothing without the rider's place.
     const by = order === "near" && !known ? "best" : order;
-    return chooseCards(rated, by, fewest, following ? MAX_CARDS : Infinity);
+    return chooseCards(
+      rated,
+      by,
+      fewest,
+      following ? MAX_CARDS : Infinity,
+      arrange,
+      leadGap,
+    );
   }, [
+    arrange,
+    leadGap,
     listed,
     order,
     known,
@@ -392,13 +430,13 @@ export default function SpotFinder(props: FinderProps) {
     halfHour,
   ]);
   // The places the list asks to be rated, and draws as pills: following the
-  // map, those with a card; else every place on the tab, as the fit wants.
+  // map, those with a card; else every place on the list, as the fit wants.
   // In a steady order, so that a new order of the same places asks nothing.
   const wanted = (following ? ranked : listed).map((l) => l.spot.id);
   const wantKey = (following ? [...wanted].sort() : wanted).join(",");
-  // The count beside the heading, once the list is the list.
-  const counted = !waiting && !placesDue;
-  const listKey = counted ? scope : "";
+  // Which list, once the list is the list.
+  const settled = !waiting && !placesDue;
+  const listKey = settled ? scope : "";
   useEffect(() => onWant(wanted, listKey), [wantKey, listKey]);
   // The places with a card: their days, their readings and their stations.
   const listedSpots = useMemo(
@@ -454,8 +492,14 @@ export default function SpotFinder(props: FinderProps) {
   const headId = "finder-heading";
   // "today", "tomorrow", "on Thursday": the day shown, in a sentence.
   const onTheDay = onDay(noon, now);
+  // With no map beside the list, there is no locate button: the sheet asks.
   const canAsk =
-    scope === "near" && !known && !waiting && !place.refused && place.locates;
+    !beside &&
+    scope === "near" &&
+    !known &&
+    !waiting &&
+    !place.refused &&
+    place.locates;
   const grid = s.cards({ class: beside ? undefined : s.cardsAlone() });
 
   return (
@@ -472,20 +516,33 @@ export default function SpotFinder(props: FinderProps) {
           aria-busy={waiting || placesDue || undefined}
           data-finder-list
         >
+          <h1 className="sr-only" id={headId} data-finder-heading>
+            {heart
+              ? "Favourites"
+              : following
+                ? "Spots in view"
+                : "Spots near you"}
+          </h1>
           <div className={s.head()}>
-            <Segmented
-              aria-label="Which spots"
-              options={SCOPES}
-              value={scope}
-              onChange={chooseScope}
-            />
-            <h1 className={s.title()} id={headId} data-finder-heading>
-              <span className="sr-only">
-                {scope === "near" ? "Near you" : "Favourites"}
-                {counted && " · "}
-              </span>
-              {counted && (total === 1 ? "1 spot" : `${total} spots`)}
-            </h1>
+            <DaySteps dates={dates} day={day} now={now} onDay={chooseDay} />
+            <Button
+              variant="quiet"
+              icon
+              pressed={heart}
+              aria-label="Favourites"
+              title={
+                heart ? "Show the spots on the map" : "Show your favourites"
+              }
+              onClick={() => chooseScope(heart ? "near" : "favourites")}
+              data-finder-heart
+            >
+              <Heart
+                size={18}
+                strokeWidth={1.75}
+                fill={heart ? "currentColor" : "none"}
+                aria-hidden="true"
+              />
+            </Button>
             <Button
               variant="quiet"
               icon
@@ -504,7 +561,6 @@ export default function SpotFinder(props: FinderProps) {
               {narrowing && <i className={s.dot()} aria-hidden="true" />}
             </Button>
           </div>
-          <DaySteps dates={dates} day={day} now={now} onDay={chooseDay} />
           <Dialog
             open={filtering}
             title="Filter"
@@ -630,14 +686,7 @@ export default function SpotFinder(props: FinderProps) {
                             ? (measuredNow.get(item.spot.id) ?? null)
                             : null
                         }
-                        readings={
-                          readings.get(item.spot.id) ?? {
-                            sky: [],
-                            air: [],
-                            sea: [],
-                            tides: [],
-                          }
-                        }
+                        readings={readings.get(item.spot.id) ?? NO_READINGS}
                         picked={pick}
                         shown={shown}
                         roseAt={roseAt}
@@ -657,8 +706,11 @@ export default function SpotFinder(props: FinderProps) {
               </ul>
               {total > ranked.length && (
                 <p className={s.more()} data-finder-more>
-                  {total} spots in view, the best {ranked.length} here. Zoom in
-                  for the rest.
+                  {total} spots in view,{" "}
+                  {arrange === "centre"
+                    ? `the ${ranked.length} nearest the middle here`
+                    : `the best ${ranked.length} here`}
+                  . Zoom in for the rest.
                 </p>
               )}
             </HoverContext.Provider>
@@ -670,10 +722,11 @@ export default function SpotFinder(props: FinderProps) {
                 ) : (
                   `No spot on this list has ${fewest} stars or more ${onTheDay}.`
                 )
-              ) : scope === "favourites" ? (
+              ) : heart ? (
                 <>
-                  Save a spot and it shows here. Find one by name with the
-                  search at the top, see the{" "}
+                  No favourites yet. Press the heart on a spot&rsquo;s card to
+                  save it here, or find one by name with the search at the top.
+                  See the{" "}
                   <Link
                     href={scopeAddress(window.location.href, "near")}
                     onClick={(event) => {
@@ -683,7 +736,7 @@ export default function SpotFinder(props: FinderProps) {
                       chooseScope("near");
                     }}
                   >
-                    spots nearby
+                    {beside ? "spots on the map" : "spots nearby"}
                   </Link>
                   , or <Link href="/spot">browse every spot</Link>.
                 </>

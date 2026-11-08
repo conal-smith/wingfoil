@@ -45,6 +45,14 @@ const mapButton = (page: Page) =>
   bar(page).getByRole("link", { name: "Chart", exact: true });
 /** On the full chart: the bar's button is the way back to the list. */
 const onChart = (page: Page) => page.locator('[data-view-switch="spots"]');
+/** The heart at the list's head: on, the favourites; off, the spots in view. */
+const heart = (page: Page) =>
+  page
+    .locator("[data-finder-list]")
+    .getByRole("button", { name: "Favourites" });
+/** The locate button on the chart beside the list. */
+const locate = (page: Page) =>
+  panel(page).getByRole("button", { name: "Use my location" });
 
 /** Marks the map's canvas, so a map drawn afresh is told from the one kept. */
 const mark = (page: Page) =>
@@ -103,17 +111,27 @@ test.describe("on a wide screen", () => {
     expect(box.x).toBeGreaterThan(card.x + card.width);
     expect(box.y).toBeGreaterThan(head.y + head.height);
     expect(box.y + box.height).toBeGreaterThan(880);
-    // Its own few controls, and none of the full chart's.
+    // Its own few controls, the zoom and the locate button under it, and
+    // none of the full chart's: no Full chart button (the top bar has Chart)
+    // and nothing at its foot.
+    const zoom = (await panel(page)
+      .getByRole("button", { name: "Zoom out" })
+      .boundingBox())!;
+    const here = (await locate(page).boundingBox())!;
+    expect(here.y).toBeGreaterThan(zoom.y + zoom.height);
+    expect(
+      Math.abs(here.x + here.width / 2 - (zoom.x + zoom.width / 2)),
+    ).toBeLessThan(2);
     await expect(
       panel(page).getByRole("button", { name: "Full chart" }),
-    ).toBeVisible();
-    await expect(
-      panel(page).getByRole("button", { name: "Zoom in" }),
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await expect(page.locator(".panel-foot, [data-panel-when]")).toHaveCount(0);
     await expect(onChart(page)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Layers" })).toHaveCount(0);
-    await expect(page.locator("[data-panel-when]")).toHaveText(
-      /^Stars at \d\d:\d\d (today|tomorrow|on \w+)$/,
+    // The pills stand at the cards' hour, which each names.
+    await expect(pills(page).first()).toHaveAttribute(
+      "aria-label",
+      /: \d\d:\d\d /,
     );
     // And every other spot, a muted dot.
     await expect(lights(page)).toHaveCount(149);
@@ -207,13 +225,13 @@ test.describe("on a wide screen", () => {
     ).toBe(zoom);
   });
 
-  test("Full chart opens the same map full screen, every spot and the chart's tools; Back, List, the collapse and Escape return to the list", async ({
+  test("the top bar's Chart opens the same map full screen, every spot and the chart's tools; Back, List, the collapse and Escape return to the list", async ({
     page,
   }) => {
     await openHome(page);
     await mark(page);
     const open = async () => {
-      await panel(page).getByRole("button", { name: "Full chart" }).click();
+      await mapButton(page).click();
       await expect(page).toHaveURL(/\/\?map$/);
       await expect(onChart(page)).toBeVisible();
       await expect(lights(page)).toHaveCount(149);
@@ -329,19 +347,16 @@ test.describe("on a wide screen", () => {
     await expect(barName(page)).toHaveText("Brandon Bay");
   });
 
-  test("Nearby lists the spots round the rider; the chart beside it shows the rider as a blue dot", async ({
+  test("the locate button lists the spots round the rider, the heart turned off; the chart beside it shows the rider as a blue dot", async ({
     page,
     context,
   }) => {
     await context.grantPermissions(["geolocation"]);
     await context.setGeolocation(DUBLIN);
     await openHome(page, ["brandon"]);
-    await page
-      .getByRole("group", { name: "Which spots" })
-      .getByRole("button", { name: "Nearby" })
-      .click();
-    await page.locator("[data-finder-filter]").click();
-    await page.getByRole("button", { name: "Use my location" }).click();
+    await expect(heart(page)).toHaveAttribute("aria-pressed", "true");
+    await locate(page).click();
+    await expect(heart(page)).toHaveAttribute("aria-pressed", "false");
     await expect(cards(page).filter({ hasText: "Dollymount" })).toHaveCount(1, {
       timeout: 30000,
     });
@@ -357,16 +372,30 @@ test.describe("on a wide screen", () => {
 test.describe("a first visit, with no favourites", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("location allowed: Nearby lists the spots round the rider, and the chart beside it is fitted to them, with the blue dot", async ({
+  test("no question on a first visit; the locate button lists the spots round the rider, and the chart beside it opens round them, with the blue dot", async ({
     page,
     context,
   }) => {
     await context.grantPermissions(["geolocation"]);
     await context.setGeolocation(DUBLIN);
+    await page.addInitScript(() => {
+      const w = window as unknown as { asked: number };
+      w.asked = 0;
+      const geo = navigator.geolocation;
+      const ask = geo.getCurrentPosition.bind(geo);
+      geo.getCurrentPosition = (...args) => {
+        w.asked++;
+        ask(...args);
+      };
+    });
     await page.goto("/");
     await expect(finder(page)).toHaveAttribute("data-scope", "near");
-    await page.locator("[data-finder-filter]").click();
-    await page.getByRole("button", { name: "Use my location" }).click();
+    await expect(heart(page)).toHaveAttribute("aria-pressed", "false");
+    await expect(cards(page).first()).toBeVisible({ timeout: 30000 });
+    expect(
+      await page.evaluate(() => (window as unknown as { asked: number }).asked),
+    ).toBe(0);
+    await locate(page).click();
     await expect(cards(page).filter({ hasText: "Dollymount" })).toHaveCount(1, {
       timeout: 30000,
     });
@@ -390,7 +419,7 @@ test.describe("a first visit, with no favourites", () => {
     await expect.poll(() => pillsInside(page)).toBe(listed);
   });
 
-  test("location not known: the chart opens fitted to the spots nearest the middle of Ireland, once, and Nearby then lists what it shows", async ({
+  test("location not known: the chart opens fitted to the spots nearest the middle of Ireland, once, and the list then is what it shows", async ({
     page,
   }) => {
     await page.goto("/");
@@ -420,11 +449,14 @@ test.describe("a first visit, with no favourites", () => {
   });
 });
 
-/** The count at the head of the list. */
-const head = async (page: Page) =>
+/** How many spots the map shows, as the note after a capped list says. */
+const inView = async (page: Page) =>
   Number(
-    /(\d+) spots?/.exec(
-      (await page.locator("[data-finder-heading]").textContent()) ?? "",
+    /(\d+) spots in view/.exec(
+      (await page
+        .locator("[data-finder-more]")
+        .textContent({ timeout: 1000 })
+        .catch(() => "")) ?? "",
     )?.[1] ?? NaN,
   );
 const headIds = (page: Page) =>
@@ -496,7 +528,7 @@ const freeDot = (page: Page) =>
     throw new Error("no muted dot to reach");
   });
 
-/** Nearby on the whole of the chart, every spot in view, the first visit's. */
+/** The heart off on the whole of the chart, every spot in view, the first visit's. */
 async function wholeChart(page: Page) {
   await page.goto("/");
   await expect(cards(page).first()).toBeVisible({ timeout: 30000 });
@@ -505,10 +537,10 @@ async function wholeChart(page: Page) {
     await button(page, "Zoom out").click();
     await rest(page);
   }
-  await expect.poll(() => head(page), { timeout: 30000 }).toBe(149);
+  await expect.poll(() => inView(page), { timeout: 30000 }).toBe(149);
 }
 
-test.describe("Nearby follows the map beside the list", () => {
+test.describe("with the heart off, the list follows the map beside it", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test("a pan to another part of the country lists the spots there, once the camera settles, with no location set", async ({
@@ -532,7 +564,7 @@ test.describe("Nearby follows the map beside the list", () => {
       expect(await headIds(page)).toEqual(before);
     });
     await expect.poll(() => headIds(page)).not.toEqual(before);
-    // Each card a pill in view, the head saying how many.
+    // Each card a pill in view.
     await expect
       .poll(
         async () => (await cards(page).count()) === (await pillsInside(page)),
@@ -558,7 +590,7 @@ test.describe("Nearby follows the map beside the list", () => {
       )
       .toBe(true);
     const before = await headIds(page);
-    await button(page, "Full chart").click();
+    await mapButton(page).click();
     await expect(onChart(page)).toBeVisible();
     await rest(page);
     expect(await headIds(page)).toEqual(before);
@@ -568,26 +600,27 @@ test.describe("Nearby follows the map beside the list", () => {
     await expect.poll(() => headIds(page)).toEqual(before);
   });
 
-  test("Favourites keeps the rider's own list on a pan", async ({ page }) => {
+  test("the heart on keeps the rider's own list on a pan, and pressed fits the map to it", async ({
+    page,
+  }) => {
     await openHome(page);
     const before = await headIds(page);
     await drag(page, -300, 0);
     expect(await headIds(page)).toEqual(before);
     await expect(pills(page)).toHaveCount(3);
-    // And Nearby then lists what the map shows; back, the same favourites.
-    await page
-      .getByRole("group", { name: "Which spots" })
-      .getByRole("button", { name: "Nearby" })
-      .click();
+    // Off, the list is what the map shows; the favourites now off to one
+    // side, pressed on again, the map is fitted to them.
+    await heart(page).click();
+    await expect(heart(page)).toHaveAttribute("aria-pressed", "false");
     await expect.poll(() => headIds(page)).not.toEqual(before);
-    await page
-      .getByRole("group", { name: "Which spots" })
-      .getByRole("button", { name: "Favourites" })
-      .click();
+    await drag(page, -400, 0);
+    await heart(page).click();
+    await expect(heart(page)).toHaveAttribute("aria-pressed", "true");
     await expect(cards(page)).toHaveCount(3);
+    await expect.poll(() => pillsInside(page)).toBe(3);
   });
 
-  test("over the cap: the best 30 cards, the true count, a quiet line, and the rest as dots", async ({
+  test("over the cap: 30 cards led by each county's best, a quiet line with the true count, and the rest as dots", async ({
     page,
   }) => {
     await wholeChart(page);
@@ -597,6 +630,16 @@ test.describe("Nearby follows the map beside the list", () => {
     );
     await expect(pills(page)).toHaveCount(30);
     await expect(dots(page)).toHaveCount(119);
+    // The whole country is far wider than 180 km: the list leads with the
+    // best spot in each county, so its first cards are each another county's.
+    await expect(page.locator(".spot-marker.pending")).toHaveCount(0, {
+      timeout: 30000,
+    });
+    const counties = await cards(page).evaluateAll((els) =>
+      els.map((el) => /Co\. ([^·\n]+)/.exec(el.textContent ?? "")?.[1]?.trim()),
+    );
+    const lead = counties.slice(0, 6);
+    expect(new Set(lead).size).toBe(lead.length);
   });
 
   test("open sea: says so, and zooming back out lists spots again", async ({
@@ -616,13 +659,12 @@ test.describe("Nearby follows the map beside the list", () => {
     );
     await expect(cards(page)).toHaveCount(0);
     await expect(pills(page)).toHaveCount(0);
-    expect(await head(page)).toBe(0);
     for (let i = 0; i < 4; i++) {
       await button(page, "Zoom out").click();
       await rest(page);
     }
     await expect(empty).toHaveCount(0);
-    await expect.poll(() => head(page)).toBeGreaterThan(0);
+    await expect.poll(() => cards(page).count()).toBeGreaterThan(0);
   });
 
   test("a card under the pointer changes neither the list nor the map", async ({
@@ -703,7 +745,7 @@ test.describe("Nearby follows the map beside the list", () => {
     await expect(page).toHaveURL(new RegExp(`/spot/${id}`));
   });
 
-  test("a pill pressed on Nearby brings its card into view", async ({
+  test("a pill pressed with the heart off brings its card into view", async ({
     page,
   }) => {
     await wholeChart(page);
@@ -749,7 +791,7 @@ test.describe("a dot under a finger, beside the list", () => {
 test.describe("under the width for the chart beside the list", () => {
   test.use({ viewport: { width: 900, height: 860 } });
 
-  test("Nearby is the spots nearest the middle of Ireland, with no map to follow", async ({
+  test("with the heart off, the list is the spots nearest the middle of Ireland, with no map to follow", async ({
     page,
   }) => {
     await page.goto("/");
