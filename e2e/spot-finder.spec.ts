@@ -432,7 +432,7 @@ test.describe("on a desktop", () => {
     await expect(rim).toHaveCSS("stroke", "rgb(255, 255, 255)");
   });
 
-  test("the waves in metres, and water the sea's waves do not reach keeps its Waves row, empty", async ({
+  test("the waves in whole feet, and water the sea's waves do not reach keeps its Waves row, empty", async ({
     page,
   }) => {
     // GFS-Wave alone: the sample's SWAN run, which the finder would read
@@ -457,7 +457,7 @@ test.describe("on a desktop", () => {
     const brandon = cards(page).filter({ hasText: "Brandon Bay" });
     const keel = cards(page).filter({ hasText: "Keel Beach" });
     const sea = brandon.locator('[data-bar="waves"]');
-    await expect(sea.locator("b").first()).toHaveText(/^\d+\.\d$/, {
+    await expect(sea.locator("b").first()).toHaveText(/^(\d+|<1)$/, {
       timeout: 30000,
     });
     await expect(sea).not.toHaveAttribute("data-inland");

@@ -37,13 +37,15 @@ import {
   type DirectionKey,
   type Rider,
 } from "../force5/src/stars";
-import type { Units } from "../force5/src/units";
+import type { Units, WaveUnits } from "../force5/src/units";
 import { inForces, ratingIsOurs, setDirection } from "../spot/web/yourStars";
 
 /** What Settings is setting, until Save keeps it. */
 export interface Draft {
   weightKg: number | null;
   units: Units;
+  /** The units a wave or swell height is shown in. */
+  waveUnits: WaveUnits;
   /** The four wind numbers and the shore: ours until changed. */
   custom: CustomRating;
   /** Degrees into the wind, past straight across it: ours, 0, until changed. */
@@ -69,6 +71,7 @@ export function draftOf(prefs: Prefs): Draft {
   return inUnits({
     weightKg: rider.weightKg,
     units: prefs.units,
+    waveUnits: prefs.waveUnits,
     custom: rider.custom
       ? { ...rider.custom, wind: { ...rider.custom.wind } }
       : oursCopy(),
@@ -195,6 +198,7 @@ export function applyDraft(
   const next: Prefs = {
     ...prefs,
     units: draft.units,
+    waveUnits: draft.waveUnits,
     nightHours: draft.nightHours,
     blendModels: [...draft.blendModels],
     waveModel: draft.waveModel,

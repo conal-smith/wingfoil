@@ -53,7 +53,14 @@ import {
 import type { NightHours, Prefs } from "../force5/src/prefs";
 import { DOWNWIND_MAX, UPWIND_MAX } from "../force5/src/rideWedge";
 import { NEVER, type DirectionKey } from "../force5/src/stars";
-import { UNITS, beaufort, forceKn, type Units } from "../force5/src/units";
+import {
+  UNITS,
+  WAVE_UNITS,
+  beaufort,
+  forceKn,
+  type Units,
+  type WaveUnits,
+} from "../force5/src/units";
 import {
   THEME_EVENT,
   chooseTheme,
@@ -445,6 +452,15 @@ function YouPart({ draft, setDraft, unit }: PartProps & { unit: UnitScale }) {
             ))}
           </ul>
         )}
+      </div>
+      <div className="st-row">
+        <span className="st-kick">Wave height</span>
+        <Segmented<WaveUnits>
+          aria-label="Wave height"
+          options={WAVE_UNITS.map((u) => ({ value: u.id, label: u.name }))}
+          value={draft.waveUnits}
+          onChange={(waveUnits) => setDraft({ ...draft, waveUnits })}
+        />
       </div>
     </div>
   );
@@ -1329,10 +1345,10 @@ function ForecastPart({
           {draft.waveModel === WAVE_BLEND
             ? "The wave blend: the middle of every wave model’s height, period and direction at each hour, the swells the finest model’s. Where none is published, the finest model at each hour."
             : draft.waveModel
-            ? `${modelEntry(draft.waveModel)?.detail}. The waves are ${modelName(draft.waveModel)}’s, and the next model’s past the end of its run. The wave blend shows beside them.`
-            : `The finest wave model that reaches each hour, then the next as its run ends: ${waveChoices()
-                .map((entry) => entry.name)
-                .join(", ")}. The wave blend shows beside them.`}
+              ? `${modelEntry(draft.waveModel)?.detail}. The waves are ${modelName(draft.waveModel)}’s, and the next model’s past the end of its run. The wave blend shows beside them.`
+              : `The finest wave model that reaches each hour, then the next as its run ends: ${waveChoices()
+                  .map((entry) => entry.name)
+                  .join(", ")}. The wave blend shows beside them.`}
         </p>
       </div>
       <div className="st-row">

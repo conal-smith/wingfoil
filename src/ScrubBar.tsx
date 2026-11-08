@@ -65,7 +65,13 @@ import type { ModelAvailability } from "../force5/src/manifests";
 import type { NightHours } from "../force5/src/prefs";
 import { spotSquare } from "../force5/src/spotData";
 import { tideAt, type SpotTide } from "../force5/src/tides";
-import { speedShort, unitLabel, type Units } from "../force5/src/units";
+import {
+  speedShort,
+  unitLabel,
+  waveText,
+  type Units,
+  type WaveUnits,
+} from "../force5/src/units";
 import { variableValue } from "../force5/src/variables";
 import { compass, windCss, type Spot } from "../force5/src/weather";
 import {
@@ -160,6 +166,7 @@ export interface ScrubBarProps {
   /** Whose waves a point reads: a riding place near it, or none. */
   lender: Spot | null;
   units: Units;
+  waveUnits: WaveUnits;
   nightHours: NightHours;
   /**
    * The spot's page, at the hour in hand; null where there is none. On the
@@ -184,6 +191,7 @@ export default function ScrubBar({
   onWantMarine,
   lender,
   units,
+  waveUnits,
   nightHours,
   href,
   reachable,
@@ -799,6 +807,7 @@ export default function ScrubBar({
         waves={lanes.some((l) => l.kind === "waves")}
         tide={!!tide}
         units={units}
+        waveUnits={waveUnits}
         measured={measuredHere}
         withStars={
           rated && rated.of
@@ -1191,6 +1200,7 @@ function Readout({
   waves,
   tide,
   units,
+  waveUnits,
   measured,
   withStars,
 }: {
@@ -1216,6 +1226,7 @@ function Readout({
   waves: boolean;
   tide: boolean;
   units: Units;
+  waveUnits: WaveUnits;
 }) {
   const when = (
     <div className="sb-cell is-time">
@@ -1324,7 +1335,9 @@ function Readout({
           <span className="sb-label">Waves</span>
           <span className="sb-value">
             <b>
-              {reading.waves === null ? "–" : `${reading.waves.toFixed(1)} m`}
+              {reading.waves === null
+                ? "–"
+                : waveText(reading.waves, waveUnits)}
             </b>
           </span>
         </div>

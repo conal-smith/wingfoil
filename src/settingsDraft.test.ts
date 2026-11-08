@@ -232,6 +232,7 @@ describe("the forecast's hours, model and blend", () => {
     const before = prefs();
     const draft = draftOf(before);
     expect(draft.nightHours).toBe(before.nightHours);
+    expect(draft.waveUnits).toBe(before.waveUnits);
     expect(draft.model).toBe(chosenModel(before.rider.starsFrom));
     expect(draft.blendModels).toEqual(before.blendModels);
 
@@ -240,11 +241,13 @@ describe("the forecast's hours, model and blend", () => {
       {
         ...withBlendModel(draft, "gfs", false),
         nightHours: "hide",
+        waveUnits: "m",
         model: "icon-eu",
       },
       NOW,
     );
     expect(next.nightHours).toBe("hide");
+    expect(next.waveUnits).toBe("m");
     expect(chosenModel(next.rider.starsFrom)).toBe("icon-eu");
     expect(next.blendModels).not.toContain("gfs");
     // None of them is the rating: the stars' own stamp stays.

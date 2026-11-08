@@ -224,7 +224,7 @@ test("the scrub bar draws the spot's week: its wind and gusts, its stars, the ni
   // and the tide. 22:00 is after last light: no stars, and it says so.
   const pill = barPill(page);
   await expect(pill).toHaveText(
-    /^Sun 13 22:00Wind\d+ kn(g\d+)?[NSEW]{1,3}StarsDarkWaves(–|\d+\.\d m)Tide\d+\.\d m[↑↓]$/,
+    /^Sun 13 22:00Wind\d+ kn(g\d+)?[NSEW]{1,3}StarsDarkWaves(–|\d+ ft|under 1 ft)Tide\d+\.\d m[↑↓]$/,
   );
   await expect(pill).not.toHaveAttribute("data-stars");
   // The map's small print stands over the bar, not under it.
@@ -395,7 +395,7 @@ test("the waves and the tide have lanes of their own under the wind, and none wh
       );
   const before = await places();
   await timeSlider(page).fill(String(columnAt("2026-09-17T00:00:00Z")));
-  await expect(cell("waves")).toHaveText(/^Waves\d+\.\d m$/);
+  await expect(cell("waves")).toHaveText(/^Waves(\d+ ft|under 1 ft)$/);
   expect(await places()).toEqual(before);
   // The tide, Fenit's: a height and which way it is going.
   await expect(bar.locator('[data-lane="tide"] .sb-line')).toHaveCount(1);

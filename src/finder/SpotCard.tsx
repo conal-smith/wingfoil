@@ -24,7 +24,7 @@ import {
 import { Heart } from "lucide-react";
 import { faintRose, loupeRose, roseScale } from "../../force5/src/focus";
 import { Loupe } from "../../shared/web/Loupe";
-import { speedShort, unitLabel } from "../../force5/src/units";
+import { speedShort, unitLabel, waveFigure } from "../../force5/src/units";
 import {
   measuredAt,
   pairedName,
@@ -34,7 +34,7 @@ import {
 import { windCss } from "../../force5/src/windCss";
 import { spotHref } from "../../force5/src/siteNav";
 import type { Rider } from "../../force5/src/stars";
-import type { Units } from "../../force5/src/units";
+import type { Units, WaveUnits } from "../../force5/src/units";
 import type { Spot } from "../../force5/src/weather";
 import { Button } from "../../ui/Button";
 import { Tag } from "../../ui/Tag";
@@ -293,6 +293,7 @@ export interface SpotCardProps {
   now: number;
   rider: Rider;
   units: Units;
+  waveUnits: WaveUnits;
   starred: boolean;
   phone: boolean;
   reducedMotion: boolean;
@@ -320,6 +321,7 @@ export function SpotCard(props: SpotCardProps) {
     roseAt,
     rider,
     units,
+    waveUnits,
     starred,
     onToggleStar,
     onPick,
@@ -412,6 +414,7 @@ export function SpotCard(props: SpotCardProps) {
             shown={shown}
             isToday={isToday}
             units={units}
+            waveUnits={waveUnits}
             onPick={onPick}
           />
         )}
@@ -497,6 +500,7 @@ function DayBars({
   shown,
   isToday,
   units,
+  waveUnits,
   onPick,
 }: {
   day: DayRow;
@@ -505,6 +509,7 @@ function DayBars({
   shown: number;
   isToday: boolean;
   units: Units;
+  waveUnits: WaveUnits;
   onPick: (time: number) => void;
 }) {
   const s = cardStyles();
@@ -623,7 +628,7 @@ function DayBars({
             if (!sea) return null;
             const h = sea.height;
             return {
-              text: h.toFixed(1),
+              text: waveFigure(h, waveUnits),
               className: [
                 h >= 2.2 ? s.barNumLight() : "",
                 h >= 1.6 ? s.barNumDarkShade() : s.barNumDarkLight(),

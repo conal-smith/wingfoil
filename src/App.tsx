@@ -1340,7 +1340,7 @@ export default function App() {
             : null,
         order: seen ? (seen.get(spot.id) ?? null) : null,
         // A bead says the same once lit: what is known of it.
-        pill: pillContent(fieldShown, reading, prefs.units),
+        pill: pillContent(fieldShown, reading, prefs.units, prefs.waveUnits),
         figure: pillFigure(fieldShown, reading),
       });
     }
@@ -1357,6 +1357,7 @@ export default function App() {
     bestPillReadings,
     fieldShown,
     prefs.units,
+    prefs.waveUnits,
     rider,
     picked,
     point?.id,
@@ -2758,6 +2759,7 @@ export default function App() {
     <MapDock
       onRoom={setDockRoom}
       field={fieldShown}
+      waveUnits={prefs.waveUnits}
       offered={offered}
       note={legendNote}
       onField={chooseField}
@@ -2895,6 +2897,7 @@ export default function App() {
         time={lightColumn ? lightColumn.time : null}
         now={clockNow}
         units={prefs.units}
+        waveUnits={prefs.waveUnits}
         kind={kind}
         href={lightLink(spot)}
         onClose={onClose}
@@ -3036,6 +3039,7 @@ export default function App() {
                   onToggleStar={onToggleStar}
                   rider={rider}
                   units={prefs.units}
+                  waveUnits={prefs.waveUnits}
                   reducedMotion={reducedMotion}
                   phone={phone}
                   onWant={onWant}
@@ -3344,6 +3348,7 @@ export default function App() {
                         picked ? (pointSource?.source?.spot ?? null) : point
                       }
                       units={prefs.units}
+                      waveUnits={prefs.waveUnits}
                       nightHours={prefs.nightHours}
                       measured={dockPaired}
                       rated={ratedSpots}
@@ -3509,7 +3514,11 @@ export default function App() {
               floor: foilState.manifest?.floorMetres,
             }}
             rain={{ on: layers.rain, line: rainLine }}
-            waves={{ on: fieldShown === "waves", line: wavesLine }}
+            waves={{
+              on: fieldShown === "waves",
+              line: wavesLine,
+              units: prefs.waveUnits,
+            }}
             sources={sources}
             satellite={satellite.note}
             satelliteError={satellite.error}
