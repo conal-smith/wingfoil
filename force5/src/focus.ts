@@ -1,5 +1,5 @@
-// The mark round the chosen spot: a loupe laid on the chart, a range ring, or
-// nothing. Pure geometry, so the sizes can be tested without a map; WindMap.tsx
+// The mark round the chosen spot: a loupe laid on the chart, or nothing (the
+// range ring went on 2026-11-08: the open spot's light pill marks it). Pure geometry, so the sizes can be tested without a map; WindMap.tsx
 // draws them.
 import { offshoreSpans, rideRose, type Rose, type Span } from "./rideWedge";
 import { windBand, type Rider } from "./stars";
@@ -15,9 +15,9 @@ import {
 import { compass, windColor } from "./weather";
 
 /** How the map marks the chosen spot's surroundings. */
-export type FocusStyle = "loupe" | "ring" | "off";
+export type FocusStyle = "loupe" | "off";
 
-export const FOCUS_STYLES: readonly FocusStyle[] = ["loupe", "ring", "off"];
+export const FOCUS_STYLES: readonly FocusStyle[] = ["loupe", "off"];
 
 export const isFocusStyle = (value: unknown): value is FocusStyle =>
   FOCUS_STYLES.includes(value as FocusStyle);
@@ -55,13 +55,46 @@ export function bezelTicks(r: number) {
   return ticks;
 }
 
+/** The bands the wash is cut in: each is a layer of its own on the map. */
+export const WASH_BANDS = 1;
+
 /**
- * The distance a range ring is measured in, after the rider's speed units:
+ * The light paper wash beyond the loupe: its hole round the spot in pixels,
+ * one flat 18% from there out, its edge under the rim's paper band. Nothing
+ * with no loupe.
+ */
+export function washHoles(
+  style: FocusStyle,
+  px: number,
+): { holes: number[]; opacity: number[] } {
+  if (style === "loupe")
+    return { holes: [px + LOUPE_BAND / 2], opacity: [0.18] };
+  return { holes: [], opacity: [] };
+}
+
+/* ---- the ride rose: the loupe's glass, at a true distance ----------------- */
+
+/**
+ * How far the rose reaches on the ground, in the rider's units: the round
+ * distance nearest a kilometre (about as far as a rider goes on one tack
+ * before turning), with a ring at half of it. Half a nautical mile with knots,
+ * half a mile with miles an hour, a kilometre with either metric unit.
+ */
+export interface RoseScale {
+  metres: number;
+  label: string;
+  /** The inner ring, at half the distance. */
+  inner: number;
+  innerLabel: string;
+}
+
+/**
+ * The distances the rose is measured in, after the rider's speed units:
  * nautical miles with knots, miles with miles an hour, kilometres with
  * kilometres an hour, and metres (kilometres past one) with metres a second.
  * Force is read in knots, so nautical miles.
  */
-const RANGE_UNITS: Record<
+const DISTANCE_UNITS: Record<
   ScaleUnits,
   { metres: number; steps: readonly number[]; label: (n: number) => string }
 > = {
@@ -87,87 +120,10 @@ const RANGE_UNITS: Record<
   },
 };
 
-/**
- * The range ring: the longest round distance that sits inside 42% of the
- * map's shorter side, in the rider's units, and its radius on screen. Chosen
- * again whenever the camera rests, so it steps through the distances as the
- * rider zooms; in between it is a distance on the chart and moves with it.
- */
-export function rangeRing(
-  metresPerPx: number,
-  short: number,
-  units: Units = "kn",
-) {
-  const unit = RANGE_UNITS[scaleUnits(units)];
-  const max = 0.42 * short;
-  const n =
-    [...unit.steps]
-      .reverse()
-      .find((d) => (d * unit.metres) / metresPerPx <= max) ?? unit.steps[0];
-  const metres = n * unit.metres;
-  // "0.5 NM", "500 m": the ring's distance, as it is written beside it.
-  return { metres, label: unit.label(n), px: metres / metresPerPx };
-}
-
-/** The most bands the wash is ever cut in: each is a layer of its own on the map. */
-export const WASH_BANDS = 5;
-
-/**
- * The light paper wash beyond the mark: holes round the spot in pixels, and
- * the wash's strength from each hole out to the next, the last out to the
- * edge of the world. The loupe's is one flat 18%, its edge under the rim's
- * paper band. The ring's is barely there and only well beyond it, feathered
- * out to 10% in five steps too slight to see.
- *
- * Each band is as strong as that many sheets of the first one's paper laid
- * on one another, which is how the ring's wash was first drawn: five sheets
- * of the whole world, each with its hole, stacked. That filled the map five
- * times over on every frame; a band apiece fills it once.
- */
-export function washHoles(
-  style: FocusStyle,
-  px: number,
-): { holes: number[]; opacity: number[] } {
-  if (style === "loupe")
-    return { holes: [px + LOUPE_BAND / 2], opacity: [0.18] };
-  if (style === "ring") {
-    const steps = WASH_BANDS;
-    const start = px * 1.45;
-    const sheet = 1 - (1 - 0.1) ** (1 / steps);
-    return {
-      holes: Array.from(
-        { length: steps },
-        (_, i) => start + (i * 160) / (steps - 1),
-      ),
-      opacity: Array.from(
-        { length: steps },
-        (_, i) => 1 - (1 - sheet) ** (i + 1),
-      ),
-    };
-  }
-  return { holes: [], opacity: [] };
-}
-
-/* ---- the ride rose: the loupe's glass, at a true distance ----------------- */
-
-/**
- * How far the rose reaches on the ground, in the rider's units: the round
- * distance nearest a kilometre (about as far as a rider goes on one tack
- * before turning), with a ring at half of it. Half a nautical mile with knots,
- * half a mile with miles an hour, a kilometre with either metric unit.
- */
-export interface RoseScale {
-  metres: number;
-  label: string;
-  /** The inner ring, at half the distance. */
-  inner: number;
-  innerLabel: string;
-}
-
 const metricLabel = (km: number) => (km < 1 ? `${km * 1000} m` : `${km} km`);
 
 export function roseScale(units: Units): RoseScale {
-  const unit = RANGE_UNITS[scaleUnits(units)];
+  const unit = DISTANCE_UNITS[scaleUnits(units)];
   const n = unit.steps.reduce((best, d) =>
     Math.abs(d * unit.metres - 1000) < Math.abs(best * unit.metres - 1000)
       ? d

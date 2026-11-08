@@ -390,14 +390,3 @@ export function LoupeGlyph(props: ChartGlyphProps) {
     </Glyph>
   );
 }
-
-/** The range ring: a dashed ring at a distance round the light. */
-export function RingGlyph(props: ChartGlyphProps) {
-  return (
-    <Glyph {...props}>
-      <circle cx="12" cy="12" r="9" strokeDasharray="2.4 2.2" />
-      <path d="M12 2V5M12 19V22M2 12H5M19 12H22" strokeWidth={1.1} />
-      <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
-    </Glyph>
-  );
-}

@@ -40,11 +40,11 @@ from the home-compute checkout. Edits made on the dashboard are kept unless you 
 
 **A job argument the pinned image does not know fails every run at once.** The worker
 parses its arguments strictly, so a timetable that passes a new flag must not reach the
-plane before the release that carries it is the image the jobs pin. HARMONIE's and
-`blend-after-harmonie`'s `--daylight-only --always-hours 5,19` (November 2026) exit 2
-with argparse's "unrecognized arguments" on any older image: import that timetable only
-after promoting the release that has `force5/ingest/daylight.py`, with that release's
-digest (`--image`, docs/RELEASES.md, "The forecast jobs"), dry run first.
+plane before the release that carries it is the image the jobs pin. Both
+HARMONIE jobs ran with `--daylight-only --always-hours 5,19` in November 2026, and
+a timetable that passes those flags exits 2 with argparse's "unrecognized arguments" on
+any image from before `force5/ingest/daylight.py`: import such a timetable only after
+promoting the release that has it, with that release's digest (`--image`, docs/RELEASES.md, "The forecast jobs"), dry run first.
 
 ### Switching back to the local scheduler
 
@@ -131,9 +131,9 @@ listing, not an import.
 A daylight-gated slot outside the riding window (`--daylight-only`,
 `force5/ingest/daylight.py`) costs less still: the worker exits before it reads the
 bucket, with a `forecast_unchanged` event whose `reason` is `dark`, so the run counts as
-`unchanged`. HARMONIE's hourly slots from 03:35 to 21:35 UTC fetch 13 times a day in
-December and all 19 in June; in winter the other six are a container start and
-nothing more. A fetching HARMONIE slot is ~826 MB and about 3½ minutes.
+`unchanged`. No job in the shipped timetable uses the gate now: HARMONIE runs at 05:35,
+08:35, 11:35, 16:35, 19:35 and 23:35 UTC and fetches at each. A fetching HARMONIE slot
+is ~826 MB and about 3½ minutes.
 
 Bacalhau is told the Colima VM's size, less half a GiB for Docker and the kernel,
 and each job's memory is a hard ceiling (`RESOURCES` in `deploy/schedules.py`): 1 GB

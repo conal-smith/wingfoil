@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { dayNights, formatLocal, sunTimes } from "./sun";
+import {
+  dayNights,
+  formatLocal,
+  sunElevation,
+  sunElevationAt,
+  sunTimes,
+} from "./sun";
 
 const BRANDON = { lat: 52.276, lon: -10.024 };
 const minutes = (date: Date) =>
@@ -68,6 +74,65 @@ describe("sun times", () => {
     const winter = sunTimes(78, 15, new Date("2026-12-21T00:00:00Z"));
     expect(winter.sunset).toBeNull();
     expect(winter.polar).toBe("night");
+  });
+});
+
+describe("the sun's height", () => {
+  const DUBLIN = { lat: 53.35, lon: -6.26 };
+  it("stands at 90° less the latitude, plus the declination, at noon", () => {
+    // Midsummer: 90 - 53.35 + 23.44; midwinter: 90 - 53.35 - 23.44.
+    const june = sunTimes(
+      DUBLIN.lat,
+      DUBLIN.lon,
+      new Date("2026-06-21T12:00Z"),
+    );
+    const december = sunTimes(
+      DUBLIN.lat,
+      DUBLIN.lon,
+      new Date("2026-12-21T12:00Z"),
+    );
+    expect(
+      sunElevation(DUBLIN.lat, DUBLIN.lon, june.solarNoon.getTime()),
+    ).toBeCloseTo(60.09, 0);
+    expect(
+      sunElevation(DUBLIN.lat, DUBLIN.lon, december.solarNoon.getTime()),
+    ).toBeCloseTo(13.21, 0);
+  });
+  it("is at the horizon at sunset and 6° under it at civil dusk", () => {
+    const day = sunTimes(
+      BRANDON.lat,
+      BRANDON.lon,
+      new Date("2026-09-14T12:00:00Z"),
+    );
+    // Sunset is the disc's top on the horizon seen through the air: the
+    // centre geometrically 0.833° under it. The day's times take the sun's
+    // declination at noon, so they agree to a tenth of a degree or so.
+    const at = (date: Date | null) =>
+      sunElevation(BRANDON.lat, BRANDON.lon, date!.getTime());
+    expect(Math.abs(at(day.sunset) + 0.833)).toBeLessThan(0.15);
+    expect(Math.abs(at(day.civilDusk) + 6)).toBeLessThan(0.15);
+    expect(Math.abs(at(day.sunrise) + 0.833)).toBeLessThan(0.15);
+  });
+  it("is far under the horizon at midnight in winter", () => {
+    const elevation = sunElevation(
+      DUBLIN.lat,
+      DUBLIN.lon,
+      Date.parse("2026-12-21T00:25:00Z"),
+    );
+    expect(elevation).toBeLessThan(-55);
+  });
+  it("sets in the east first: the same instant, Dublin darker than Brandon", () => {
+    const at = sunElevationAt(Date.parse("2026-12-21T16:30:00Z"));
+    expect(at(DUBLIN.lat, DUBLIN.lon)).toBeLessThan(
+      at(BRANDON.lat, BRANDON.lon),
+    );
+    expect(at(BRANDON.lat, BRANDON.lon)).toBe(
+      sunElevation(
+        BRANDON.lat,
+        BRANDON.lon,
+        Date.parse("2026-12-21T16:30:00Z"),
+      ),
+    );
   });
 });
 

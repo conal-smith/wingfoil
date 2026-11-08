@@ -1,7 +1,8 @@
 // Rain: ICON-EU's hourly precipitation, as force5/ingest/fetch_icon_weather.py
 // publishes it (weather/icon-eu-weather.json, one frame an hour carrying
-// `precip` and the total cloud `clct`), and what the chart's Rain layer and the
-// dock's rain row make of it. The cloud is read here and drawn by nothing yet.
+// `precip` and the total cloud `clct`), and what the map's Weather field and
+// the dock's rain row make of it. The rain is drawn over the sky, which the
+// cloud colours (force5/src/sky.ts).
 //
 // A step's rain is the amount in the interval that ends at it, so it belongs
 // to that interval and to no other hour. Both readers say it per hour: the
@@ -14,12 +15,13 @@ import { parseColour } from "./foilDepth";
 import { forecastUrl } from "./urls";
 import { runPath } from "./spotData";
 import type { BundleFrame } from "./variables";
+import { edgeAt, gridLayout, sampleAt, type GridImage } from "./gridImage";
 import type { Grid } from "./weather";
 
 /** The weather run whose frames carry the rain. */
 export const RAIN_MODEL = "icon-eu-weather";
 export const RAIN_URL = "weather/icon-eu-weather.json";
-/** The variable the frames carry for the Rain layer. */
+/** The variable the frames carry for the rain the Weather field draws. */
 export const RAIN_VARIABLE = "precip";
 /** The total cloud the same frames carry, for the sky. */
 export const CLOUD_VARIABLE = "clct";
@@ -73,16 +75,33 @@ export interface RainFrame {
   clct?: (number | null)[];
 }
 
-/** What the map draws: the mm/h of every cell over some hours, on one grid. */
+/**
+ * What the map's Weather field draws: the mm/h of every cell over some hours,
+ * and the sky's cloud under it, on one grid.
+ */
 export interface RainView {
-  /** Changes whenever the picture would: the run and the hours averaged. */
+  /**
+   * Changes whenever the picture would: the run, the hours averaged and the
+   * hour shown, whose sun the sky is darkened by.
+   */
   key: string;
   grid: Grid;
   /** mm/h per cell, rows north to south; NaN where nothing is known. */
   rates: Float32Array;
+  /**
+   * The mean total cloud of the same frames, per cent per cell, rows north to
+   * south, NaN where unknown; null when the frames carry no cloud, and then
+   * the rain alone is drawn.
+   */
+  cloud: Float32Array | null;
   /** The hours the rates are the mean of: [start, end] in UTC milliseconds. */
   from: number;
   to: number;
+  /**
+   * The instant the sky's sun is worked out for, in UTC milliseconds: the
+   * time of the column shown, so its night falls where that hour's does.
+   */
+  time: number;
 }
 
 /** A step's interval, from its end and its declared span (or the step before). */
@@ -343,26 +362,26 @@ export function rainColour(
   return a.rgba.map((v, i) => v + (b.rgba[i] - v) * t) as unknown as RainRgba;
 }
 
-/** Mercator y of a latitude, in radians of the projection. */
-const mercator = (lat: number) =>
-  Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
-const latitude = (y: number) =>
-  (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * (180 / Math.PI);
-
 /** The table's span: from where the drizzle fades in to well past heavy. */
 const TABLE_SIZE = 256;
 const TABLE_LOW = Math.log(FADE_FROM_MM);
 const TABLE_HIGH = Math.log(16);
 
-/** A rate's place in the table, or -1 where nothing is drawn. */
-function tableIndex(mmPerHour: number) {
+/** A rate's place in `rainTable`, or -1 where nothing is drawn. */
+export function rainTableIndex(mmPerHour: number) {
   if (!(mmPerHour >= FADE_FROM_MM)) return -1;
   const t = (Math.log(mmPerHour) - TABLE_LOW) / (TABLE_HIGH - TABLE_LOW);
   return Math.min(TABLE_SIZE - 1, Math.round(t * (TABLE_SIZE - 1)));
 }
 
-/** `rainColour` at each of the table's rates, as RGBA bytes. */
-function rainTable(ramp: readonly { mmPerHour: number; rgba: RainRgba }[]) {
+/**
+ * `rainColour` at rates along the logarithm, as RGBA bytes: the ramp read
+ * once, so a picture of a quarter of a million pixels costs no logarithm
+ * each. A rate's place in it is `rainTableIndex`.
+ */
+export function rainTable(
+  ramp: readonly { mmPerHour: number; rgba: RainRgba }[],
+) {
   const table = new Uint8ClampedArray(TABLE_SIZE * 4);
   for (let k = 0; k < TABLE_SIZE; k++) {
     const rate = Math.exp(
@@ -378,26 +397,12 @@ function rainTable(ramp: readonly { mmPerHour: number; rgba: RainRgba }[]) {
   return table;
 }
 
-export interface RainImage {
-  width: number;
-  height: number;
-  /** RGBA, row by row from the north, as an ImageData takes it. */
-  data: Uint8ClampedArray;
-  /** The image's corners for a MapLibre image source: NW, NE, SE, SW. */
-  coordinates: [
-    [number, number],
-    [number, number],
-    [number, number],
-    [number, number],
-  ];
-}
+export type RainImage = GridImage;
 
 /**
- * The layer's picture: the grid's rates coloured, on rows evenly spaced in
- * Mercator (the map's own projection, which a latitude grid is not), `scale`
- * pixels to a cell each way and sampled bilinearly between cells. Its edge
- * fades over a few cells rather than stopping in a straight line, and a cell
- * that is dry or unknown is transparent, so the chart shows through.
+ * The rain's picture: the grid's rates coloured, laid out for the map
+ * (force5/src/gridImage.ts), `scale` pixels to a cell each way. A cell that is
+ * dry or unknown is transparent, so the chart shows through.
  */
 export function rainImage(
   grid: Grid,
@@ -405,66 +410,20 @@ export function rainImage(
   ramp: readonly { mmPerHour: number; rgba: RainRgba }[],
   scale = 2,
 ): RainImage {
-  const width = Math.max(2, Math.round(grid.width * scale));
-  const yN = mercator(grid.north);
-  const yS = mercator(grid.south);
-  // As many rows as the finest cell (the southern, in Mercator) needs.
-  const finest = mercator(grid.south + grid.dy) - yS;
-  const height = Math.max(2, Math.ceil(((yN - yS) / finest + 1) * scale));
+  const layout = gridLayout(grid, scale);
+  const { width, height } = layout;
   const data = new Uint8ClampedArray(width * height * 4);
-  const feather = 4;
-  // The ramp read once into a table along the logarithm of the rate, so a
-  // picture of a quarter of a million pixels costs no logarithm each.
   const lut = rainTable(ramp);
-  const w = grid.width;
   for (let row = 0; row < height; row++) {
-    const lat = latitude(yN + ((yS - yN) * (row + 0.5)) / height);
-    const fy = Math.min(
-      grid.height - 1,
-      Math.max(0, (grid.north - lat) / grid.dy),
-    );
-    const y0 = Math.floor(fy);
-    const y1 = Math.min(grid.height - 1, y0 + 1);
-    const ty = fy - y0;
-    const edgeY = Math.min(fy, grid.height - 1 - fy) / feather;
     for (let col = 0; col < width; col++) {
-      const fx = ((col + 0.5) / width) * (w - 1);
-      const x0 = Math.floor(fx);
-      const x1 = Math.min(w - 1, x0 + 1);
-      const tx = fx - x0;
-      // Bilinear; an unknown corner (NaN) is left out and the rest reweighted.
-      const a = rates[y0 * w + x0];
-      const b = rates[y0 * w + x1];
-      const c = rates[y1 * w + x0];
-      const d = rates[y1 * w + x1];
-      const ka = a === a ? (1 - tx) * (1 - ty) : 0;
-      const kb = b === b ? tx * (1 - ty) : 0;
-      const kc = c === c ? (1 - tx) * ty : 0;
-      const kd = d === d ? tx * ty : 0;
-      const weight = ka + kb + kc + kd;
-      if (!weight) continue;
-      const sum =
-        (ka && a * ka) + (kb && b * kb) + (kc && c * kc) + (kd && d * kd);
-      const at = tableIndex(sum / weight);
+      const at = rainTableIndex(sampleAt(rates, grid.width, layout, row, col));
       if (at < 0) continue;
-      const edge = Math.min(1, edgeY, Math.min(fx, w - 1 - fx) / feather);
       const i = (row * width + col) * 4;
       data[i] = lut[at * 4];
       data[i + 1] = lut[at * 4 + 1];
       data[i + 2] = lut[at * 4 + 2];
-      data[i + 3] = Math.round(lut[at * 4 + 3] * Math.max(0, edge));
+      data[i + 3] = Math.round(lut[at * 4 + 3] * edgeAt(layout, row, col));
     }
   }
-  const { west, east, north, south } = grid;
-  return {
-    width,
-    height,
-    data,
-    coordinates: [
-      [west, north],
-      [east, north],
-      [east, south],
-      [west, south],
-    ],
-  };
+  return { width, height, data, coordinates: layout.coordinates };
 }

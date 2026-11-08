@@ -25,6 +25,7 @@ import { windBand, type Rider } from "../force5/src/stars";
 import { windColor } from "../force5/src/weather";
 import {
   AboutGlyph,
+  ChartGlyph,
   ColouredWindGlyph,
   CurrentsGlyph,
   HighTideGlyph,
@@ -34,17 +35,17 @@ import {
   ParticlesGlyph,
   RainGlyph,
   ReliefGlyph,
-  RingGlyph,
   SatelliteGlyph,
   SoundingsGlyph,
   SourcesGlyph,
   StarGlyph,
   TidalDepthGlyph,
   TintsGlyph,
+  glyphs,
 } from "./chartGlyphs";
 import FoilLegend from "./FoilLegend";
 import { KnotScale } from "./KnotScale";
-import { RainScale } from "./RainScale";
+import { RainScale, SkyScale, WaveScale } from "./RainScale";
 import type { InfoSection } from "./mapInfoContext";
 import { riderLine } from "./riderLine";
 import "./mapInfo.css";
@@ -104,9 +105,17 @@ const PARTS: readonly Part[] = [
     glyph: (size) => <CurrentsGlyph size={size} />,
   },
   {
+    id: "waves",
+    name: "Waves",
+    short: "Waves",
+    glyph: (size) => <ChartGlyph glyph={glyphs.waves} size={size} />,
+  },
+  {
+    // The Weather field: the sky and the rain over it. Its id is the rain's
+    // from before the sky was drawn, so the links to it still open it.
     id: "rain",
-    name: "Rain",
-    short: "Rain",
+    name: "Weather",
+    short: "Weather",
     glyph: (size) => <RainGlyph size={size} />,
   },
   {
@@ -149,10 +158,15 @@ export interface MapInfoProps {
   /** The tidal-depth key's readings (src/FoilLegend.tsx). */
   foil: Parameters<typeof FoilLegend>[0];
   /**
-   * The Rain layer: whether it is on, and what it draws at the hour shown
-   * (or why it draws nothing there).
+   * The Weather field, the sky and the rain: whether it is on, and what it
+   * draws at the hour shown (or why it draws nothing there).
    */
   rain?: { on: boolean; line: string | null };
+  /**
+   * The Waves field: whether it is on, and what it draws at the hour shown
+   * (or why it draws nothing there).
+   */
+  waves?: { on: boolean; line: string | null };
   sources: ReactNode;
   /** "Satellite: high tide (≈4.6 m)" while the image is on, else null. */
   satellite?: string | null;
@@ -182,6 +196,7 @@ export default function MapInfo({
   spotId,
   foil,
   rain = { on: false, line: null },
+  waves = { on: false, line: null },
   sources,
   satellite = null,
   satelliteError = null,
@@ -261,7 +276,8 @@ export default function MapInfo({
         </Suspense>
       </>
     ),
-    rain: () => <RainPart {...rain} />,
+    waves: () => <WavesPart {...waves} />,
+    rain: () => <WeatherPart {...rain} />,
     satellite: () => (
       <SatellitePart
         line={satellite}
@@ -365,39 +381,21 @@ function MapKey({ scale }: { scale: string }) {
         <span className="mi-fig">{scale}</span>
       </p>
       <h4>
-        The lights <small>one a spot</small>
+        The spots <small>a pill or a bead</small>
       </h4>
       <ul className="mi-keys">
-        <Key mark={<KeyLight stars={5} />} name="Five stars">
-          In magenta.
+        <Key mark={<i className="mi-pill" />} name="A pill">
+          Beside the list, each card in view; on a phone&rsquo;s map and here,
+          the best five in view. It says what the map shows: the wind with no
+          layer on or with Wind, the waves with Waves, the sky with Weather. A
+          red arrow blows offshore.
         </Key>
-        <Key mark={<KeyLight stars={4} />} name="Three or four">
-          Inked in.
+        <Key mark={<i className="mi-dot" />} name="A bead">
+          Every other spot. Where spots stand close, a tap asks which.
         </Key>
-        <Key mark={<KeyLight stars={2} />} name="One or two">
-          A plain ring.
-        </Key>
-        <Key mark={<KeyLight stars={0} />} name="None now">
-          Dashed: no stars at this hour.
-        </Key>
-        <Key mark={<i className="mi-dot" />} name="Seen from far out">
-          A small dot has no stars at this hour, or stands beside a better spot.
-          Zoom in to see it in full.
-        </Key>
-        <Key mark={<KeyLight stars={1} struck />} name="Offshore">
-          Struck through in red. Not safe.
-        </Key>
-        <Key mark={<KeyLight stars={3} arrow cross />} name="Cross-offshore">
-          A red arrow. One star off, unless you set it otherwise.
-        </Key>
-        <Key mark={<KeyLight stars={4} arrow />} name="The arrow">
-          Stars at the hour shown; the arrow blows downwind.
-        </Key>
-        <Key mark={<KeyLight stars={4} arrow wedge />} name="The wedge">
-          On the spot you open, with the range ring or no mark: the headings you
-          can hold out to sea in this wind, as far up and down the wind as you
-          say you ride. The longer it is, the better powered you are; it pulses
-          faster with more stars.
+        <Key mark={<i className="mi-pill is-lit" />} name="The spot you open">
+          Its pill turns light, with a card beside it: its wind, waves, weather,
+          tide and stars at the hour shown.
         </Key>
       </ul>
       <h4>
@@ -482,13 +480,29 @@ function MapKey({ scale }: { scale: string }) {
   );
 }
 
-/** The Rain layer: what its blues mean, where they come from, what they miss. */
-function RainPart({ on, line }: { on: boolean; line: string | null }) {
+/**
+ * The Weather field: the sky's colours and the rain's blues over them, what
+ * they mean, where they come from, and what they miss.
+ */
+function WeatherPart({ on, line }: { on: boolean; line: string | null }) {
   return (
     <>
-      <p className="mi-lede">Where it rains in the hour shown, and how hard.</p>
+      <p className="mi-lede">
+        The sky in the hour shown: how much cloud, whether it is dark, and where
+        it rains.
+      </p>
       <h4>
-        The colours <small>rain in the hour</small>
+        The sky <small>cloud by day, black by night</small>
+      </h4>
+      <SkyScale />
+      <p>
+        Yellow where the sky is clear, paling through cream to grey under a full
+        cover of cloud. Where the sun is down the sky is black, cloud or none;
+        through dusk and dawn the one shades into the other, so the night is
+        seen crossing the map from the east.
+      </p>
+      <h4>
+        The rain <small>over the sky, in the hour</small>
       </h4>
       <RainScale />
       <p data-rain-line>
@@ -497,13 +511,47 @@ function RainPart({ on, line }: { on: boolean; line: string | null }) {
           : "Off. Turn it on with the map\u2019s Weather chip."}
       </p>
       <p>
-        From DWD&rsquo;s ICON-EU model: about 6.5 km, hourly, for three days
-        from its run. Dry is left clear. At a three-hour column the blues are
-        the mean of its hours. A shower a few kilometres across can be missed or
-        put in the wrong place.
+        From DWD&rsquo;s ICON-EU model: about 6.5 km, its total cloud and its
+        rain in each hour, out to about three days from its run; past that the
+        map draws no sky, and the legend says how far it goes. Dry is left clear
+        of blue. At a three-hour column the sky and the rain are the mean of its
+        hours. A shower a few kilometres across can be missed or put in the
+        wrong place.
       </p>
       <p className="ip-small">
         Weather data: Deutscher Wetterdienst (DWD) ICON-EU open data, CC BY 4.0.
+      </p>
+    </>
+  );
+}
+
+/** The Waves field: what its colours mean, and where they come from. */
+function WavesPart({ on, line }: { on: boolean; line: string | null }) {
+  return (
+    <>
+      <p className="mi-lede">
+        How high the waves are on the sea at the hour shown.
+      </p>
+      <h4>
+        The colours <small>wave height, metres</small>
+      </h4>
+      <WaveScale />
+      <p data-waves-line>
+        {on
+          ? (line ?? "Reading…")
+          : "Off. Turn it on with the map\u2019s Waves chip."}
+      </p>
+      <p>
+        From the Marine Institute&rsquo;s Irish Shelf SWAN wave model: the
+        significant wave height (the mean of the highest third of the waves) on
+        a grid of about 2.8 km over the sea round Ireland, every three hours. An
+        hour between two of them shows the nearer; the land is left clear. Close
+        in, in a bay or behind a headland, the sea can be calmer or rougher than
+        a cell of the grid says.
+      </p>
+      <p className="ip-small">
+        Wave forecast &copy; Marine Institute, CC BY 4.0. Best-endeavours, not
+        for safety-critical use.
       </p>
     </>
   );
@@ -527,7 +575,6 @@ const SYMBOLS: readonly [ReactNode, string, string][] = [
     "A compass rose",
     "Round the chosen spot: the loupe",
   ],
-  [<RingGlyph size={32} />, "A range ring", "Round the chosen spot"],
 ];
 
 /** How the stars are given, how to read them, and who they are for. */
@@ -923,49 +970,6 @@ function KeyRose() {
         style={{ fill: `rgb(${windColor(16).join(",")})` }}
         d="M0 16.5L-2 8L0 9.5L2 8Z"
       />
-    </svg>
-  );
-}
-
-/** A light as the key shows it. */
-function KeyLight({
-  stars,
-  arrow = false,
-  struck = false,
-  cross = false,
-  wedge = false,
-}: {
-  stars: number;
-  arrow?: boolean;
-  struck?: boolean;
-  cross?: boolean;
-  wedge?: boolean;
-}) {
-  const level = struck ? "off" : `s${stars}`;
-  return (
-    <svg
-      width="34"
-      height={arrow || wedge ? 34 : 24}
-      viewBox={arrow || wedge ? "-17 -17 34 34" : "-17 -12 34 24"}
-      aria-hidden="true"
-      className={`k-light lt-key ${level}${cross ? " xoff" : ""}`}
-    >
-      {wedge && (
-        <path className="lt-key-wedge" d="M0 0L15 0A15 15 0 0 1 6.3 13.6Z" />
-      )}
-      {arrow && (
-        <path
-          className="lt-arrow"
-          d="M5.5 -5.5L13 -13M8.2 -13.4L13.6 -13.6L13.4 -8.2"
-        />
-      )}
-      <circle className="lt-ring" r="7.6" />
-      {struck && (
-        <line className="lt-strike" x1="-5.6" y1="5.6" x2="5.6" y2="-5.6" />
-      )}
-      <text className="lt-n" y="3.4" textAnchor="middle">
-        {stars}
-      </text>
     </svg>
   );
 }

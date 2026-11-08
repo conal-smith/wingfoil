@@ -5,6 +5,8 @@ import { expect, rememberSpot, test, type Page } from "./fixtures";
  * light, south coast included, clear of the head and the controls, even for a
  * visitor whose last spot was in the north-west. The lights are on the chart
  * at every zoom: zoomed out past the island, they stand closer, never gone.
+ * With no list beside it, the best five in view are pills and every other
+ * spot a bead; a bead a pill stands on is under it, and counts as there.
  */
 test.use({
   viewport: { width: 393, height: 852 },
@@ -27,7 +29,8 @@ const lightsInView = (page: Page) =>
       const style = getComputedStyle(light);
       return (
         style.display !== "none" &&
-        style.visibility !== "hidden" &&
+        (style.visibility !== "hidden" ||
+          light.classList.contains("lt-under")) &&
         Number(style.opacity) > 0 &&
         r.width > 0 &&
         r.left >= chart.left &&
@@ -52,6 +55,10 @@ test("a phone opens on the whole island, every light in view, and keeps them thr
     timeout: 30000,
   });
   await expect.poll(() => lightsInView(page)).toEqual({ seen: 149, all: 149 });
+  // Five pills at most, the rest beads.
+  const pills = await page.locator(".spot-marker.lt-pilled").count();
+  expect(pills).toBeGreaterThan(0);
+  expect(pills).toBeLessThanOrEqual(5);
   // The south coast too, not just the north-west.
   for (const id of ["tramore", "kearney", "keel"])
     await expect(page.locator(`[data-spot-id="${id}"]`)).toBeInViewport();

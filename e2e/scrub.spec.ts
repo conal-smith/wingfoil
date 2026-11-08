@@ -438,7 +438,7 @@ test("a tap off the spot lets it go, leaving the plain timeline still moving the
   await expect(barName(page)).toHaveText("Brandon Bay");
 });
 
-test("the spot's name on the map opens its page at the hour in hand, and so does the keys' link", async ({
+test("the card beside the spot's pill opens its page at the hour in hand, and so does the keys' link", async ({
   page,
 }) => {
   await openBar(page);
@@ -451,12 +451,23 @@ test("the spot's name on the map opens its page at the hour in hand, and so does
   await expect(link).toHaveAttribute("href", at(later));
   await link.focus();
   await expect(link).toBeInViewport();
-  // The name beside the chosen light.
-  const name = page.locator(
-    '.spot-marker.sel[data-spot-id="brandon"] .lt-lab b',
-  );
-  await expect(name).toHaveText("Brandon Bay");
-  await name.click();
+  // The card beside the chosen spot's light pill (2026-11-08): its pointer at
+  // the pill, never over it.
+  const card = page.locator('[data-spot-peek="brandon"]');
+  await expect(card).toBeVisible();
+  const pill = (await page
+    .locator('.spot-marker.sel[data-spot-id="brandon"] .lt-pill')
+    .boundingBox())!;
+  const box = (await card.boundingBox())!;
+  expect(
+    box.x >= pill.x + pill.width ||
+      box.x + box.width <= pill.x ||
+      box.y >= pill.y + pill.height ||
+      box.y + box.height <= pill.y,
+  ).toBe(true);
+  const open = card.locator("[data-peek-open]");
+  await expect(open).toHaveAttribute("href", at(later));
+  await open.click();
   await expect(page).toHaveURL(
     new RegExp(
       `/spot/brandon\\?at=${encodeURIComponent(sampleStrip[later].validTime)}$`,
@@ -1375,14 +1386,14 @@ const coastTides = {
 };
 
 /**
- * Choose the range ring round a chosen spot, before the page opens. The
- * loupe flies a spot in to fit its half-mile rose, three or four zooms
- * closer than `tapAt`'s two lights stand apart; the ring keeps the camera
- * where these taps were framed.
+ * Choose no mark round a chosen spot, before the page opens. The loupe
+ * flies a spot in to fit its half-mile rose, three or four zooms closer than
+ * `tapAt`'s two lights stand apart; with none the camera stays where these
+ * taps were framed.
  */
 const ringNotLoupe = (page: Page) =>
   page.addInitScript(() =>
-    localStorage.setItem("wingfoil.map.focus.v1", "ring"),
+    localStorage.setItem("wingfoil.map.focus.v1", "off"),
   );
 
 /**

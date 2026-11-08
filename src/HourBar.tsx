@@ -1,4 +1,4 @@
-import { Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -59,17 +59,24 @@ export function hourWords(time: number, now: number): string {
  * hour it is at, both ways. A slider to the keys and a screen reader: the
  * arrows step an hour, Page Up and Page Down three, Home and End go to the
  * ends. Play steps on an hour at a time to 21:00 and stops there.
+ *
+ * On a narrow screen, where the list's head is out of sight under the map,
+ * the day steps on the bar itself: ‹ before the hour's words and › after
+ * them (`onDay`), each off where there is no day past it.
  */
 export default function HourBar({
   time,
   now,
   onTime,
+  onDay,
 }: {
   /** The hour shown. */
   time: number;
   now: number;
   /** An hour of the same day, chosen. */
   onTime: (time: number) => void;
+  /** A day back or on, and whether there is one either way; none, no steps. */
+  onDay?: { step: (by: -1 | 1) => void; back: boolean; on: boolean };
 }) {
   const date = irishDate(time);
   const hours = useMemo(() => dayHours(date), [date]);
@@ -151,9 +158,37 @@ export default function HourBar({
           <Play size={15} strokeWidth={1.75} aria-hidden="true" />
         )}
       </Button>
+      {onDay && (
+        <Button
+          variant="quiet"
+          size="sm"
+          icon
+          className="hb-day"
+          aria-label="The day before"
+          disabled={!onDay.back}
+          onClick={() => onDay.step(-1)}
+          data-hour-day="back"
+        >
+          <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+        </Button>
+      )}
       <span className="hb-when" data-hour-when aria-hidden="true">
         {words}
       </span>
+      {onDay && (
+        <Button
+          variant="quiet"
+          size="sm"
+          icon
+          className="hb-day"
+          aria-label="The day after"
+          disabled={!onDay.on}
+          onClick={() => onDay.step(1)}
+          data-hour-day="on"
+        >
+          <ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />
+        </Button>
+      )}
       <div
         ref={track}
         className="hb-track"

@@ -24,7 +24,7 @@ function choices(over: Partial<LayerChoices> = {}): LayerChoices {
     onLayersChange: vi.fn(),
     satellite: "off",
     onSatellite: vi.fn(),
-    focusStyle: "ring",
+    focusStyle: "off",
     onFocusStyle: vi.fn(),
     ...over,
   };
@@ -110,14 +110,14 @@ describe("railGroups", () => {
   });
 
   it("switches the loupe on, and off to the range ring", () => {
-    const off = choices({ focusStyle: "ring" });
+    const off = choices({ focusStyle: "off" });
     item(railGroups(layerGroups(off)), "focus-loupe").press();
     expect(off.onFocusStyle).toHaveBeenLastCalledWith("loupe");
     const on = choices({ focusStyle: "loupe" });
     const loupe = item(railGroups(layerGroups(on)), "focus-loupe");
     expect(loupe.on).toBe(true);
     loupe.press();
-    expect(on.onFocusStyle).toHaveBeenLastCalledWith("ring");
+    expect(on.onFocusStyle).toHaveBeenLastCalledWith("off");
   });
 
   it("goes from high tide to low tide to no satellite on one button", () => {

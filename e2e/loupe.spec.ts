@@ -56,7 +56,7 @@ async function firstHour(page: Page, relation: string) {
   throw new Error(`No ${relation} hour with wind to ride`);
 }
 
-/** The spot's link, with the loupe chosen round it (the range ring is the default). */
+/** The spot's link, with the loupe chosen round it (no mark is the default). */
 async function open(page: Page, spot: string, width = 1440, height = 900) {
   await page.addInitScript(() =>
     localStorage.setItem("wingfoil.map.focus.v1", "loupe"),

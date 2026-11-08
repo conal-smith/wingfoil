@@ -196,6 +196,7 @@ export const css = {
   "map-rain-light": "rgba(64, 128, 186, 0.32)",
   "map-rain-moderate": "rgba(38, 98, 170, 0.52)",
   "map-rain-heavy": "rgba(24, 58, 140, 0.74)",
+  "map-sky-night": "#0b0c10",
   "map-pill": "#0c0c0e",
   "map-pill-edge": "#6b6b74",
   "map-pill-ink": "#f2f2f4",

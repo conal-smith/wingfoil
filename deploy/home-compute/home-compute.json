@@ -30,29 +30,16 @@
   "jobs": [
     {
       "id": "harmonie",
-      "description": "HARMONIE-AROME (Met Éireann), hourly DINI cycle, in daylight only (the 05 and 19 UTC slots whatever the light)",
+      "description": "HARMONIE-AROME (Met Éireann), hourly DINI cycle",
       "schedule": {
         "at": {
           "hours": [
-            3,
-            4,
             5,
-            6,
-            7,
             8,
-            9,
-            10,
             11,
-            12,
-            13,
-            14,
-            15,
             16,
-            17,
-            18,
             19,
-            20,
-            21
+            23
           ],
           "minutes": [
             35
@@ -99,10 +86,7 @@
           "--models",
           "harmonie",
           "--step",
-          "1",
-          "--daylight-only",
-          "--always-hours",
-          "5,19"
+          "1"
         ],
         "report": {
           "format": "json-lines",
@@ -1385,29 +1369,16 @@
     },
     {
       "id": "blend-after-harmonie",
-      "description": "Every spot's wind blend, for the map's stars, in daylight only (the 05 and 19 UTC slots whatever the light)",
+      "description": "Every spot's wind blend, for the map's stars",
       "schedule": {
         "at": {
           "hours": [
-            3,
-            4,
             5,
-            6,
-            7,
             8,
-            9,
-            10,
             11,
-            12,
-            13,
-            14,
-            15,
             16,
-            17,
-            18,
             19,
-            20,
-            21
+            23
           ],
           "minutes": [
             45
@@ -1452,10 +1423,7 @@
         ],
         "parameters": [
           "--models",
-          "blend",
-          "--daylight-only",
-          "--always-hours",
-          "5,19"
+          "blend"
         ],
         "report": {
           "format": "json-lines",

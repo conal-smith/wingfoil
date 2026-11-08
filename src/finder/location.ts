@@ -1,7 +1,6 @@
 /**
  * Where the rider is, for the spots round them: the browser is asked only when
- * the rider presses the locate button on the map beside the list (or, with no
- * map beside it, "Use my location" in the filter sheet), never on its own, so a
+ * the rider presses the locate button on the map, never on its own, so a
  * first visit is never asked. A yes is kept on this device and the place is
  * read again quietly on later visits (the browser does not ask twice); a no is
  * kept too, and the browser is not asked again on its own, only when the rider

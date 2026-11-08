@@ -9,7 +9,6 @@ import {
   metresPerPixel,
   LOUPE_BAND,
   polar,
-  rangeRing,
   roseDrawing,
   roseFitRadius,
   roseRadius,
@@ -23,9 +22,9 @@ import { rideRose } from "./rideWedge";
 import { DEFAULT_RIDER } from "./stars";
 
 describe("the mark round the chosen spot", () => {
-  it("knows its three styles and nothing else", () => {
+  it("knows its two styles and nothing else: the range ring is gone", () => {
     expect(isFocusStyle("loupe")).toBe(true);
-    expect(isFocusStyle("ring")).toBe(true);
+    expect(isFocusStyle("ring")).toBe(false);
     expect(isFocusStyle("off")).toBe(true);
     expect(isFocusStyle("spotlight")).toBe(false);
     expect(isFocusStyle(null)).toBe(false);
@@ -88,44 +87,11 @@ describe("the mark round the chosen spot", () => {
     expect(east.y2).toBeCloseTo(0);
   });
 
-  it("draws the ring at the longest round distance inside 42% of the view", () => {
-    // 3 NM is 161 px at 34.4 m a pixel; 5 NM, 269 px, is over 260.
-    expect(rangeRing(34.4, 620)).toEqual({
-      metres: 3 * 1852,
-      label: "3 NM",
-      px: (3 * 1852) / 34.4,
-    });
-    // Two zooms in, four times the pixels a mile: 1 NM is 215 px.
-    expect(rangeRing(8.6, 620).label).toBe("1 NM");
-    // Nothing fits: the shortest, rather than none.
-    expect(rangeRing(1, 620).label).toBe("0.25 NM");
-  });
-
-  it("measures the ring in the distance that goes with the rider's speed units", () => {
-    // 0.5 of each fits in 260 px at 3.7 m a pixel; 1 of none of them does.
-    expect(rangeRing(3.7, 620, "kn").label).toBe("0.5 NM");
-    expect(rangeRing(3.7, 620, "mph").label).toBe("0.5 mi");
-    expect(rangeRing(3.7, 620, "km/h").label).toBe("0.5 km");
-    expect(rangeRing(3.7, 620, "m/s").label).toBe("500 m");
-    expect(rangeRing(3.7, 620, "m/s").px).toBeCloseTo(500 / 3.7);
-    // Past a kilometre, metres a second writes kilometres.
-    expect(rangeRing(30, 620, "m/s").label).toBe("5 km");
-  });
-
-  it("washes lightly beyond the loupe, and more lightly still beyond the ring", () => {
+  it("washes lightly beyond the loupe, and not at all without it", () => {
     expect(washHoles("loupe", 200)).toEqual({
       holes: [206.5],
       opacity: [0.18],
     });
-    const ring = washHoles("ring", 100);
-    expect(ring.holes).toEqual([145, 185, 225, 265, 305]);
-    // Each band as strong as the sheets of paper once stacked there: one
-    // sheet's worth past the first hole, and 10% beyond the last.
-    const sheet = ring.opacity[0];
-    ring.opacity.forEach((o, i) =>
-      expect(o).toBeCloseTo(1 - (1 - sheet) ** (i + 1), 10),
-    );
-    expect(ring.opacity[4]).toBeCloseTo(0.1);
     expect(washHoles("off", 100)).toEqual({ holes: [], opacity: [] });
   });
 });

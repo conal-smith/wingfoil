@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   pillContent,
+  pillFigure,
   pillHtml,
   pillKey,
   type PillReading,
@@ -165,5 +166,29 @@ describe("a pill's markup", () => {
 
   it("is nothing for no pill", () => {
     expect(pillHtml(null)).toBe("");
+  });
+});
+
+describe("pillFigure", () => {
+  const sample = {
+    from: 270,
+    windKn: 14,
+    gustKn: 20,
+    dark: false,
+    sky: "partly" as const,
+    air: 12,
+    rain: 0.4,
+    sea: { height: 1.6, period: 9, direction: 260 },
+    inland: false,
+  };
+  it("ranks by what the map shows", () => {
+    expect(pillFigure("none", sample)).toBe(14);
+    expect(pillFigure("wind", sample)).toBe(14);
+    expect(pillFigure("waves", sample)).toBe(1.6);
+    expect(pillFigure("waves", { ...sample, inland: true })).toBeNull();
+    expect(pillFigure("weather", sample)).toBeCloseTo(6.6);
+    expect(
+      pillFigure("weather", { ...sample, sky: null, rain: null }),
+    ).toBeNull();
   });
 });

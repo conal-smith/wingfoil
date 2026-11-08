@@ -88,10 +88,12 @@ the ramp by hand is how the legend and the map drifted apart before.
 
 On the map, **shape carries kind and colour carries the reading.** A spot
 marker says riding spot, operator, club or area by its shape (round, squared,
-dashed); colour on a marker only ever means wind. On the Spot finder's map a
-spot whose card is in view is a round-ended pill, neutral (dark, with light
-words, in either theme) and saying what the map shows, its arrow alone red
-offshore; every other spot is a bead, a small off-white dot (2026-11-08). A
+dashed); colour on a marker only ever means wind. On every map a spot with a
+pill (beside the list, its card in view; on the phone's map and the full
+chart, one of the best five in view) is a round-ended pill, neutral (dark,
+with light words, in either theme) and saying what the map shows, its arrow
+alone red offshore; every other spot is a bead, a small off-white dot
+(2026-11-08). A
 weather station or buoy is a squarer, smaller tag in the buoy's gold, its wind
 as it was measured. A forecast is never gold.
 
@@ -554,8 +556,8 @@ chart is the same map in a bigger box, never made twice (src/App.tsx). Its
 address is `/?map`, pushed, so Back is the list again; a spot's link
 (`/?spot=keel`) opens it on that spot with its dock. The top bar's Chart and
 Spots button moves between the two (2026-11-01), as do Escape and the
-collapse button above the zoom. Under 1100 pixels the list is alone; on a
-phone the map is made the first time it is asked for and kept. The old
+collapse button above the zoom. Under 1100 pixels the map and the list are a
+switch apart, the map first (2026-11-08). The old
 addresses are put right: `/spots` is the root, and `/?chart` is `/?map`. The
 root is always the list.
 
@@ -671,8 +673,9 @@ Every page with a head has the one top bar: the wordmark at the left, the spot
 search, a section's own actions, one outlined button for the other view
 (Chart, or Spots on the chart), light or dark, and the menu at the far right;
 on a phone the search folds into a round button and light or dark moves into
-the menu. The button replaces the black List and Map buttons at the foot of
-the chart and the finder (2026-10-26). The site menu is a drawer from the
+the menu. The button replaced the black List and Map buttons at the foot of
+the chart and the finder (2026-10-26); under 1100 pixels the finder has its
+own Map | List switch over its dock again (2026-11-08). The site menu is a drawer from the
 right, where its button is: no rule under its head, its groups named in grey,
 the current page on a soft pill with "You're here", Light, Dark or Auto at its
 foot.
@@ -730,17 +733,17 @@ bar is now the data alone: no name, no close, no play or step, no switch, no
 key, no Now. Over the strip the moment is read out in cells that keep their
 places as the playhead moves (the time, the wind, the stars, the waves, the
 tide), a reading an hour lacks saying "–"; the strip draws the wind and the
-stars, and under them a lane each for the waves and the tide. The spot's name
-beside its light on the map opens its page (a tapped point has its name beside
-its mark too); a tap off the spot lets it go, the bar's forecast with it, and
+stars, and under them a lane each for the waves and the tide. The card beside
+the spot's pill opens its page (2026-11-08; a tapped point has its name beside
+its mark); a tap off the spot lets it go, the bar's forecast with it, and
 the next tap picks a point. The spot page's readout over its graph is cells in
 fixed places too, held in view on a phone, where the band names float over the
 hours instead of taking a column and the hours scrolled under a playhead are
 the hour read out. The layers' rail lost what does not change a rider's day,
 so it stands whole in a column on a phone: the chart's own parts (depth
 tints, contours, relief, names) are always drawn, the satellite is one button
-from high tide to low to none, and the loupe is on or off, the range ring in
-its stead. On the spot finder a card opens its spot's page wherever it is
+from high tide to low to none, and the loupe is on or off (with it off, no
+mark: the range ring went on 2026-11-08). On the spot finder a card opens its spot's page wherever it is
 pressed, its picture too; the list's head is one row (since 2026-11-07 the
 day, the heart and a filter button) and the filter opens the stars, the order
 and the model in a sheet. Light, dark or auto left the foot of the site menu for the first part
@@ -825,10 +828,10 @@ Institute buoy as a smaller, squarer pill in the buoy's gold (`buoy`, its
 figures in `buoy-ink`) at the wind it last measured, faded past three hours
 and gone past twelve. On the full chart a card opens under the pointer or a
 tap: the station, its network, the wind, gust and direction, when it was
-measured and whose data it is. It is always on beside the list, where it is a
-gold-edged tag with no card (2026-11-08); on the full chart it is a switch
-under Wind in Layers, off until asked for, so the forecast is the chart's
-first word there. The full chart keeps its rings for the spots.
+measured and whose data it is. It is on the full chart only, a switch under
+Wind in Layers, off until asked for, so the forecast is the chart's first word
+there; the finder's map has none (2026-11-08), and its cards keep the
+readings.
 
 **2026-11-03 — The measured wind beside the forecast, on every timeline.**
 The owner: the current conditions should be on the timelines too, and at
@@ -1073,9 +1076,9 @@ stretch of coast. The rider's own order (nearest, A to Z) holds at any width.
 the list, under the zoom. A first visit is never asked where the rider is; a
 press asks the browser (again, even after a no, as the rider has now asked),
 turns the heart off and opens the map round them, or round them and the few
-nearest spots where none is within 30 km. Under the wide width, where there is
-no map beside the list, the filter sheet keeps the button until that layout has
-a map of its own. The map beside the list loses its Full chart button (the top
+nearest spots where none is within 30 km. Under the wide width the map has its
+own locate button over the dock since that layout got its map (2026-11-08),
+and the filter sheet has none. The map beside the list loses its Full chart button (the top
 bar has Chart) and the line at its foot.
 
 Every card shows four rows, whatever the map shows: Wind, Waves, Sky and Stars.
@@ -1101,9 +1104,9 @@ map's foot (src/MapDock.tsx), the same on the finder and the full chart. At
 most one is on, and pressing the one on turns it off. With none on, which is a
 first visit, the map is dark and plain and the shallows glow blue round the
 coast (the tidal depth); with a field on the glow hides. Wind is the coloured
-wind; Weather is the sky, the rain until the cloud is drawn; Waves is the wave
-height on the sea alone, and its chip is shown only once there are wave frames
-for the map to draw (force5/src/mapField.ts `offeredFields`). The rider's last
+wind; Weather is the sky with the rain over it (2026-11-08); Waves is the wave
+height on the sea alone, and its chip is shown only while there are wave
+frames for the map to draw (force5/src/mapField.ts `offeredFields`). The rider's last
 choice is kept, none too (`wingfoil.map.field.v1`); a rider who had Coloured
 wind on starts on Wind.
 
@@ -1155,7 +1158,7 @@ temperature and the rain while it rains. The arrow alone may be red, offshore.
 Every other spot is a bead: a dot of 4 to 5 px, off-white at low strength on
 the dark map (dark on the white one) with a thin dark halo, the same whatever
 the map shows, with a 44 px reach where the nearest bead is the one meant. A
-bead a pill stands on gives it the place, and so does a station's reading.
+bead a pill stands on gives it the place.
 No spot's name stands on the map beside the list; the map's own place names
 stay.
 
@@ -1171,4 +1174,63 @@ This replaces, in 2026-11-03, the pills in the stars' colours with the spots'
 names beside them; in 2026-11-06, the pill beside the list stepping down to a
 dot; in 2026-11-07, every listed spot as a pill, the muted dot and its card
 over the map; and in 2026-10-26, a press on any spot beside the list scrolling
-to its card. The full chart keeps its rings and its cards for now.
+to its card. The full chart's rings and names went the same day (the ruling
+after this).
+
+**2026-11-08 — The sky and the waves on the map.** The owner's design. The
+Weather field is the sky: grey for cloud and the sun's yellow for a clear sky,
+from ICON-EU's total cloud (`clct`) on the cloud's own ramp (`--color-sky-*`),
+black where the sun is down (`--map-sky-night`), worked out from the sun's
+height at each cell for the hour shown, twilight between, with the hour's rain
+over it in the rain's blues (force5/src/sky.ts). Its code is a chunk of its own,
+read only when the field is first on. ICON-EU reaches about three days: past
+that the field draws nothing, and the legend says so quietly ("Sky map to
+Wed") in place of its ramp, while the cards and pills keep their sky from the
+other models. The legend is the sky's ramp, night to cloud to clear, and the
+rain's beside it, a few words under each, evenly spaced and never touching.
+
+The Waves field is the wave height on the sea alone, from the Marine
+Institute's Irish Shelf SWAN, a frame every three hours, on the cards' own
+wave-height ramp (`--color-waves-*`), so a metre is the same colour on the map
+and on a card; land and the open sea past the model's grid are left clear. Its
+legend reads "Metres" with 0, 1, 2, 3 and 5+. Its chip stands only while the
+model's pointer lists frames, as the page finds once it is idle; the source is
+named in About the map, never in the dock. This replaces, in 2026-11-07, the
+Weather field as the rain alone and Waves as a chip to come.
+
+**2026-11-08 — Map | List under 1100 px, the best five as pills where no list
+stands beside the map, and no range ring.** The owner's design. Under 1100
+pixels the finder is the map or the list, the map first: the top bar, the map
+the screen's height, a Map | List switch (a small dark pill) over the dock, a
+locate button, and the dock at the foot, the day and its hours on one row and
+the three chips the screen's width under it, with no legend and no zoom
+buttons. The list is its one-row head and its cards, the switch and the chips
+staying where they stood on a solid strip; the hours go, the cards having them.
+With the heart off the list is the spots the map showed. "Use my location"
+left the filter sheet: the map's locate button asks.
+
+On the phone's map and on the full chart, where no list stands beside the map,
+the best five spots in view have pills (force5/src/pillBest.ts): the most
+stars at the hour, then the rider's favourites, then the map's own figure (the
+wind, the wave height, or how fine the sky is), at least about 90 px apart on
+a narrow screen and 140 on a wide one, never two saying the same side by side.
+They are chosen again only when the camera rests somewhere new or the field
+changes, never through a scrub, so they hold still while what they say moves.
+Every other spot is a bead, and no spot's name stands on the full chart either.
+A pill tapped turns light and stays a pill: on the phone a peek opens over the
+dock with the spot's wind, waves, weather, tide and stars, and a second tap
+opens the spot; on the chart a card stands beside the pill, a small pointer at
+it and never over it, as the scrub bar opens below (force5/src/cardPlace.ts).
+A finger's tap with two spots or more within about 22 px of it asks which, in
+"Spots here", rows of 44 px; a mouse means the spot it is on. A spot chosen in the search is flown to, given its light
+pill and chosen: beside the list its card is outlined and brought into view,
+on the phone its peek opens; it no longer opens the spot's page from the
+finder. The finder's map shows no station's tag: at the country's zoom they
+read as a second set of pills. The range ring goes as a style; with the loupe
+off there is no mark round the open spot but its light pill, and the loupe
+stays an on/off glyph in the rail.
+
+This replaces the list alone under 1100 pixels (2026-10-26), the List and Map
+buttons' going (2026-11-01, for the finder under 1100 pixels), the range ring
+and the spot's name beside its light on the chart (2026-11-02), and the
+station tags beside the list (2026-11-03).

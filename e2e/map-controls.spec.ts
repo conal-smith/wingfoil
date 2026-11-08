@@ -163,7 +163,8 @@ test("the map's information is one dialog over the dimmed chart, from the menu's
     "The blend & models",
     "Tidal depth",
     "Currents",
-    "Rain",
+    "Waves",
+    "Weather",
     "Satellite",
     "Sources & credits",
     "About",
@@ -171,9 +172,7 @@ test("the map's information is one dialog over the dimmed chart, from the menu's
   await expect(
     info.getByRole("tab", { name: "The map’s key" }),
   ).toHaveAttribute("aria-selected", "true");
-  await expect(
-    info.getByRole("heading", { name: /^The lights/ }),
-  ).toBeVisible();
+  await expect(info.getByRole("heading", { name: /^The spots/ })).toBeVisible();
   await info.getByRole("tab", { name: "Tidal depth" }).click();
   await expect(info.getByRole("tabpanel")).toContainText(
     "Deep enough, 1 m or more",
@@ -239,7 +238,12 @@ for (const width of [390, 1440]) {
     await finder.click();
     await expect(menu).toHaveAttribute("aria-expanded", "false");
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.locator("[data-spot-finder]")).toBeVisible();
+    // Under 1100 px the finder opens on its map, the list a switch away.
+    await expect(
+      width < 1100
+        ? page.locator('[data-narrow-foot="map"]')
+        : page.locator("[data-spot-finder]"),
+    ).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(width);

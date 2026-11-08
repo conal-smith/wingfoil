@@ -1,8 +1,9 @@
 # The ride rose
 
 When a spot or a tapped point is chosen and the layers' **Loupe** is on, the
-map lays a glass round it. Off, as by default, a range ring stands round it
-instead; a rider's choice is kept for their next visit. The glass is a ride rose for the
+map lays a glass round it. Off, as by default, nothing is laid round it but
+its light pill (the range ring went on 2026-11-08); a rider's choice is kept
+for their next visit. The glass is a ride rose for the
 hour the scrub bar has selected and for this rider: the headings they can hold
 from this beach, the no-go upwind, the slow water downwind, where they would
 drift, the wind
@@ -48,7 +49,6 @@ rose draws two plain reaches, the no-go and the drift. At an hour past the end
 of the map model's run, the rose still reads the hour the dock shows, as the
 lights do: it reads the place, not the map. While the loupe is on, the light's
 own small wedge is hidden, because the rose shows the same thing, larger.
-The range ring is unchanged.
 
 ## Size: a true distance
 
@@ -68,7 +68,7 @@ tack. A dashed ring marks half of it.
   of the boxes and the dock. That is at most 200 px: about zoom 13.3 on a
   desktop and 12.9 on a phone (`roseFitRadius`, `zoomFor`). A tapped point does
   not move the camera, so its rose is drawn at whatever size the zoom gives.
-- **Zooming.** The rose scales with the chart, like the range ring. Under 70 px
+- **Zooming.** The rose scales with the chart. Under 70 px
   (`ROSE_MIN_PX`) it would be too small to read. It is then held at 70 px, no
   longer to scale, and drawn as a compass with the needle, the red bezel and
   the box, with nothing inside and no distances written. Names appear from

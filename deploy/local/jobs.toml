@@ -19,16 +19,14 @@
 [[jobs]]
 id = "harmonie"
 models = ["harmonie"]
-args = ["--step", "1", "--daylight-only", "--always-hours", "5,19"]
-hours = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
-minutes = [35]              # Every hour while riders can use it. Met Éireann starts a run
-timeout_seconds = 3300      # every hour and lists it complete (+000 to +060, ~826 MB)
-                            # about 2 h 25 m later, so :35 takes the run from 2 h 35 m
-                            # before. --daylight-only skips a slot, downloading nothing,
-                            # outside 2.5 h before civil first light to civil last light
-                            # (force5/ingest/daylight.py): 13-14 runs a day in winter,
-                            # all 19 in June. 05:35 and 19:35 run whatever the light: the
-                            # morning commute's, and the evening's for planning tomorrow.
+args = ["--step", "1"]
+hours = [5, 8, 11, 16, 19, 23]
+minutes = [35]              # Six runs a day. Met Éireann starts a run every hour and lists
+timeout_seconds = 3300      # it complete (+000 to +060, ~826 MB) about 2 h 25 m later, so
+                            # :35 takes the run from 2 h 35 m before: the 03, 06, 09, 14,
+                            # 17 and 21 UTC runs. The hours are fixed, not gated on the
+                            # light: 05:35 is for the morning commute, 08, 11 and 16 keep
+                            # the day fresh, 19 is for planning tomorrow and 23 is the last.
 
 [[jobs]]
 id = "icon-eu"
@@ -201,12 +199,9 @@ timeout_seconds = 600       # then, and the wave blend from whatever the wave jo
 [[jobs]]
 id = "blend-after-harmonie"
 models = ["blend"]
-args = ["--daylight-only", "--always-hours", "5,19"]
-hours = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
-minutes = [45]              # Ten minutes after each HARMONIE slot, under the same gate,
-                            # so the map's stars take the new run now rather than at the
-                            # next :05. A HARMONIE run landing just before last light is
-                            # blended at the next :05 instead.
+hours = [5, 8, 11, 16, 19, 23]
+minutes = [45]              # Ten minutes after each HARMONIE slot, so the map's stars take
+                            # the new run now rather than at the next :05.
 timeout_seconds = 600
 
 [[jobs]]

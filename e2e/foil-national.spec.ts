@@ -157,9 +157,9 @@ async function open(page: Page, asked: string[]) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   // The chart at the zoom these photographs were framed for. The loupe flies
   // a chosen spot in to fit its half-mile rose, where the frame would hold
-  // only the flat by the spot; the range ring keeps the camera where it was.
+  // only the flat by the spot; with no mark the camera stays where it was.
   await page.addInitScript(() =>
-    localStorage.setItem("wingfoil.map.focus.v1", "ring"),
+    localStorage.setItem("wingfoil.map.focus.v1", "off"),
   );
   // The layer is on by default: nothing stored.
   await page.goto("/?spot=rusheen");

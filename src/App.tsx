@@ -16,7 +16,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { CloudOff, LocateFixed, X } from "lucide-react";
+import { CloudOff, List, LocateFixed, Map as MapIcon, X } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Empty } from "../ui/Empty";
 import { SpotSearch } from "../ui/SpotSearch";
@@ -53,9 +53,17 @@ import { MapInfoOpen, type InfoSection } from "./mapInfoContext";
 import { foilArchiveUrl, useFoilDepth } from "./useFoilDepth";
 import { useCurrents } from "./useCurrents";
 import { useRain } from "./useRain";
-import type { LightState } from "../force5/src/lights";
-import { pillContent, type PillReading } from "../force5/src/pillContent";
-import type { Readings } from "./finder/useReadings";
+import { useWaves, useWavesPublished } from "./useWaves";
+import type { LightState, PillMode } from "../force5/src/lights";
+import { PHONE_GAP, WIDE_GAP } from "../force5/src/pillBest";
+import { placeCard, type CardPlace } from "../force5/src/cardPlace";
+import SpotPeek from "./SpotPeek";
+import {
+  pillContent,
+  pillFigure,
+  type PillReading,
+} from "../force5/src/pillContent";
+import { useReadings, type Readings } from "./finder/useReadings";
 import { speedWords } from "../force5/src/units";
 import { rideWedge } from "../force5/src/rideWedge";
 import { parseWindLayers, type WindLayers } from "../force5/src/windLayer";
@@ -69,7 +77,6 @@ import {
   parseMapField,
   shownField,
   windWith,
-  type FieldSources,
   type MapField,
 } from "../force5/src/mapField";
 import { tourOffered, tourSeen } from "./tourOffer";
@@ -294,13 +301,6 @@ function pillReading(
 }
 /** Room for the chart beside the spot finder's list, as the home page has it. */
 const SPLIT = "(min-width: 1100px)";
-/**
- * What draws each of the map's fields (force5/src/mapField.ts). The wave
- * height has no frames for the map yet, so Waves has no chip; once they are
- * published, this says so and the chip is there.
- */
-const FIELD_SOURCES: FieldSources = { waves: false };
-const OFFERED = offeredFields(FIELD_SOURCES);
 /** How long the chart takes to open out from beside the list, or back. */
 const OPEN_MS = 420;
 
@@ -413,6 +413,25 @@ export default function App() {
   const splitRef = useRef(split);
   splitRef.current = split;
   /**
+   * Under that width the finder is the map or the list, a switch between
+   * them over the dock: the map first, every time the page opens.
+   */
+  const [narrowList, setNarrowList] = useState(false);
+  /**
+   * The spot tapped on the phone's map: its pill light, its peek open above
+   * the dock; a second tap opens the spot. Also the spot found by a search
+   * on the finder, whose pill is light and whose card is outlined.
+   */
+  const [peekId, setPeekId] = useState<string | null>(null);
+  /** A crowded tap's spots, offered by name ("Spots here"), or null. */
+  const [crowd, setCrowd] = useState<readonly Spot[] | null>(null);
+  /** The finder's day, stepped from the phone's dock as well as the list's head. */
+  const [finderDay, setFinderDay] = useState<string | null>(null);
+  const [finderDates, setFinderDates] = useState<{
+    dates: readonly string[];
+    day: string;
+  } | null>(null);
+  /**
    * Whether the map is made. Beside the list, once the list is drawn and the
    * page has a moment; under that width, the first time the chart is opened.
    * Once made it is kept.
@@ -424,14 +443,14 @@ export default function App() {
   useEffect(() => {
     if (mapWanted) return;
     if (page === "chart") return setMapWanted(true);
-    if (!split || !finderDrawn) return;
+    if (!finderDrawn) return;
     const idle =
       window.requestIdleCallback ??
       ((f: () => void) => window.setTimeout(f, 300));
     const cancel = window.cancelIdleCallback ?? window.clearTimeout;
     const handle = idle(() => setMapWanted(true), { timeout: 1500 });
     return () => cancel(handle);
-  }, [mapWanted, page, split, finderDrawn]);
+  }, [mapWanted, page, finderDrawn]);
   /** The places the spot finder lists, which it needs rated first. */
   const [finderWant, setFinderWant] = useState<readonly string[]>([]);
   /**
@@ -525,7 +544,14 @@ export default function App() {
       parseWindLayers(store.get(WIND_KEY), store.get(OLD_WIND_KEY)),
     ),
   );
-  const fieldShown = shownField(field, OFFERED);
+  // Waves has a chip only once the wave model's pointer lists frames for the
+  // map, asked once the page is idle (src/useWaves.ts).
+  const wavesPublished = useWavesPublished();
+  const offered = useMemo(
+    () => offeredFields({ waves: wavesPublished }),
+    [wavesPublished],
+  );
+  const fieldShown = shownField(field, offered);
   const chooseField = (next: MapField) => {
     setField(next);
     store.set(FIELD_KEY, next);
@@ -576,7 +602,7 @@ export default function App() {
     setWind(next);
     store.set(WIND_KEY, JSON.stringify(next));
   };
-  /** The mark round the chosen spot: the range ring unless the rider chose otherwise. */
+  /** The mark round the chosen spot: the loupe, if the rider turned it on (a range ring kept from before 2026-11-08 is none). */
   const [focusStyle, setFocusStyle] = useState<FocusStyle>(() => {
     const saved = store.get(FOCUS_KEY);
     return isFocusStyle(saved) ? saved : LAYER_DEFAULTS.focusStyle;
@@ -1206,11 +1232,12 @@ export default function App() {
   const warnings = useWarnings();
   /**
    * The wind measured at the weather stations and buoys: the Live wind
-   * layer's, always on the Spot finder's plain map and on the full chart
-   * when the rider turns it on in Layers; and the readings beside a spot's
-   * forecast in the scrub bar and on the finder's cards, whatever the map.
+   * layer's, on the full chart when the rider turns it on in Layers; and the
+   * readings beside a spot's forecast in the scrub bar and on the finder's
+   * cards, whatever the map. Never on the finder's map: at the country's
+   * zoom its tags read as a second set of pills.
    */
-  const liveOn = page === "chart" ? layers.live : true;
+  const liveOn = page === "chart" && layers.live;
   const windObs = useWindObs();
   const readings = useMemo(
     () =>
@@ -1253,9 +1280,12 @@ export default function App() {
   const [finderReadings, setFinderReadings] = useState(NO_READINGS);
   const lights = useMemo(() => {
     const out = new Map<string, LightState>();
-    // Beside the list, a card in view is a pill and every other spot a bead.
+    // Beside the list, a card in view is a pill and every other spot a bead;
+    // elsewhere, the best few in view are pills (force5/src/lights.ts).
     const seen =
-      page === "chart" ? null : new Map(cardsSeen.map((id, i) => [id, i]));
+      page === "chart" || !split
+        ? null
+        : new Map(cardsSeen.map((id, i) => [id, i]));
     // The riding wedge is the open spot's alone: on every light at once it
     // buried the chart, and it is a reading of one place, not an overview.
     // Under the loupe it goes: the rose is the same thing, bigger.
@@ -1264,6 +1294,7 @@ export default function App() {
     for (const spot of spots) {
       const row = hours.get(spot.id);
       const hour = row?.[lightAt];
+      const reading = pillReading(hour, finderReadings.get(spot.id), lightAt);
       out.set(spot.id, {
         pending: !row,
         stars: hour?.rating ? hour.rating.stars : null,
@@ -1283,15 +1314,10 @@ export default function App() {
                 spot.facing ?? null,
               )
             : null,
-        ...(seen && {
-          order: seen.get(spot.id) ?? null,
-          // A bead says the same once lit: what is known of it.
-          pill: pillContent(
-            fieldShown,
-            pillReading(hour, finderReadings.get(spot.id), lightAt),
-            prefs.units,
-          ),
-        }),
+        order: seen ? (seen.get(spot.id) ?? null) : null,
+        // A bead says the same once lit: what is known of it.
+        pill: pillContent(fieldShown, reading, prefs.units),
+        figure: pillFigure(fieldShown, reading),
       });
     }
     return out;
@@ -1301,6 +1327,7 @@ export default function App() {
     version,
     lightAt,
     page,
+    split,
     cardsSeen,
     finderReadings,
     fieldShown,
@@ -1360,6 +1387,24 @@ export default function App() {
     mapAt,
     mapIndex > 0 ? (strip[mapIndex - 1]?.time ?? null) : null,
   );
+  // The Waves field at the hour the map shows: the nearest three-hourly frame.
+  const waves = useWaves(
+    fieldShown === "waves",
+    Number.isFinite(mapAt) ? mapAt : null,
+  );
+  const wavesLine = waves.view
+    ? `Shown: the waves at ${dayShort(waves.view.time)} ${clock(waves.view.time)}.`
+    : waves.note;
+  // Past the frames' reach the field draws nothing, and the legend says how
+  // far it goes, quietly ("Sky map to Wed").
+  const past = (reach: number | null) =>
+    reach !== null && Number.isFinite(mapAt) && mapAt > reach;
+  const legendNote =
+    fieldShown === "weather" && !rain.view && past(rain.reach)
+      ? `Sky map to ${dayShort(rain.reach!)}`
+      : fieldShown === "waves" && !waves.view && past(waves.reach)
+        ? `Wave map to ${dayShort(waves.reach!)}`
+        : null;
   const rainLine = rain.view
     ? `Shown: the rain ${dayShort(rain.view.from)} ${clock(rain.view.from)} to ${clock(rain.view.to)}${
         rain.view.to - rain.view.from > 3600000 ? ", per hour" : ""
@@ -1614,7 +1659,13 @@ export default function App() {
    * scrub bar there.
    */
   const tapChart = (at: TappedAt) => {
-    if (pageRef.current !== "chart") return;
+    if (pageRef.current !== "chart") {
+      // On the finder's map a tap away from the spots shuts the peek.
+      setPeekId(null);
+      setCrowd(null);
+      return;
+    }
+    setCrowd(null);
     if (focusId || point || picked) closeDock();
     else pickPoint(at);
   };
@@ -1942,7 +1993,7 @@ export default function App() {
   };
   const locateSeen = useRef(0);
   useEffect(() => {
-    if (!mapReady || page !== "finder" || !split || !finderScope) return;
+    if (!mapReady || page !== "finder" || !finderScope) return;
     const near = finderScope === "near";
     // The locate button turns the heart off: the fit waits for the list.
     if (!near && locatePresses !== locateSeen.current) return;
@@ -1953,7 +2004,7 @@ export default function App() {
     fitted.current = fitKey;
     if (!near || riderAt || !listFollows) fitList(first ? 0 : 600);
     setListFollows(true);
-  }, [mapReady, page, split, fitKey, listedSpots]);
+  }, [mapReady, page, fitKey, listedSpots]);
   /**
    * What Nearby lists: the chart's view beside the list, once it has been
    * fitted, and held under the full chart, which moves it nothing: the list
@@ -2030,6 +2081,28 @@ export default function App() {
       block: "nearest",
       behavior: reducedMotion ? "auto" : "smooth",
     });
+  };
+  /**
+   * A light pressed on the finder's map under the width for the list beside
+   * it: the first tap turns its pill light and opens its peek above the
+   * dock, the second opens the spot.
+   */
+  const pressOnPhoneMap = (spot: Spot) => {
+    setCrowd(null);
+    if (peekId === spot.id) return window.location.assign(lightLink(spot));
+    setPeekId(spot.id);
+  };
+  const pressLight = (spot: Spot, bead: boolean) => {
+    setCrowd(null);
+    if (pageRef.current === "chart") return openLight(spot);
+    if (splitRef.current) return pressBesideList(spot, bead);
+    pressOnPhoneMap(spot);
+  };
+  /** A spot chosen in "Spots here": as if its pill had been tapped once. */
+  const chooseFromCrowd = (spot: Spot) => {
+    setCrowd(null);
+    if (pageRef.current === "chart") openLight(spot);
+    else setPeekId(spot.id);
   };
   // The wind's particles hold still while the list scrolls beside them, so
   // the page's frames are the list's, and run again once it stops.
@@ -2496,13 +2569,52 @@ export default function App() {
     if (!onChart && listScroll.current) window.scrollTo(0, listScroll.current);
   }, [onChart]);
   /**
-   * A spot picked in the top bar's search: on the chart it is flown to and
-   * opened there, as a light pressed is; from the list, its own page.
+   * A spot picked in the top bar's search: the map flies to it and it is
+   * chosen there, its pill light. On the chart as a light pressed is; on the
+   * finder beside the list its card is outlined and brought into view; on a
+   * phone its peek opens over the map.
    */
   const pickFound = (spot: Spot) => {
-    if (pageRef.current === "chart") selectSpot(spot);
-    else window.location.assign(spotHref(spot.id));
+    setCrowd(null);
+    if (pageRef.current === "chart") return selectSpot(spot);
+    setNarrowList(false);
+    setPeekId(spot.id);
+    controls.current?.flyTo(spot);
   };
+  // The found spot's card beside the list, once the list has it: outlined
+  // and brought into view. The list follows the map, so it may take the
+  // flight's end for the card to be there.
+  useEffect(() => {
+    if (!peekId || !split || page !== "finder") return;
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      const card = cardOf(peekId);
+      if (card) {
+        document
+          .querySelectorAll("[data-spot-card][data-found]")
+          .forEach((el) => el.removeAttribute("data-found"));
+        card.setAttribute("data-found", "");
+        card.scrollIntoView({
+          block: "nearest",
+          behavior: reducedMotion ? "auto" : "smooth",
+        });
+      }
+      if (card || ++tries > 20) window.clearInterval(timer);
+    }, 150);
+    return () => window.clearInterval(timer);
+  }, [peekId, split, page]);
+  // The peek and the found spot let go where they no longer mean anything.
+  // A window narrowed from the list beside the map stays on the list.
+  const splitWas = useRef(split);
+  useEffect(() => {
+    if (splitWas.current && !split) setNarrowList(true);
+    splitWas.current = split;
+    setPeekId(null);
+    setCrowd(null);
+    document
+      .querySelectorAll("[data-spot-card][data-found]")
+      .forEach((el) => el.removeAttribute("data-found"));
+  }, [page, split]);
   /** A found spot's wind and stars at the hour the map shows, where rated. */
   const describeFound = (spot: Spot) => {
     const hour = hourAt(spot.id);
@@ -2557,10 +2669,23 @@ export default function App() {
       ...layers,
       depths: false,
       currents: false,
-      // The stations' and buoys' own wind, beside the spots' forecast.
-      live: true,
+      // No station's tag: the pills are the spots'.
+      live: false,
     }),
     [layers],
+  );
+  // Which spots are pills: beside the list the cards in view; on the phone's
+  // map and the full chart the best few in view, closer on a narrow screen.
+  const pills = useMemo<PillMode>(
+    () =>
+      page === "finder" && split
+        ? { kind: "cards" }
+        : {
+            kind: "best",
+            gap: split ? WIDE_GAP : PHONE_GAP,
+            field: fieldShown,
+          },
+    [page, split, fieldShown],
   );
   // The wind beside the list: the Wind field's colour, and no particles.
   const plainWind = useMemo(() => windWith(fieldShown, false), [fieldShown]);
@@ -2569,18 +2694,192 @@ export default function App() {
     <MapDock
       onRoom={setDockRoom}
       field={fieldShown}
-      offered={OFFERED}
+      offered={offered}
+      note={legendNote}
       onField={chooseField}
-      phone={phone}
+      phone={phone || !split}
       where={hours ? "finder" : "chart"}
     >
       {hours && finderShown !== null && (
-        <HourBar time={finderShown} now={clockNow} onTime={setFinderPicked} />
+        <HourBar
+          time={finderShown}
+          now={clockNow}
+          onTime={setFinderPicked}
+          onDay={split ? undefined : (dayStep ?? undefined)}
+        />
       )}
     </MapDock>
   );
-  const mode = onChart ? "full" : split && panelBox ? "panel" : "hidden";
+  /** The phone's dock steps the finder's day as the list's head does. */
+  const dayStep = finderDates && {
+    back: finderDates.dates.indexOf(finderDates.day) > 0,
+    on:
+      finderDates.dates.indexOf(finderDates.day) < finderDates.dates.length - 1,
+    step: (by: -1 | 1) => {
+      const { dates, day } = finderDates;
+      const to = dates[dates.indexOf(day) + by];
+      if (!to) return;
+      setFinderDay(to);
+      setFinderPicked(null);
+    },
+  };
+  /** Under the width for the list beside the map: the map, or the list. */
+  const narrow = !onChart && !split;
+  const listShown = !onChart && (split || narrowList);
+  const mode = onChart
+    ? "full"
+    : split
+      ? panelBox
+        ? "panel"
+        : "hidden"
+      : narrowList
+        ? "hidden"
+        : "map";
   const skip = !onChart ? SKIP.list : dockOpen ? SKIP.dock : SKIP.search;
+  /**
+   * The full chart's card for the spot open on it, beside its light pill,
+   * a small pointer at it (force5/src/cardPlace.ts). Placed where the camera
+   * rests, out of sight through a move.
+   */
+  const chartCard = useRef<HTMLDivElement>(null);
+  const cardSpot =
+    onChart && !picked && point && focusId === point.id ? point : null;
+  const [cardAt, setCardAt] = useState<CardPlace | null>(null);
+  // The spot a peek or a card is open on, read for itself where the list
+  // has not read it (a spot in view past the list's thirty, or on the chart).
+  const peekTarget =
+    cardSpot ?? (!onChart && !split && peekId ? spotById.get(peekId) : null);
+  const peekSpots = useMemo(
+    () => (peekTarget ? [peekTarget] : []),
+    [peekTarget?.id],
+  );
+  const peekReadings = useReadings(peekSpots, axis);
+  const cardFoot = Math.max(barShown ? dockHeight : 0, dockRoom);
+  useLayoutEffect(() => {
+    const map = controls.current?.map;
+    if (!cardSpot || !map || !mapReady) return setCardAt(null);
+    const place = () => {
+      const card = chartCard.current;
+      const box = map.getContainer();
+      const pill = box.querySelector(
+        `.spot-marker[data-spot-id="${CSS.escape(cardSpot.id)}"] .lt-pill`,
+      );
+      const r = pill?.getBoundingClientRect();
+      if (!card || !r?.width) return setCardAt(null);
+      const f = box.getBoundingClientRect();
+      const local = (q: DOMRect) => ({
+        l: q.left - f.left,
+        t: q.top - f.top,
+        r: q.right - f.left,
+        b: q.bottom - f.top,
+      });
+      const walls = [
+        ...document.querySelectorAll(
+          ".map-panel [data-map-wall], .map-panel .chart-box, .layer-rail",
+        ),
+      ]
+        .map((el) => el.getBoundingClientRect())
+        .filter((q) => q.width && q.height)
+        .map(local);
+      setCardAt(
+        placeCard(
+          local(r),
+          card.offsetWidth,
+          card.offsetHeight,
+          {
+            l: 10,
+            t: 10,
+            r: box.clientWidth - 10,
+            b: box.clientHeight - cardFoot - 10,
+          },
+          walls,
+          cardSpot.facing ?? null,
+        ),
+      );
+    };
+    const hide = () => setCardAt(null);
+    // Once the pill stands where the camera rests, and its look is light.
+    const soon = window.setTimeout(place, 80);
+    map.on("movestart", hide);
+    map.on("moveend", place);
+    return () => {
+      window.clearTimeout(soon);
+      map.off("movestart", hide);
+      map.off("moveend", place);
+    };
+  }, [cardSpot?.id, mapReady, cardFoot]);
+  /** A spot as its peek or its card shows it, at the hour the map is at. */
+  const peekOf = (
+    spot: Spot,
+    kind: "peek" | "card",
+    onClose: () => void,
+    place?: CardPlace | null,
+  ) => {
+    const hour = hours.get(spot.id)?.[lightAt];
+    const read = finderReadings.get(spot.id) ?? peekReadings.get(spot.id);
+    return (
+      <SpotPeek
+        ref={kind === "card" ? chartCard : undefined}
+        spot={spot}
+        hour={hour}
+        reading={pillReading(hour, read, lightAt)}
+        tides={read?.tides ?? []}
+        time={lightColumn ? lightColumn.time : null}
+        now={clockNow}
+        units={prefs.units}
+        kind={kind}
+        href={lightLink(spot)}
+        onClose={onClose}
+        side={place?.side}
+        style={
+          kind === "card"
+            ? ({
+                transform: place
+                  ? `translate(${Math.round(place.box.l)}px, ${Math.round(place.box.t)}px)`
+                  : undefined,
+                visibility: place ? undefined : "hidden",
+                "--p": place ? `${Math.round(place.along)}px` : undefined,
+              } as React.CSSProperties)
+            : undefined
+        }
+      />
+    );
+  };
+  const peekSpot = narrow && peekId ? spotById.get(peekId) : undefined;
+  /** "Spots here": a crowded tap's spots by name, 44 px a row. */
+  const chooser = crowd && (
+    <div
+      className="spots-here"
+      role="dialog"
+      aria-label="Spots here"
+      data-spots-here
+    >
+      <div className="sh-head">
+        <p>Spots here</p>
+        <Button
+          variant="quiet"
+          size="sm"
+          icon
+          aria-label="Close"
+          onClick={() => setCrowd(null)}
+        >
+          <X size={16} strokeWidth={1.75} aria-hidden="true" />
+        </Button>
+      </div>
+      {crowd.slice(0, 6).map((spot) => (
+        <Button
+          key={spot.id}
+          variant="quiet"
+          className="sh-row"
+          onClick={() => chooseFromCrowd(spot)}
+          data-spots-here-row={spot.id}
+        >
+          <b>{spot.name}</b>
+          {spot.county && <span>Co. {spot.county}</span>}
+        </Button>
+      ))}
+    </div>
+  );
   const skipTo = (event: React.MouseEvent) => {
     event.preventDefault();
     const to = document.querySelector<HTMLElement>(skip.to);
@@ -2594,6 +2893,7 @@ export default function App() {
       className={`app-shell${phone ? " is-phone" : ""}${focusId ? " is-focus" : ""}`}
       data-view={page}
       data-chart={mode}
+      data-narrow={narrow ? (narrowList ? "list" : "map") : undefined}
       style={
         {
           ...(panelBox && {
@@ -2652,9 +2952,9 @@ export default function App() {
           <div
             className="finder-under"
             ref={finderUnder}
-            data-shown={!onChart || revealing || undefined}
-            inert={onChart || undefined}
-            aria-hidden={onChart || undefined}
+            data-shown={listShown || revealing || undefined}
+            inert={!listShown || undefined}
+            aria-hidden={!listShown || undefined}
           >
             {finderSeen.current && (
               <Suspense fallback={null}>
@@ -2672,6 +2972,10 @@ export default function App() {
                   phone={phone}
                   onWant={onWant}
                   beside={split}
+                  mapped={!split}
+                  chosenDay={finderDay}
+                  onChosenDay={setFinderDay}
+                  onDays={setFinderDates}
                   view={panelView}
                   onHover={hoverCard}
                   onInView={setCardsSeen}
@@ -2703,7 +3007,7 @@ export default function App() {
                 onChart ? "Wind chart" : "The chart, at the spots on the list"
               }
             >
-              {!onChart && (
+              {!onChart && split && (
                 <div className="panel-tools">
                   <div
                     className="zbox chart-box"
@@ -2790,7 +3094,9 @@ export default function App() {
                     lights={lights}
                     named={onChart ? named : NO_NAMES}
                     lightLabel={lightLabel}
-                    selectedId={onChart && !picked ? (point?.id ?? null) : null}
+                    selectedId={
+                      onChart ? (picked ? null : (point?.id ?? null)) : peekId
+                    }
                     focus={
                       onChart && focusAt
                         ? { lon: focusAt.lon, lat: focusAt.lat }
@@ -2823,17 +3129,21 @@ export default function App() {
                     foil={foilViews}
                     currents={onChart ? currents.features : null}
                     rain={rain.view}
+                    waves={waves.view}
                     satellite={onChart ? satellite.image : null}
                     reducedMotion={reducedMotion}
                     // Clear of the scrub bar and of the map's dock over it,
                     // so a fitted spot never lands under either.
-                    bottomInset={Math.max(barShown ? dockHeight : 0, dockRoom)}
-                    phone={phone}
-                    onSelect={(spot, bead) =>
-                      pageRef.current === "chart"
-                        ? openLight(spot)
-                        : pressBesideList(spot, bead)
+                    // Under the width for the list, over the switch above it too.
+                    bottomInset={
+                      narrow
+                        ? dockRoom + 48
+                        : Math.max(barShown ? dockHeight : 0, dockRoom)
                     }
+                    phone={phone}
+                    onSelect={pressLight}
+                    onCrowd={setCrowd}
+                    pills={pills}
                     onHoverSpot={hoverLight}
                     onOpenPage={(place) =>
                       window.location.assign(
@@ -2853,6 +3163,10 @@ export default function App() {
                   />
                 </Suspense>
               )}
+              {onChart &&
+                cardSpot &&
+                peekOf(cardSpot, "card", closeDock, cardAt)}
+              {onChart && chooser}
               {onChart && (status || (loading && frame)) && (
                 <div
                   className={`frame-status chart-box${modelError || frameError ? " is-error" : ""}`}
@@ -2989,6 +3303,73 @@ export default function App() {
               )}
             </section>
           </main>
+          {narrow && (
+            <div
+              className="narrow-foot"
+              data-narrow-foot={narrowList ? "list" : "map"}
+              style={{ "--nf-room": `${dockRoom}px` } as React.CSSProperties}
+            >
+              {!narrowList && "geolocation" in navigator && (
+                <div className="zbox chart-box nf-locate" data-map-wall>
+                  <Button
+                    variant="quiet"
+                    size="sm"
+                    icon
+                    aria-label="Use my location"
+                    title="Use my location"
+                    onClick={() => setLocatePresses((n) => n + 1)}
+                    data-locate
+                  >
+                    <LocateFixed
+                      size={16}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    />
+                  </Button>
+                </div>
+              )}
+              {!narrowList &&
+                peekSpot &&
+                peekOf(peekSpot, "peek", () => setPeekId(null))}
+              {!narrowList && chooser}
+              <div
+                className="nf-switch"
+                role="group"
+                aria-label="Map or list"
+                data-map-wall
+                data-view-switch
+              >
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  pressed={!narrowList}
+                  onClick={() => {
+                    setNarrowList(false);
+                    window.scrollTo(0, 0);
+                  }}
+                  data-view="map"
+                >
+                  <MapIcon size={14} strokeWidth={1.75} aria-hidden="true" />
+                  Map
+                </Button>
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  pressed={narrowList}
+                  onClick={() => {
+                    setNarrowList(true);
+                    setPeekId(null);
+                    setCrowd(null);
+                  }}
+                  data-view="list"
+                >
+                  <List size={14} strokeWidth={1.75} aria-hidden="true" />
+                  List
+                </Button>
+              </div>
+              {mapDock(!narrowList)}
+            </div>
+          )}
         </>
       )}
       {syncAccount && (
@@ -3093,6 +3474,7 @@ export default function App() {
               floor: foilState.manifest?.floorMetres,
             }}
             rain={{ on: layers.rain, line: rainLine }}
+            waves={{ on: fieldShown === "waves", line: wavesLine }}
             sources={sources}
             satellite={satellite.note}
             satelliteError={satellite.error}

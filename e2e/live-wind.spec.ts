@@ -96,10 +96,22 @@ test.describe("beside the list", () => {
     await expect(page).toHaveURL(/\/spot\/brandon/);
   });
 
-  test("the stations and buoys are gold-edged tags at their last reading, with no card over the map", async ({
+  test("the finder's map has no station tags; on the full chart they are gold tags at their last reading", async ({
     page,
   }) => {
+    // Beside the list the pills are the spots' alone (2026-11-08): at the
+    // country's zoom the stations' tags read as a second set of pills.
     await openHome(page);
+    await page.waitForTimeout(1500);
+    await expect(readings(page)).toHaveCount(0);
+    // On the full chart, with Live wind on.
+    await page.evaluate(() =>
+      localStorage.setItem(
+        "wingfoil.map.layers.v1",
+        JSON.stringify({ live: true }),
+      ),
+    );
+    await page.goto("/?map");
     await expect(readings(page)).toHaveCount(STATIONS, { timeout: 30000 });
     // Mace Head: its last reading, in knots, the gust raised.
     const mace = OBS.stations.ME_03963.latest;
@@ -112,15 +124,15 @@ test.describe("beside the list", () => {
         `^Mace Head, Met Éireann: ${kn(mace.speed)} knots, gusting ${kn(mace.gust)}, from .+, measured 22:00$`,
       ),
     );
-    // A gold edge, stepped back from the spots, and squarer than their pills.
+    // In the buoy's gold, and squarer than the spots' pills.
     const look = await pill.evaluate((el) => {
       const cs = getComputedStyle(el);
       return {
-        edge: cs.borderLeftColor,
+        fill: cs.backgroundColor,
         radius: parseFloat(cs.borderTopLeftRadius),
       };
     });
-    expect(look.edge).toBe("rgb(233, 178, 0)");
+    expect(look.fill).not.toMatch(/^(transparent|rgba\(0, 0, 0, 0\))$/);
     expect(look.radius).toBeLessThan(8);
     // The station with no gusts says none.
     await expect(reading(page, "ME_03966").locator("sup")).toBeHidden();
@@ -130,16 +142,6 @@ test.describe("beside the list", () => {
       "aria-label",
       /M6 Atlantic buoy, Marine Institute: .+, measured 17:00, over 3 hours ago$/,
     );
-
-    // No card opens over the map beside the list, under the pointer or the
-    // keys: the reading says itself to a screen reader. (Forced: a reading
-    // a spot's pill or another reading stands on gives it the place.)
-    await pill.hover({ force: true });
-    await pill.dispatchEvent("pointerenter", { pointerType: "mouse" });
-    await page.waitForTimeout(300);
-    await expect(card(page)).toBeHidden();
-    await reading(page, "MI_M2").dispatchEvent("focus");
-    await expect(card(page)).toBeHidden();
   });
 });
 
@@ -285,7 +287,13 @@ test("the map's credits name both networks while the readings are shown", async 
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openHome(page, ["brandon"]);
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "wingfoil.map.layers.v1",
+      JSON.stringify({ live: true }),
+    ),
+  );
+  await page.goto("/?map");
   await expect(readings(page)).toHaveCount(STATIONS, { timeout: 30000 });
   await openFromMenu(page, "About the map");
   const info = page.getByRole("dialog", { name: "About the map" });

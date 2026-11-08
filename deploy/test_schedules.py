@@ -182,15 +182,21 @@ class QueueTest(unittest.TestCase):
 
 
 class DaylightGateTest(unittest.TestCase):
-    """The daylight-gated jobs, as jobs.toml writes them."""
+    """HARMONIE's six fixed hours, and the description of a daylight-gated job."""
+
+    def test_harmonie_runs_at_six_fixed_hours(self):
+        jobs = {job["id"]: job for job in schedules.load()}
+        self.assertEqual(jobs["harmonie"]["hours"], [5, 8, 11, 16, 19, 23])
+        self.assertEqual(jobs["harmonie"]["minutes"], [35])
+        for job_id in ("harmonie", "blend-after-harmonie"):
+            self.assertNotIn("--daylight-only", jobs[job_id]["args"])
+            self.assertNotIn("--always-hours", jobs[job_id]["args"])
 
     def test_the_blend_after_harmonie_follows_harmonie(self):
         jobs = {job["id"]: job for job in schedules.load()}
         harmonie, blend = jobs["harmonie"], jobs["blend-after-harmonie"]
         self.assertEqual(blend["hours"], harmonie["hours"])
         self.assertEqual([minute - 10 for minute in blend["minutes"]], harmonie["minutes"])
-        gate = harmonie["args"][harmonie["args"].index("--daylight-only"):]
-        self.assertEqual(blend["args"], gate)
 
     def test_the_always_hours_are_slots_of_the_job(self):
         for job in schedules.load():
@@ -203,8 +209,10 @@ class DaylightGateTest(unittest.TestCase):
 
     def test_the_description_says_so(self):
         home = {entry["id"]: entry for entry in schedules.home_compute(schedules.load())["jobs"]}
-        self.assertTrue(home["harmonie"]["description"].endswith(
-            ", in daylight only (the 05 and 19 UTC slots whatever the light)"))
+        self.assertNotIn("daylight", home["harmonie"]["description"])
+        self.assertEqual(
+            schedules.gate_text(["--daylight-only", "--always-hours", "5,19"]),
+            ", in daylight only (the 05 and 19 UTC slots whatever the light)")
         self.assertEqual(home["icon-eu"]["description"], "ICON-EU wind (DWD)")
 
 

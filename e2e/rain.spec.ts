@@ -13,15 +13,16 @@ import {
 import { sampleStrip } from "./columns";
 
 /**
- * Rain, hourly: the Weather field over the chart, the rain until the sky is
- * drawn under it (off at first, and then nothing of it is read, neither its
- * frames nor its code), following the scrub bar's hour. A spot's rain hour by hour is on its page. The e2e site's ICON-EU
+ * The Weather field over the chart: the sky, grey cloud and yellow clear sky,
+ * black where the sun is down, with the hour's rain over it (off at first,
+ * and then nothing of it is read, neither its frames nor its code),
+ * following the scrub bar's hour. A spot's rain hour by hour is on its page. The e2e site's ICON-EU
  * weather is an hourly run from HARMONIE's sample day for three days
  * (scripts/sample-weather.mjs), with a frame of rain an hour.
  */
 
 const FRAMES = /\/weather\/icon-eu-weather-[^/]+\/frames\/\d{3}\.json$/;
-const CODE = /rain(Data|Layer)[^/]*\.(js|ts)$/;
+const CODE = /(rainData|skyLayer|sky)[^/]*\.(js|ts)$/;
 
 function watch(page: Page) {
   const asked: string[] = [];
@@ -67,10 +68,11 @@ test("turned on, it draws the hour shown under the chart's ink, and follows the 
   await page.goto("/?spot=brandon");
   await barReady(page);
   await setField(page, "Weather", true);
-  // The legend at the dock's right is the rain's ramp now.
-  await expect(
-    mapDock(page).locator('[data-map-legend="weather"]'),
-  ).toBeVisible();
+  // The legend at the dock's right is the sky's ramp and the rain's now.
+  const legend = mapDock(page).locator('[data-map-legend="weather"]');
+  await expect(legend).toBeVisible();
+  await expect(legend).toContainText("Sky");
+  await expect(legend).toContainText("Rain");
 
   // The hour shown, read from its own frame: one hour's rain, under the relief.
   await expect(map(page)).toHaveAttribute(
@@ -81,6 +83,8 @@ test("turned on, it draws the hour shown under the chart's ink, and follows the 
     },
   );
   await expect(map(page)).toHaveAttribute("data-rain-under", "relief");
+  // The e2e site's frames carry the cloud: the sky is drawn, the rain over it.
+  await expect(map(page)).toHaveAttribute("data-sky", "cloud");
   const to = Date.parse((await map(page).getAttribute("data-rain-to"))!);
   const from = Date.parse((await map(page).getAttribute("data-rain-from"))!);
   expect(to - from).toBe(3600000);
@@ -115,7 +119,7 @@ test("its part of About the map says what the hour shows", async ({ page }) => {
     timeout: 30000,
   });
   await openFromMenu(page, "About the map");
-  await page.getByRole("tab", { name: "Rain" }).click();
+  await page.getByRole("tab", { name: "Weather" }).click();
   const part = page.locator("#map-info-rain");
   await expect(part).toBeVisible();
   await expect(part.locator("[data-rain-key]")).toBeVisible();
@@ -142,7 +146,7 @@ test("with no rain published the page still works, and says so", async ({
     timeout: 30000,
   });
   await openFromMenu(page, "About the map");
-  await page.getByRole("tab", { name: "Rain" }).click();
+  await page.getByRole("tab", { name: "Weather" }).click();
   await expect(page.locator("[data-rain-line]")).toHaveText(
     "No rain forecast is published just now.",
     { timeout: 20000 },

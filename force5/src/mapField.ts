@@ -3,7 +3,8 @@
  * the lit chips in the map's dock (src/MapDock.tsx). At most one is on; with
  * none, the map is dark and plain with the shallows glowing blue round the
  * coast (the tidal depth). Wind is the coloured wind, Waves the wave height on
- * the sea, Weather the sky (the rain, for now).
+ * the sea, Weather the sky (grey cloud, yellow clear sky, black night) with
+ * the rain over it.
  *
  * Apart from the map, so the choice is read and kept the same way wherever it
  * is shown: the finder's map and the full chart share it.
@@ -58,8 +59,9 @@ export const pressField = (on: MapField, pressed: FieldId): MapField =>
 /** Which fields have something to draw them with. */
 export interface FieldSources {
   /**
-   * The wave height as frames for the map. Until those are published there is
-   * no Waves chip; the cards still have their waves.
+   * The wave height as frames for the map: whether the wave model's pointer
+   * lists any, as the page finds once it is idle (src/useWaves.ts). With none
+   * there is no Waves chip; the cards still have their waves.
    */
   waves: boolean;
 }
