@@ -18,11 +18,12 @@
  * parts out, for lights.ts to draw and for a test to read.
  */
 import { skyGlyph, type GlyphDef } from "../../shared/web/glyphSet";
+import type { MapField } from "./mapField";
 import type { WeatherIcon } from "./presentWeather";
 import { speedShort, unitLabel, type Units } from "./units";
 
-/** The map's field: the colour laid over it, or none. */
-export type PillField = "none" | "wind" | "waves" | "weather";
+/** The map's field: the colour laid over it, or none (./mapField.ts). */
+export type PillField = MapField;
 
 /** One spot's reading at the hour the pills stand at. */
 export interface PillReading {

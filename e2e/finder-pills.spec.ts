@@ -61,17 +61,18 @@ const audit = (page: Page) =>
       el.querySelector(".lt-pill")!.getBoundingClientRect(),
     );
     // A seen card with no pill: its bead stands on its spot, which is to be
-    // off the map's view.
+    // off the map's view, or in the dock's room at its foot.
+    const dock = document
+      .querySelector("[data-map-dock]")
+      ?.getBoundingClientRect();
+    const foot = dock ? Math.min(map.bottom, dock.top) : map.bottom;
     const missing = seen.filter((id) => {
       if (ids.includes(id)) return false;
       const r = marker(id).getBoundingClientRect();
       const x = r.x + r.width / 2;
       const y = r.y + r.height / 2;
       return (
-        x > map.left + 4 &&
-        x < map.right - 4 &&
-        y > map.top + 4 &&
-        y < map.bottom - 4
+        x > map.left + 4 && x < map.right - 4 && y > map.top + 4 && y < foot - 4
       );
     });
     const hit = (a: DOMRect, b: DOMRect) =>
@@ -85,7 +86,7 @@ const audit = (page: Page) =>
         if (hit(boxes[i], boxes[j])) overlaps.push([ids[i], ids[j]]);
     const others = [
       ...document.querySelectorAll(
-        "[data-map-wall], .maplibregl-ctrl, .obs-mark:not(.obs-under) .obs",
+        "[data-map-wall], [data-map-dock], .maplibregl-ctrl, .obs-mark:not(.obs-under) .obs",
       ),
     ]
       .map((el) => el.getBoundingClientRect())
@@ -196,6 +197,35 @@ test("at the whole country, Dublin close in and Sligo: a pill for each card in v
   await closeIn(page, "strandhill", 3);
   await expect(cards(page).filter({ hasText: "Strandhill" })).toHaveCount(1);
   await pillsAreTheCardsInView(page);
+});
+
+test("the pills say what the map shows: the wind and the sky, then Wind, Waves or Weather as chosen", async ({
+  page,
+}) => {
+  await country(page);
+  await pillsAreTheCardsInView(page);
+  const first = pills(page).first();
+  // None on: the arrow, the wind with its unit, and the sky after it.
+  await expect(first.locator(".lt-u")).toHaveText("kn");
+  await expect(first.locator(".lt-pill > :last-child")).toHaveClass(/lt-sky/);
+  // Wind: the arrow, the wind and the gust raised, no unit, no sky.
+  await page.locator('[data-map-field="wind"]').click();
+  await expect(first.locator(".lt-u")).toHaveCount(0);
+  await expect(first.locator(".lt-sky")).toHaveCount(0);
+  await expect(first.locator(".lt-pa")).toHaveCount(1);
+  await expect(first.locator(".lt-kn")).toHaveText(/^\d+$/);
+  await rest(page);
+  await pillsAreTheCardsInView(page);
+  // Weather: the sky first, beside the air's temperature.
+  await page.locator('[data-map-field="weather"]').click();
+  await expect(first.locator(".lt-pill > :first-child")).toHaveClass(/lt-sky/);
+  await expect(first.locator(".lt-kn")).toHaveText(/^-?\d+°$/);
+  await expect(first.locator(".lt-pa")).toHaveCount(0);
+  await rest(page);
+  await pillsAreTheCardsInView(page);
+  // Off again: the wind and the sky.
+  await page.locator('[data-map-field="weather"]').click();
+  await expect(first.locator(".lt-u")).toHaveText("kn");
 });
 
 test("the pills follow a scroll of the list once it has rested, never in the middle of it", async ({

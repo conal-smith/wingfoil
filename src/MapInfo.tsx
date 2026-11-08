@@ -494,7 +494,7 @@ function RainPart({ on, line }: { on: boolean; line: string | null }) {
       <p data-rain-line>
         {on
           ? (line ?? "Reading…")
-          : "Off. Turn it on in Layers, under Weather: \u201cRain\u201d."}
+          : "Off. Turn it on with the map\u2019s Weather chip."}
       </p>
       <p>
         From DWD&rsquo;s ICON-EU model: about 6.5 km, hourly, for three days
@@ -515,7 +515,11 @@ const SYMBOLS: readonly [ReactNode, string, string][] = [
   [<TintsGlyph size={32} />, "Depth tints", "Layers: Depths"],
   [<SoundingsGlyph size={32} />, "Contours, soundings", "Layers: Depths"],
   [<ReliefGlyph size={32} />, "Land relief", "Layers: Depths"],
-  [<TidalDepthGlyph size={32} />, "A drying height", "Layers: Tidal depth"],
+  [
+    <TidalDepthGlyph size={32} />,
+    "A drying height",
+    "The map with no field on",
+  ],
   [<CurrentsGlyph size={32} />, "A flood stream", "Layers: Currents"],
   [<SatelliteGlyph size={32} />, "A photograph inset", "Layers: Satellite"],
   [
@@ -662,7 +666,7 @@ function WindPart() {
       </h4>
       <KnotScale />
       <h4>
-        Two layers of it <small>in Layers, either or both</small>
+        Two ways to see it <small>either or both</small>
       </h4>
       <div className="mi-two">
         {(
@@ -670,12 +674,12 @@ function WindPart() {
             [
               <ColouredWindGlyph size={40} />,
               "Coloured wind",
-              "Its speed laid on the sea.",
+              "Its speed laid on the sea: the map\u2019s Wind chip.",
             ],
             [
               <ParticlesGlyph size={40} />,
               "Particles",
-              "The default: lines moving with the wind, at the hour shown. Over the colour, its speed and its way at a glance.",
+              "The default, in Layers: lines moving with the wind, at the hour shown. Over the colour, its speed and its way at a glance.",
             ],
           ] as const
         ).map(([glyph, name, line]) => (

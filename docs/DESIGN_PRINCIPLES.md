@@ -28,7 +28,9 @@ Everything else that can be pressed is outlined (the default), soft (a grey
 fill, a second action in a card) or quiet (no edge until the pointer is over
 it). Over moving water this is not timidity: a screen of filled buttons over
 the map is unreadable. A pressed toggle or chip is filled in ink as well as
-marked `aria-pressed`, and that is not a second filled action.
+marked `aria-pressed`, and that is not a second filled action. The map's
+layer chips alone glow in their layer's colour instead (`Chip variant="lit"`,
+2026-11-07).
 
 A destructive confirmation is a dialog, a view of its own, and its answer is
 `variant="danger"`, red words in an outlined button, because what it confirms
@@ -73,7 +75,9 @@ what a figure is ("14.4 °C, M3 weather buoy, 50 km from here").
 speed bands, not safety ratings and not ability ratings, and they are the only
 way colour may describe wind. No other element, state or category borrows them.
 They are the same for every rider: the stars are the rider's, the colours are
-not (2026-10-19).
+not (2026-10-19). The Wind chip's glow in the map's dock is the ramp's mid
+green: a swatch of the field the chip turns on, so it still means wind speed
+(2026-11-07).
 
 They do not re-theme. A colour that means 35 knots means 35 knots in white and
 in dark, as the now-marker, the gust cap, the weather's colours and Met
@@ -159,8 +163,9 @@ the chart's magenta marks the best of something (and the focus ring); the red
 accent marks the time now and what is off. The sea tints, the land and the
 depth ink draw the map itself. The only other families are warm (now or
 degraded), green (`ok`, one liveness mark), Met Éireann's warning levels, the
-weather's state, the stars and the wind. A further family is a design change,
-not an implementation detail.
+weather's state, the stars, the wind, the wave height's ramp (`--color-waves-*`),
+the sky's (`--color-sky-*`) and the map's layer chips' glows (`glow-*`, 2026-11-07). A further family is
+a design change, not an implementation detail.
 
 **Text contrast.** At least 4.5:1 for every word, in both themes. `ink-muted`
 is the floor for text, on the ground and on `sunken`. `line-strong` and
@@ -420,17 +425,19 @@ rest of the map it drew nothing and looked broken. The site has no LiDAR
 layer and serves none of it; the pipeline and what it would take to bring
 the layer back (wider coverage) are in scripts/lidar/README.md.
 
-**2026-10-25 — The wind in two layers, Coloured wind and Particles.** "Let's
+**2026-10-25 — The wind in two layers, the colour and the particles.** "Let's
 get rid of ink. So we should have colored wind and particles... two separate
 layers." The wind was one style of three (Ink, Coloured wind, Coloured
-arrows); it is two switches now, either, both or neither. Coloured wind is the
-speed as a wash on the sea and nothing more. Particles are the moving lines,
-drawn in the ink colour so they read over the colour; the arrows tinted by
-speed are gone. A first visit has the particles alone. A rider's older choice
-is read into the layers once (force5/src/windLayers.ts `parseWindLayers`): Ink
-is the particles, Coloured wind the colour alone, Coloured arrows both. The
-app has the same two switches in its Layers sheet and reads its own older
-choice the same way; with Reduce Motion on, its particles are still arrows.
+arrows); it is two layers now, either, both or neither. The coloured wind is
+the speed as a wash on the sea and nothing more; on the site it is the Wind
+field of the map's dock (2026-11-07). Particles are the moving lines, drawn in
+the ink colour so they read over the colour, a switch on the chart's rail; the
+arrows tinted by speed are gone. A first visit has the particles alone. A
+rider's older choice is read into the layers once
+(force5/src/windLayers.ts `parseWindLayers`): Ink is the particles, Coloured
+wind the colour alone, Coloured arrows both. The app has the same two switches
+in its Layers sheet and reads its own older choice the same way; with Reduce
+Motion on, its particles are still arrows.
 
 **2026-10-25 — Stars have colours of their own.** `stars-1` … `stars-5`
 (ui/theme.css), pale pink to deep magenta on white, the chart's magenta paled
@@ -607,13 +614,14 @@ the dock's wind row the same, not dashes that read as no forecast
 
 **2026-10-29 — One menu in four groups, and the layers are the rail.** The
 owner: the old Layers panel ("What the chart draws", its tiles and its
-dialog) goes, and the layers are the rail of small round glyphs by the zoom,
-on a phone as on a desktop (src/LayerRail.tsx); there is no Layers row in the
-menu. On a phone the rail stands under the zoom, down the right edge, and
-wherever it would run into the dock it scrolls in the room above it; a tap
-names the layer and whether it is on, for a moment. What a layer cannot draw
-just now (the tidal depth out too far, the currents past their hours) is a
-small dot on its button and a line under its name. The model is chosen in
+dialog) goes, and the chart's extra layers are the rail of small round glyphs
+by the zoom, glyphs only, on a phone as on a desktop (src/LayerRail.tsx);
+there is no Layers row in the menu. What colours the map is not on the rail
+but in the map's dock (2026-11-07). On a phone the rail stands under the
+zoom, down the right edge, and wherever it would run into the dock it scrolls
+in the room above it; a tap names the layer and whether it is on, for a
+moment. What a layer cannot draw just now (the currents past their hours) is
+a small dot on its button and a line under its name. The model is chosen in
 the display options. The site menu is the same on every page, in four
 groups: Chart and Spot finder; Settings and Display options; About and Take
 the tour; then the site's other sections, Use with AI last. From a page that
@@ -922,16 +930,14 @@ data alone, as 2026-11-02 has it, but it is opaque, its wind is a solid fill on
 a scale, and its bands are named in a column of their own. With no spot chosen
 it has one lane, how many spots have stars at each hour.
 
-**2026-11-06 — The tidal depth is a look worth seeing, and the coloured wind
-gives way to it.** The owner on the tidal depth: "the depth around the
+**2026-11-06 — The tidal depth is a look worth seeing.** The owner on the tidal depth: "the depth around the
 coastline... a really nice light coloured blue effect". It "is a gradient
 showing the tidal data at the exact hour... most likely pretty expensive, but I
 do want it on the finders map"; "I'm happy that you only see it when you zoom in
 on the whole Ireland chart... too much data"; "When you zoom out we just put
 like a little bit of a faint blue glow around, like a cheap, something much
 cheaper. And then when you zoom in, then you know it shows the more detail."
-Coloured wind stays off by default, and the two exclude each other: turning
-either on turns the other off.
+It is the map with no field on (2026-11-07).
 
 **2026-11-07 — The sea's coast is the chart's one bright line.** At country
 zoom every lough, pond and river polygon, and every island in them, was
@@ -1087,6 +1093,45 @@ and a figure at a bar's end is held inside it.
 
 This replaces the head of two tabs and a count (2026-11-02), "Use my location"
 in the filter sheet (the first entry of this date), and the two-bar card.
+
+**2026-11-07 — The map's colour is one field, chosen with lit chips in a dock.**
+The owner's design for the finder and the chart. What colours the map is one
+field, Wind, Waves or Weather, chosen with three chips in a dock centred on the
+map's foot (src/MapDock.tsx), the same on the finder and the full chart. At
+most one is on, and pressing the one on turns it off. With none on, which is a
+first visit, the map is dark and plain and the shallows glow blue round the
+coast (the tidal depth); with a field on the glow hides. Wind is the coloured
+wind; Weather is the sky, the rain until the cloud is drawn; Waves is the wave
+height on the sea alone, and its chip is shown only once there are wave frames
+for the map to draw (force5/src/mapField.ts `offeredFields`). The rider's last
+choice is kept, none too (`wingfoil.map.field.v1`); a rider who had Coloured
+wind on starts on Wind.
+
+The chips are a kit variant, `Chip variant="lit"`: off, a ghost with no edge or
+fill, a small line icon and a muted word, a faint fill under the pointer; on,
+the chip glows in its layer's colour (`glow-*` in ui/theme.css), a fifth of it
+for the fill, the edge at about seven tenths, the icon in the colour and the
+word in full ink. No cross, a 150 ms fade, `aria-pressed`, one stop on Tab with
+the arrows walking the chips and Escape turning the field off. Their words read
+at 4.5:1 off and on in both themes; on white the edge takes a deeper shade so
+the glow still reads (ui/tv.test.ts). This is an exception to the accent rule's
+pressed chip filled in ink, for the map's layer chips alone: there the chip is
+a swatch of what it turns on. Wind's glow is the wind ramp's mid green, so the
+wind rule holds; the glows are a new colour family, written in the theme, and
+the Waves legend draws the cards' own wave-height ramp (`--color-waves-*`), so a
+metre is the same colour on the map as on a card.
+
+The legend stands at the dock's right: "Shallow water" with its swatch with no
+field on, else the field's ramp with its unit and a few figures under it,
+evenly spaced and never touching (src/MapScales.tsx). It names no source, and
+on a phone there is none. Under the chips beside the list is a slim hour bar
+for the list's day (src/HourBar.tsx): play, "Today 13:00", and 06 to 21. It
+and the cards share one hour both ways, and with a field on the map beside the
+list draws that hour. The full chart keeps its week bar with the stars, the
+dock standing over it with the chips and the legend alone. The chart's rail
+loses Coloured wind, Tidal depth and Rain, and their exclusion of each other
+(2026-11-06) with them; it keeps the particles, live wind, currents, the
+depths, the satellite and the loupe.
 
 **2026-11-08 — Pills for the cards in view, beads for the rest, linked on
 hover.** The owner chose the design. On the map beside the list a pill is a

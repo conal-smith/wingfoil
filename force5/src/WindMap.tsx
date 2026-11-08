@@ -1388,6 +1388,7 @@ export default function WindMap(props: Props) {
       (spot) => latest.current.onOpenPage?.(spot),
     );
     lightsRef.current.light(lit.current);
+    lightsRef.current.foot(latest.current.bottomInset);
     return () => {
       lightsRef.current?.destroy();
       lightsRef.current = null;
@@ -1402,6 +1403,11 @@ export default function WindMap(props: Props) {
       units,
     );
   }, [ready, spots, lights, selectedId, named, units, props.lightLabel]);
+
+  // No pill beside the list stands in the dock's room at the map's foot.
+  useEffect(() => {
+    lightsRef.current?.foot(bottomInset);
+  }, [ready, spots, bottomInset]);
 
   // The plain map's pills, from the map box's class (src/map.css).
   const plain = !!props.plain;

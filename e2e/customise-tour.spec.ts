@@ -453,19 +453,19 @@ test("the tour is offered on a first visit, can be skipped, and is not offered a
   );
   await prompt(page).getByRole("button", { name: "Take the tour" }).click();
   await expect(prompt(page)).toHaveCount(0);
-  await expect(card(page)).toContainText("Step 1 of 6");
+  await expect(card(page)).toContainText("Step 1 of 7");
   await expect(card(page)).toContainText("Spots on the map");
   // A ring is round a light.
   await expect(page.locator(".tour-ring path")).toBeVisible();
   await card(page).getByRole("button", { name: "Next" }).click();
   // Tapping a light: the tour opens a spot's week in the scrub bar.
-  await expect(card(page)).toContainText("2 of 6");
+  await expect(card(page)).toContainText("2 of 7");
   await expect(page.locator(".scrub[data-spot]")).toBeVisible({
     timeout: 30000,
   });
   await expect(barName(page)).toHaveCount(1);
   await card(page).getByRole("button", { name: "Back" }).click();
-  await expect(card(page)).toContainText("1 of 6");
+  await expect(card(page)).toContainText("1 of 7");
   await card(page).getByRole("button", { name: "Next" }).click();
   await card(page).getByRole("button", { name: "Skip tour" }).click();
   await expect(card(page)).toHaveCount(0);
@@ -503,17 +503,17 @@ test("No thanks is never asked again; Escape leaves the tour; the menu replays i
 
   // From the menu, at any time; Escape leaves it.
   await openFromMenuRow(page, "Take the tour");
-  await expect(card(page)).toContainText("1 of 6");
+  await expect(card(page)).toContainText("1 of 7");
   await page.keyboard.press("Escape");
   await expect(card(page)).toHaveCount(0);
 
   // Through every card: the lights, a spot's week, the time, the loupe, the
-  // menu, the layers.
+  // map's colours in its dock, the menu, the layers.
   await openFromMenuRow(page, "Take the tour");
-  const steps = ["lights", "bar", "time", "loupe", "menu", "layers"];
+  const steps = ["lights", "bar", "time", "loupe", "field", "menu", "layers"];
   for (const [i, id] of steps.entries()) {
     await expect(page.locator(".tour")).toHaveAttribute("data-step", id);
-    await expect(card(page)).toContainText(`${i + 1} of 6`);
+    await expect(card(page)).toContainText(`${i + 1} of 7`);
     await expect(page.locator(".tour-ring path")).toBeVisible({
       timeout: 15000,
     });

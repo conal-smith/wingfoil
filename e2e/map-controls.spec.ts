@@ -3,6 +3,7 @@ import {
   SITE_ROWS,
   closeLayers,
   expect,
+  fieldChip,
   layerTile,
   layersButton,
   layersRail,
@@ -61,8 +62,13 @@ test("the chart's controls: zoom and Layers on the right, Layers the rail on a p
   const rail = layersRail(page);
   await expect(rail).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  for (const group of ["Wind", "Sea", "Weather", "Ground", "Round your spot"])
+  for (const group of ["Wind", "Sea", "Ground", "Round your spot"])
     await expect(rail.getByRole("group", { name: group })).toBeAttached();
+  // What colours the map is the dock's, not the rail's (the ruling of
+  // 2026-11-07): no Weather group, no Coloured wind, Tidal depth or Rain.
+  await expect(rail.getByRole("group", { name: "Weather" })).toHaveCount(0);
+  for (const name of ["Coloured wind", "Tidal depth", "Rain"])
+    await expect(layerTile(page, name)).toHaveCount(0);
   await expect(rail.getByRole("group", { name: "Chart" })).toHaveCount(0);
   // The depths are one switch under the sea, off until a rider asks.
   await expect(
@@ -71,33 +77,30 @@ test("the chart's controls: zoom and Layers on the right, Layers the rail on a p
       exact: true,
     }),
   ).toHaveAttribute("aria-pressed", "false");
-  // The wind in two layers, each its own switch: the particles alone at
-  // first; and the wind measured at the stations, off on the full chart.
+  // The wind's particles, on at first, and the wind measured at the
+  // stations, off on the full chart.
   const wind = rail.getByRole("group", { name: "Wind" });
-  await expect(wind.getByRole("button")).toHaveCount(3);
-  for (const [i, name] of ["Coloured wind", "Particles", "Live wind"].entries())
+  await expect(wind.getByRole("button")).toHaveCount(2);
+  for (const [i, name] of ["Particles", "Live wind"].entries())
     await expect(wind.getByRole("button").nth(i)).toHaveAccessibleName(name);
   await expect(layerTile(page, "Particles")).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await expect(layerTile(page, "Coloured wind")).toHaveAttribute(
-    "aria-pressed",
-    "false",
-  );
-  // A tap switches one, the particles staying on over it, and says which.
-  await layerTile(page, "Coloured wind").click();
-  await expect(layerTile(page, "Coloured wind")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  // The Wind chip in the dock colours the map, the particles staying on
+  // over it.
+  await fieldChip(page, "Wind").click();
+  await expect(fieldChip(page, "Wind")).toHaveAttribute("aria-pressed", "true");
   await expect(layerTile(page, "Particles")).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  // It stands clear of the scrub bar, scrolling in the room above it.
+  // It stands clear of the scrub bar and the dock over it, scrolling in the
+  // room above them.
   const railBox = (await rail.boundingBox())!;
+  const dock = (await page.locator(".map-dock").boundingBox())!;
   expect(railBox.y + railBox.height).toBeLessThanOrEqual(bar.y);
+  expect(railBox.y + railBox.height).toBeLessThanOrEqual(dock.y);
   // A layer switched on stays on.
   await setLayer(page, "Currents", true);
   await page.reload();
@@ -132,12 +135,9 @@ test("the chart's controls: zoom and Layers on the right, Layers the rail on a p
 test("the map's information is one dialog over the dimmed chart, from the menu's About", async ({
   page,
 }) => {
-  // The tidal-depth layer on, as a rider who had it on last time.
+  // The tidal depth on: the map with no field, as a rider who left it so.
   await page.addInitScript(() =>
-    localStorage.setItem(
-      "wingfoil.map.layers.v1",
-      JSON.stringify({ foil: true }),
-    ),
+    localStorage.setItem("wingfoil.map.field.v1", "none"),
   );
   // And Brandon Bay in the scrub bar, from the link: the stars' link names it.
   await page.goto("/?spot=brandon");

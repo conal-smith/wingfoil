@@ -12,9 +12,10 @@ import "./rail.css";
 
 /**
  * What stands below the rail on the chart, which it must not run into: the
- * scrub bar at the chart's foot (src/ScrubBar.tsx), and Gust's button.
+ * scrub bar at the chart's foot (src/ScrubBar.tsx), the map's dock over it
+ * (src/MapDock.tsx), and Gust's button.
  */
-const BELOW = ".map-footer, .gust-launcher";
+const BELOW = ".map-footer, .map-dock, .gust-launcher";
 /** How clear of them the rail keeps, at the least. */
 const CLEAR = 12;
 /**
@@ -41,8 +42,9 @@ function below(el: Element): Box {
  * the chart stays in view while the layers change. Off is plain; on is filled
  * in ink. A layer's name shows to its left under the pointer and on the keys'
  * focus. The groups are the layers' own (src/layerGroups.tsx), each set apart
- * by space. A layer's colour scale stands at the foot of the chart while it
- * draws (src/MapScales.tsx), not here.
+ * by space. What colours the map (the coloured wind, the rain, the shallows'
+ * glow) is not here: it is the field, chosen in the map's dock with its
+ * legend (src/MapDock.tsx).
  *
  * It is the one way to the layers, on a phone as on a desktop: there is no
  * panel behind it. Where it would run into the dock it scrolls, in the room

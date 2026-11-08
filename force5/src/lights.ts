@@ -231,6 +231,11 @@ export interface Lights {
    * puts it out. A class on the light, so nothing is drawn again but it.
    */
   light(id: string | null): void;
+  /**
+   * The room the map's dock takes at the map's foot, in pixels: beside the
+   * list no pill stands there, as no camera move puts a spot there.
+   */
+  foot(px: number): void;
   destroy(): void;
 }
 
@@ -424,7 +429,7 @@ export function createLights(
       l: PILL_ROOM,
       t: PILL_ROOM,
       r: boxW - PILL_ROOM,
-      b: boxH - PILL_ROOM,
+      b: boxH - footRoom - PILL_ROOM,
     };
     const placed = new Map(
       placePills(items, room, walls(frame), names()).map((p) => [p.id, p]),
@@ -472,6 +477,8 @@ export function createLights(
   };
   /** Where the pills beside the list stand, as last placed. */
   let pillBoxes: PillBox[] = [];
+  /** The dock's room at the map's foot (`foot`). */
+  let footRoom = 0;
   /**
    * The Live wind layer's readings beside the list (./readingPills.ts): a
    * pill has the place, and so do the map's names and a reading kept before
@@ -1091,6 +1098,12 @@ export function createLights(
         entry.rev++;
       }
       layer.classList.toggle("has-lit", id !== null && entries.has(id));
+    },
+    foot(px) {
+      if (px === footRoom) return;
+      footRoom = px;
+      dirty = true;
+      queue();
     },
     destroy() {
       cancelAnimationFrame(queued);
