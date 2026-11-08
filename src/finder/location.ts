@@ -1,13 +1,15 @@
 /**
- * Where the rider is, for "near you": the browser is asked once, when the
- * rider presses "Use my location" in the filter sheet, never on its own. A yes is kept on this device and the place is
- * read again quietly on later visits (the browser does not ask twice); a no
- * is kept too, and the browser is never asked again. Without a place, the
- * finder looks round where the chart was last centred (src/lastView.ts). That
- * is the whole of Nearby under the wide width; beside the map it is the list's
- * first paint, and the place the map opens on: the list then follows the map's
- * view, the rider's place only measuring its distances
- * (src/finder/SpotFinder.tsx).
+ * Where the rider is, for the spots round them: the browser is asked only when
+ * the rider presses the locate button on the map beside the list (or, with no
+ * map beside it, "Use my location" in the filter sheet), never on its own, so a
+ * first visit is never asked. A yes is kept on this device and the place is
+ * read again quietly on later visits (the browser does not ask twice); a no is
+ * kept too, and the browser is not asked again on its own, only when the rider
+ * presses the button once more. Without a place, the finder looks round where
+ * the chart was last centred (src/lastView.ts). That is the whole of the list
+ * under the wide width; beside the map it is the list's first paint, and the
+ * place the map opens on: the list then follows the map's view, the rider's
+ * place only measuring its distances (src/finder/SpotFinder.tsx).
  */
 import { useEffect, useState } from "react";
 import { chartCentre, type LatLon } from "../lastView";
@@ -86,27 +88,31 @@ export const ASK_WAIT_MS = 8000;
 
 /**
  * The rider's place. `ask` is whether the browser may be asked now (the
- * rider pressed "Use my location", or said yes before and is on Near you):
- * once, unless it said no before. `asking` is true
- * from the first render that may ask, so the finder never shows the places
- * round another place before the browser has had its chance to answer.
+ * rider pressed the locate button, or said yes before and the heart is off):
+ * once, unless it said no before. `presses` counts the rider's presses of the
+ * locate button: each asks the browser again, even after a no, as the rider
+ * has asked for it (a browser that blocks the site answers no at once).
+ * `asking` is true from the first render that may ask, so the finder never
+ * shows the places round another place before the browser has had its chance
+ * to answer.
  */
-export function useRiderPlace(ask: boolean): RiderPlace {
+export function useRiderPlace(ask: boolean, presses = 0): RiderPlace {
   const [place, setPlace] = useState<Place>(initial);
   // The browser has answered, or the finder has stopped waiting on it.
   const [settled, setSettled] = useState(false);
   useEffect(() => {
     if (!ask) return;
     const answer = stored();
-    if (answer && "refused" in answer) return;
+    if (answer && "refused" in answer && presses === 0) return;
     const geo = geolocation();
     if (!geo) return;
     let live = true;
     // Asked for the first time, the finder waits on the answer, a while;
     // known already, the kept place stands while it is read again.
-    const wait = answer
-      ? 0
-      : window.setTimeout(() => live && setSettled(true), ASK_WAIT_MS);
+    const wait =
+      answer && "at" in answer
+        ? 0
+        : window.setTimeout(() => live && setSettled(true), ASK_WAIT_MS);
     geo.getCurrentPosition(
       (position) => {
         const at = {
@@ -123,7 +129,7 @@ export function useRiderPlace(ask: boolean): RiderPlace {
         if (error.code === error.PERMISSION_DENIED) keep({ refused: true });
         window.clearTimeout(wait);
         if (!live) return;
-        if (!answer) setPlace(fallback());
+        if (!answer || "refused" in answer) setPlace(fallback());
         setSettled(true);
       },
       { maximumAge: 600000, timeout: 15000 },
@@ -132,7 +138,7 @@ export function useRiderPlace(ask: boolean): RiderPlace {
       live = false;
       window.clearTimeout(wait);
     };
-  }, [ask]);
+  }, [ask, presses]);
   // Never asked before, and about to be or being asked.
   const kept = stored();
   const asking = ask && !settled && geolocation() !== null && kept === null;

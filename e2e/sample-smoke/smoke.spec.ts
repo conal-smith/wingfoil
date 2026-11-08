@@ -68,7 +68,7 @@ const test = frozen.extend<{ errors: string[] }>({
   ],
 });
 
-/** Star these places before the page's own scripts run: the finder's Favourites. */
+/** Save these places before the page's own scripts run: the finder's favourites. */
 const star = (page: Page, ids: string[]) =>
   page.addInitScript(
     ([key, ids]) => {
@@ -95,12 +95,17 @@ async function finderReads(page: Page, count: number) {
       { timeout: 30000 },
     )
     .toBe(true);
-  // Today hour by hour, each hour's wind a figure.
-  const brandon = cards(page).filter({ hasText: "Brandon Bay" });
-  await expect(brandon.getByText("Today", { exact: true })).toBeVisible();
+  // The heart on, the favourites; today, over the cards, and each card the
+  // day hour by hour in four rows, the wind's a figure every three hours.
   await expect(
-    brandon.locator("[data-day-hours] [data-hour] b").first(),
-  ).toHaveText(/\d/);
+    page
+      .locator("[data-finder-list]")
+      .getByRole("button", { name: "Favourites" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("[data-finder-day]")).toContainText("Today");
+  const brandon = cards(page).filter({ hasText: "Brandon Bay" });
+  await expect(brandon.locator("[data-bar]")).toHaveCount(4);
+  await expect(brandon.locator('[data-bar="wind"] b').first()).toHaveText(/\d/);
 }
 
 /**

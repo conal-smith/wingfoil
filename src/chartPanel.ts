@@ -66,8 +66,7 @@ export function spotsBounds(
 
 /**
  * Room kept clear round the places when the chart is fitted to them: the
- * Full chart button at the top left and the zoom at the top right, and the
- * hour's label at the foot.
+ * zoom and the locate button at the top right, and a margin all round.
  */
 export const fitPadding = { top: 64, bottom: 48, left: 44, right: 64 };
 

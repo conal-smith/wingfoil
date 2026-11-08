@@ -138,6 +138,19 @@ const COLOURS: Record<string, string> = {
   "wave-swan": "#22a093",
   "wave-gfs": "#bb8a2a",
   "wave-ecmwf": "#9b6be0",
+  // The finder's cards: the waves' height, metres, and the sky by its cloud.
+  "waves-m0": "#c9ece4",
+  "waves-m05": "#86d8cb",
+  "waves-m1": "#3fb6b4",
+  "waves-m2": "#1f83a8",
+  "waves-m3": "#2a55a3",
+  "waves-m5": "#3b2c8e",
+  "waves-m8": "#27105e",
+  "sky-c0": "#e9b200",
+  "sky-c30": "#f0d060",
+  "sky-c55": "#ddd6b8",
+  "sky-c78": "#bdbdc2",
+  "sky-c100": "#8f9096",
 };
 
 // Size, line height, then weight and tracking where the step has one.
