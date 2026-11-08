@@ -5,6 +5,16 @@ driven by somebody else's wind; this adapter does not run it. It asks ERDDAP for
 server-side subsets of one published run and republishes per-spot series, plus
 optional map frames.
 
+Map frames (`--frames`) carry the wave height alone, over the Ireland crop of the
+shelf grid at its native 0.025°, every `--frame-step` hours (three by default)
+while the spot series keep their own `--step`: the map's Waves layer colours the
+sea by height, and an hour-by-hour map of it would cost three times the bytes for
+a field that changes slowly. Heights are rounded to 0.1 m, which is finer than a
+colour ramp can show and keeps a frame near 200 KB of JSON; land and cells the
+model does not resolve are null. Each frame is one small request in ERDDAP's
+OPeNDAP ASCII (`.asc`), which states the axes once rather than on every cell as
+the CSV does, about a seventh of the bytes.
+
 Run identity. ERDDAP exposes only the aggregated `time` axis, and that axis holds
 a hindcast followed by the forecast, so the axis alone cannot say where the
 forecast begins. The dataset's global `date` attribute is the model day and the
@@ -38,6 +48,7 @@ import io
 import math
 import os
 from pathlib import Path
+import re
 import sys
 import threading
 import time
@@ -75,7 +86,14 @@ SOURCE_VARIABLES = {"swh": "significant_wave_height",
                     "mwd": "mean_wave_direction_from",
                     "pwd": "peak_wave_direction_from",
                     "spread": "directional_spread"}
-FRAME_VARIABLES = ("swh", "mwp", "mwd")
+FRAME_VARIABLES = ("swh",)
+# What a frame's values are rounded to, in the variable's units, as the manifest
+# states it (`framePrecision`): a tenth of a metre, finer than the map can show.
+FRAME_PRECISION = {"swh": 0.1}
+FRAME_DIGITS = {"swh": 1}
+# Hours between map frames; the spot series keep `--step`.
+FRAME_STEPS = (1, 3, 6)
+FRAME_STEP = 3
 LIMITS = {"swh": (0.0, 25.0, 2), "hswe": (0.0, 25.0, 2), "shww": (0.0, 25.0, 2),
           "mwp": (0.0, 30.0, 2), "pp1d": (0.0, 40.0, 2), "mwd": (0.0, 360.0, 1),
           "pwd": (0.0, 360.0, 1), "spread": (0.0, 180.0, 1)}
@@ -428,32 +446,70 @@ def frame_grid(bounds):
             "units": "per variable; see the variables map"}, longitudes, latitudes
 
 
+# ERDDAP's OPeNDAP ASCII: a section header such as `name.name[1][200][240]` or
+# `name.latitude[200]`, then its values, a grid row led by its index (`[0][5], `).
+ASC_SECTION = re.compile(r"^\w+\.(\w+)((?:\[\d+\])+)$")
+
+
+def ascii_sections(text):
+    """{name: (shape, rows of value strings)} from an ERDDAP `.asc` response."""
+    lines = text.splitlines()
+    start = next((index for index, line in enumerate(lines) if line.startswith("---")), None)
+    if start is None:
+        raise ValueError("ERDDAP's ASCII response has no data section")
+    sections, current = {}, None
+    for line in lines[start + 1:]:
+        if not line.strip():
+            continue
+        header = ASC_SECTION.match(line)
+        if header:
+            shape = tuple(int(size) for size in re.findall(r"\d+", header.group(2)))
+            current = sections[header.group(1)] = (shape, [])
+            continue
+        if current is None:
+            raise ValueError("ERDDAP's ASCII response has values before any header")
+        values = [value.strip() for value in line.split(",")]
+        current[1].append(values[1:] if values[0].startswith("[") else values)
+    return sections
+
+
 def frame_fields(dataset, run, hour, longitudes, latitudes, cache):
     """One request per frame for the frame variables over the published crop."""
     when = run + timedelta(hours=hour)
     text = fetch(griddap(dataset, block(FRAME_VARIABLES, when, when, 1, latitudes[0],
-                                        latitudes[-1], longitudes[0], longitudes[-1])),
-                 cache / f"{dataset}-frame-{hour:03d}.csv")
-    table = erddap_rows(text, columns(FRAME_VARIABLES))
-    count = len(longitudes) * len(latitudes)
-    if len(table) != count:
-        raise ValueError(f"Frame {hour} returned {len(table)} of {count} cells")
-    fields = {name: [None] * count for name in FRAME_VARIABLES}
-    # Published rows run north-to-south; ERDDAP returns latitude ascending.
-    row_of = {value: index for index, value in enumerate(reversed(latitudes))}
-    column_of = {value: index for index, value in enumerate(longitudes)}
-    for row in table:
-        if moment(row[0]) != when:
-            raise ValueError(f"Frame {hour} carries time {row[0]}")
-        y, x = row_of.get(round(float(row[1]), 6)), column_of.get(round(float(row[2]), 6))
-        if y is None or x is None:
-            raise ValueError(f"Frame {hour} returned cell {row[1]},{row[2]} outside the crop")
-        for index, name in enumerate(FRAME_VARIABLES):
-            fields[name][y * len(longitudes) + x] = number(row[3 + index], name)
+                                        latitudes[-1], longitudes[0], longitudes[-1]), "asc"),
+                 cache / f"{dataset}-frame-{hour:03d}.asc")
+    sections = ascii_sections(text)
+    width, height = len(longitudes), len(latitudes)
+    axes = {name: [float(value) for row in sections.get(name, ((), []))[1] for value in row]
+            for name in ("time", "latitude", "longitude")}
+    if len(axes["time"]) != 1 or abs(axes["time"][0] - when.timestamp()) > 1:
+        raise ValueError(f"Frame {hour} carries time {axes['time']}")
+    if ([round(value, 6) for value in axes["latitude"]] != latitudes
+            or [round(value, 6) for value in axes["longitude"]] != longitudes):
+        raise ValueError(f"Frame {hour} returned cells outside the crop")
+    fields = {}
+    for name in FRAME_VARIABLES:
+        shape, rows = sections.get(SOURCE_VARIABLES[name], ((), []))
+        if (shape != (1, height, width) or len(rows) != height
+                or any(len(row) != width for row in rows)):
+            raise ValueError(f"Frame {hour} returned {SOURCE_VARIABLES[name]} as {shape}, "
+                             f"not 1 x {height} x {width} cells")
+        # Published rows run north-to-south; ERDDAP returns latitude ascending.
+        fields[name] = [compact(number(value, name), FRAME_DIGITS[name])
+                        for row in reversed(rows) for value in row]
     return fields
 
 
-def describe(step, hours, framed, spots):
+def compact(value, digits):
+    """A frame value at its published precision, as briefly as JSON writes it: 1, not 1.0."""
+    if value is None:
+        return None
+    value = round(value, digits)
+    return int(value) if value.is_integer() else value
+
+
+def describe(step, hours, frame_step, spots):
     used = [record for record in spots.values() if record.get("dataset")]
     nested = sum(1 for record in used if record.get("nest"))
     searched = sum(1 for record in used if record.get("neighbourSearch"))
@@ -477,9 +533,10 @@ def describe(step, hours, framed, spots):
         f"heights; every other value is source output, rounded only. Land and unresolved cells are "
         f"null, never zero. "
         + (f"Frames are the {abs(FRAME_BOX[0])}-{abs(FRAME_BOX[2])}°W / {FRAME_BOX[1]}-"
-           f"{FRAME_BOX[3]}°N crop of the shelf grid at native resolution, carrying "
-           f"{', '.join(FRAME_VARIABLES)}."
-           if framed else "No map frames are published in this run: the spot series is the product "
+           f"{FRAME_BOX[3]}°N crop of the shelf grid at native resolution, every {frame_step} h "
+           f"from the run hour, carrying the wave height (swh) alone, rounded to "
+           f"{FRAME_PRECISION['swh']} m; land and unresolved cells are null."
+           if frame_step else "No map frames are published in this run: the spot series is the product "
                           "and the full grid is far larger than the site needs."))
 
 
@@ -510,19 +567,21 @@ def build(args, infos, run, cache, now):
     directory = f"mi-swan-{run.strftime('%Y%m%d%H')}-{args.hours}h-v1"
     if args.frames:
         grid, longitudes, latitudes = frame_grid(infos[SHELF]["bounds"])
+        frame_hours = list(range(0, args.hours + 1, args.frame_step))
         timing.start("download", workers=CONCURRENCY)
         with ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
             fields = list(pool.map(lambda hour: frame_fields(SHELF, run, hour, longitudes,
-                                                            latitudes, cache), hours))
+                                                            latitudes, cache), frame_hours))
         timing.start("decode")
-        for hour, values in zip(hours, fields):
+        for hour, values in zip(frame_hours, fields):
             when = stamp(run + timedelta(hours=hour))
             frame = {"model": "mi-swan", "run": run.strftime("%Y%m%d%H"), "hour": hour,
                      "validTime": when, "grid": grid, **values}
             name = frame_name(directory, hour, "json")
             write_json(output / name, frame)
             frames.append({"hour": hour, "validTime": when, "url": f"weather/{name}"})
-        print(f"  {len(frames)} frames of {grid['width']} x {grid['height']} cells", flush=True)
+        print(f"  {len(frames)} frames of {grid['width']} x {grid['height']} cells, every "
+              f"{args.frame_step} h", flush=True)
 
     attributes = infos[SHELF]["attributes"]
     manifest = {
@@ -553,16 +612,19 @@ def build(args, infos, run, cache, now):
         "sourceTimeRange": {"from": attributes.get("time_coverage_start"),
                             "to": attributes.get("time_coverage_end")},
         "variables": VARIABLES, "frames": frames, "spotSeries": series, "spotCells": records,
-        "processing": describe(args.step, args.hours, bool(frames), records),
+        "processing": describe(args.step, args.hours, args.frame_step if frames else None,
+                               records),
         "source": f"Marine Institute ERDDAP griddap {SHELF}"
                   + (f" and {NEST}" if NEST in infos else ""),
         "sourceUrl": SOURCE_URL, "attribution": ATTRIBUTION, "licenseUrl": LICENSE_URL,
     }
     if grid is not None:
-        # Frames carry fewer fields than the spot series: a map needs height, period
-        # and direction, and tripling the grid for the rest would not earn its bytes.
+        # Frames carry the height alone, at their own step and precision: the map
+        # colours the sea by it, and the spot series carry everything else.
         manifest["grid"] = grid
         manifest["frameVariables"] = list(FRAME_VARIABLES)
+        manifest["frameStepHours"] = args.frame_step
+        manifest["framePrecision"] = dict(FRAME_PRECISION)
     # Only this final atomic write advances the published wave forecast.
     pointer = write_run(output, "mi-swan.json", manifest, directory, spots)
     print(f"Published {len(hours)} steps for {len(spots)} locations to "
@@ -578,15 +640,21 @@ def main(argv=None):
     parser.add_argument("--step", type=int, choices=[1, 3], default=1,
                         help="Source cadence to publish; SWAN is hourly (default 1)")
     parser.add_argument("--frames", action="store_true",
-                        help="Also publish map frames; off by default because the grid is large")
+                        help="Also publish map frames of the wave height over Ireland")
+    parser.add_argument("--frame-step", type=int, choices=FRAME_STEPS,
+                        help=f"Hours between map frames with --frames (default {FRAME_STEP}); "
+                             "the spot series keep --step")
     parser.add_argument("--no-nest", action="store_true",
                         help="Ignore the 200 m Connemara nest and use the shelf grid everywhere")
     args = parser.parse_args(argv)
     if not 1 <= args.hours <= FORECAST_HOURS or args.hours % args.step:
         parser.error(f"Publish 1-{FORECAST_HOURS} hours as a whole number of {args.step}-hour steps")
-    if args.frames and args.step == 1:
-        print("Warning: hourly frames over the Ireland crop are roughly 0.9 MB each; "
-              "--step 3 is the intended combination with --frames.", file=sys.stderr)
+    if args.frame_step is not None and not args.frames:
+        parser.error("--frame-step only applies with --frames")
+    args.frame_step = args.frame_step or FRAME_STEP
+    if args.frames and (args.frame_step % args.step or args.hours % args.frame_step):
+        parser.error(f"Frames every {args.frame_step} h must fall on the {args.step}-hour series "
+                     f"steps and end at +{args.hours} h")
     now = datetime.now(timezone.utc)
     root = Path(ROOT) / ".cache" / "mi-swan"
     datasets = [SHELF] if args.no_nest else [SHELF, NEST]

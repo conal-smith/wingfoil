@@ -564,6 +564,7 @@ class WorkerUnchangedRunTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.args = SimpleNamespace(models=["ecmwf"], step=1, run=None, ecmwf_source="ecmwf",
                                     ecmwf_cycle=None, noaa_source="nomads",
+                                    frames=False, frame_step=None,
                                     bucket="test", prefix="", publish_only=False,
                                     max_age_hours=None, timeout_seconds=60)
 
@@ -618,6 +619,25 @@ class WorkerUnchangedRunTest(unittest.TestCase):
             self.args.models = [model]
             self.run_models(1)
             self.assertNotIn("--cycle", self.command, model)
+
+    def test_frames_on_request_reach_the_adapter_with_their_step(self):
+        self.args.models, self.args.frames, self.args.frame_step = ["mi-swan"], True, 3
+        self.run_models(1)
+        self.assertEqual(self.command[-3:], ["--frames", "--frame-step", "3"])
+        self.args.frame_step = None
+        self.run_models(1)
+        self.assertEqual(self.command[-1], "--frames")
+        self.args.frames = False
+        self.run_models(1)
+        self.assertNotIn("--frames", self.command)
+
+    def test_frames_are_refused_for_a_model_that_does_not_publish_them_on_request(self):
+        for argv in (["--models", "gfs-wave", "--frames"],
+                     ["--models", "mi-swan", "--frame-step", "3"],
+                     ["--models", "mi-swan", "--frames", "--frame-step", "2"]):
+            with self.subTest(argv=argv), patch("sys.argv", ["worker.py", *argv]), \
+                    contextlib.redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+                self.worker.main()
 
     def test_a_real_failure_is_still_a_failure(self):
         status, event = self.run_models(1)
