@@ -22,6 +22,12 @@ that a press takes away. A word that only describes something is a
   can have one on (a single choice) or several (filters).
 - **Removable**: no `aria-pressed`; the cross says a press clears it ("Spots
   named 'Bally' ×"). Used for a filter in use, next to a quiet Clear.
+- **Lit** (`variant="lit"`, the map's layer chips alone): a small line icon
+  before the words. Off, a ghost: no edge or fill, the words in
+  `sem.color.ink-muted`, `sem.color.well` under the pointer. On, it glows in
+  its layer's colour (`glow`: wind, waves or weather, `--color-glow-*` in
+  ui/theme.css): a fifth of it for the fill, its edge and icon in the colour
+  (deeper on white), the words in `sem.color.ink`. No cross; 150 ms fade.
 
 ## States
 

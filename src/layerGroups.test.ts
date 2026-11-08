@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChartLayers } from "../force5/src/WindMap";
 import {
   LAYER_DEFAULTS,
-  excludeWashFoil,
   layerGroups,
   railGroups,
   type LayerChoices,
@@ -80,34 +79,23 @@ describe("railGroups", () => {
     });
   });
 
-  it("switches the wind's two layers each by itself, either, both or neither", () => {
+  it("switches the particles alone: the coloured wind is the dock's Wind field", () => {
     const set = choices();
     const rail = railGroups(layerGroups(set));
     expect(rail[0].items.map((entry) => [entry.name, entry.on])).toEqual([
-      ["Coloured wind", false],
       ["Particles", true],
       ["Live wind", false],
     ]);
-    item(rail, "wind-wash").press();
-    expect(set.onWind).toHaveBeenLastCalledWith({
-      wash: true,
-      particles: true,
-    });
     item(rail, "wind-particles").press();
     expect(set.onWind).toHaveBeenLastCalledWith({
       wash: false,
       particles: false,
     });
-    const both = choices({ wind: { wash: true, particles: true } });
-    const panel = layerGroups(both)[0];
-    expect(
-      panel.tiles
-        .filter((tile) => tile.id.startsWith("wind-"))
-        .every((tile) => tile.on),
-    ).toBe(true);
-    panel.tiles[0].press();
-    expect(both.onWind).toHaveBeenLastCalledWith({
-      wash: false,
+    // Under Wind the coloured wind is kept as it is.
+    const washed = choices({ wind: { wash: true, particles: false } });
+    item(railGroups(layerGroups(washed)), "wind-particles").press();
+    expect(washed.onWind).toHaveBeenLastCalledWith({
+      wash: true,
       particles: true,
     });
   });
@@ -152,44 +140,14 @@ describe("railGroups", () => {
     const ids = railGroups(layerGroups(choices())).flatMap((group) =>
       group.items.map((entry) => entry.id),
     );
+    // No Coloured wind, Tidal depth or Rain: the dock's field is those.
     expect(ids).toEqual([
-      "wind-wash",
       "wind-particles",
       "live",
-      "foil",
       "currents",
       "depths",
-      "rain",
       "satellite",
       "focus-loupe",
     ]);
-  });
-});
-
-describe("coloured wind and the tidal depth", () => {
-  const wind = { wash: false, particles: true };
-  const washed = { wash: true, particles: true };
-  const layers = { ...LAYER_DEFAULTS.layers, foil: true };
-  const dry = { ...layers, foil: false };
-
-  it("turns the tidal depth off when coloured wind goes on", () => {
-    expect(excludeWashFoil(wind, layers, washed, layers).layers.foil).toBe(
-      false,
-    );
-  });
-
-  it("turns coloured wind off when the tidal depth goes on", () => {
-    expect(excludeWashFoil(washed, dry, washed, layers).wind.wash).toBe(false);
-  });
-
-  it("leaves the other alone when one goes off", () => {
-    expect(excludeWashFoil(washed, dry, wind, dry)).toEqual({
-      wind,
-      layers: dry,
-    });
-    expect(excludeWashFoil(wind, layers, wind, dry)).toEqual({
-      wind,
-      layers: dry,
-    });
   });
 });

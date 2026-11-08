@@ -240,6 +240,21 @@ export const css = {
   "grid-template-columns-ai-row": "40px minmax(0, 1fr) auto",
   "text-ai-row": "16.5px",
   "text-ai-row--line-height": "1.25",
+  "color-glow-wind": "#4cb35a",
+  "color-glow-wind-edge": "#2f8a3c",
+  "color-glow-wind-ink": "#2f8a3c",
+  "color-glow-waves": "#1fa6ad",
+  "color-glow-waves-edge": "#0e7c83",
+  "color-glow-waves-ink": "#0e7c83",
+  "color-glow-weather": "#e9b200",
+  "color-glow-weather-edge": "#8f6b00",
+  "color-glow-weather-ink": "#8f6b00",
+  "color-legend-shallow": "#3f9fd0",
+  "map-wave-0": "#c9ece4",
+  "map-wave-1": "#3fb6b4",
+  "map-wave-2": "#1f83a8",
+  "map-wave-3": "#2a55a3",
+  "map-wave-5": "#3b2c8e",
 } as const;
 
 export type CssToken = keyof typeof css;

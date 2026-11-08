@@ -984,3 +984,50 @@
   --text-ai-row: 16.5px;
   --text-ai-row--line-height: 1.25;
 }
+
+/* ==== map layers =========================================================
+   The map's one field (force5/src/mapField.ts), chosen with the lit chips in
+   the map's dock (ui/Chip.tsx `lit`, src/MapDock.tsx), and the legend beside
+   them (src/MapScales.tsx). A chip that is on glows in its field's colour: a
+   fill of `glow-*` at a fifth, an edge of `glow-*-edge`, its icon in
+   `glow-*-ink`. Wind's glow is the wind ramp's mid green (`wind-k15`), a
+   swatch of the field it turns on; on white its edge and icon take a deeper
+   shade of the same green, and the others theirs, so they read at 3:1 on the
+   ground. A chip's word is always ink, never the glow (ui/tv.test.ts). */
+@theme static {
+  --color-glow-wind: #4cb35a;
+  --color-glow-wind-edge: #2f8a3c;
+  --color-glow-wind-ink: #2f8a3c;
+  --color-glow-waves: #1fa6ad;
+  --color-glow-waves-edge: #0e7c83;
+  --color-glow-waves-ink: #0e7c83;
+  --color-glow-weather: #e9b200;
+  --color-glow-weather-edge: #8f6b00;
+  --color-glow-weather-ink: #8f6b00;
+  /* The legend's swatch for the shallows' glow, the map with no field on. */
+  --color-legend-shallow: #3f9fd0;
+}
+/* The wave height's ramp, 0, 1, 2, 3 and 5 m and over, for the Waves field's
+   legend and the frames that will draw it: a pale sea green through the sea's
+   blue to a deep violet on white; on black from a dark teal up to a light
+   violet, so the big seas are the bright ones. */
+:root {
+  --map-wave-0: #c9ece4;
+  --map-wave-1: #3fb6b4;
+  --map-wave-2: #1f83a8;
+  --map-wave-3: #2a55a3;
+  --map-wave-5: #3b2c8e;
+}
+:root[data-theme="dark"] {
+  --color-glow-wind-edge: #4cb35ab3;
+  --color-glow-wind-ink: #5cc96a;
+  --color-glow-waves-edge: #1fa6adb3;
+  --color-glow-waves-ink: #3cc3c9;
+  --color-glow-weather-edge: #e9b200b3;
+  --color-glow-weather-ink: #f2c21c;
+  --map-wave-0: #12303a;
+  --map-wave-1: #0c6c80;
+  --map-wave-2: #1b88a0;
+  --map-wave-3: #4a98d8;
+  --map-wave-5: #8f96f0;
+}

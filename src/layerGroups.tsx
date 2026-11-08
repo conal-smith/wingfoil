@@ -7,23 +7,23 @@ import { DEFAULT_WIND } from "../force5/src/windLayers";
 import {
   ChartGlyph,
   glyphs,
-  ColouredWindGlyph,
   CurrentsGlyph,
   HighTideGlyph,
   LiveWindGlyph,
   LoupeGlyph,
   LowTideGlyph,
   ParticlesGlyph,
-  RainGlyph,
   SatelliteGlyph,
   SoundingsGlyph,
-  TidalDepthGlyph,
 } from "./chartGlyphs";
 import type { InfoSection } from "./mapInfoContext";
 
 /** What the chart draws, and the way to change each part of it. */
 export interface LayerChoices {
-  /** The wind's two layers, the coloured wind and the particles, each on or off. */
+  /**
+   * The wind's two layers. The rail switches the particles; the coloured wind
+   * is the Wind field, the dock's (src/MapDock.tsx).
+   */
   wind: WindLayers;
   onWind: (wind: WindLayers) => void;
   layers: ChartLayers;
@@ -35,15 +35,15 @@ export interface LayerChoices {
   focusStyle: FocusStyle;
   onFocusStyle: (style: FocusStyle) => void;
   /**
-   * What a layer that is on cannot draw just now, in a few words: the tidal
-   * depth out too far, the currents at an hour they do not reach.
+   * What a layer that is on cannot draw just now, in a few words: the
+   * currents at an hour they do not reach.
    */
-  notes?: Partial<Record<"foil" | "currents", string | null>>;
+  notes?: Partial<Record<"currents", string | null>>;
 }
 
 /**
- * The chart a first visit opens on (src/App.tsx): the particles, tidal
- * depth, the names and the range ring.
+ * The chart a first visit opens on (src/App.tsx): the particles, the
+ * shallows' glow (no field on), the names and the range ring.
  */
 export const LAYER_DEFAULTS: {
   wind: WindLayers;
@@ -57,10 +57,12 @@ export const LAYER_DEFAULTS: {
     // eye went to the figures in the water, and the chart is lighter without.
     depths: false,
     names: true,
+    // The tidal depth and the rain follow the map's one field
+    // (force5/src/mapField.ts): the depth with none on, the rain under
+    // Weather. A first visit has none.
     foil: true,
     // Off by default: nothing of it is read until a rider asks for it.
     currents: false,
-    // Off too, and nothing of it read until asked for.
     rain: false,
     // The measured wind at the weather stations and buoys. On the Spot
     // finder's plain map always (src/App.tsx); on the full chart off until
@@ -99,7 +101,7 @@ export interface LayerTile {
 
 export interface LayerGroup {
   /** For the panel's notes under a group. */
-  id: "wind" | "sea" | "weather" | "chart" | "ground" | "focus";
+  id: "wind" | "sea" | "chart" | "ground" | "focus";
   name: string;
   /** The group's glyph, before its name. */
   glyph: ReactNode;
@@ -109,16 +111,16 @@ export interface LayerGroup {
 }
 
 /**
- * The layers a rider switches, in the groups and the order the layers' rail
- * (src/LayerRail.tsx) shows them: the wind, the sea, the weather, the ground
- * under the chart, and the loupe round the chosen spot. Few enough to stand
- * in a column on a phone (the owner's ruling of 2026-11-02): the names are
- * always drawn, the depths (their tints, contours, soundings and the land's
- * relief) are one switch under the Sea, off until asked for (the ruling of
- * 2026-11-03), the satellite is one button that goes from high tide to low
- * tide to none, and the loupe is on or off, the range ring standing in for it
- * when off. The rest, the wind's two layers among them, each switch their own
- * part.
+ * The layers a rider switches on the chart, in the groups and the order the
+ * layers' rail (src/LayerRail.tsx) shows them: the wind, the sea, the ground
+ * under the chart, and the loupe round the chosen spot. What colours the map
+ * (the coloured wind, the rain, and with neither the tidal depth's glow) is
+ * the dock's field, not the rail's (the ruling of 2026-11-07). Few enough to
+ * stand in a column on a phone: the names are always drawn, the depths (their
+ * tints, contours, soundings and the land's relief) are one switch under the
+ * Sea, off until asked for (the ruling of 2026-11-03), the satellite is one
+ * button that goes from high tide to low tide to none, and the loupe is on or
+ * off, the range ring standing in for it when off.
  */
 export function layerGroups({
   wind,
@@ -158,8 +160,7 @@ export function layerGroups({
     on: layers[key],
     press: () => onLayersChange({ ...layers, [key]: !layers[key] }),
     layer: key,
-    note:
-      layers[key] && (key === "foil" || key === "currents") ? notes[key] : null,
+    note: layers[key] && key === "currents" ? notes[key] : null,
     info,
   });
   return [
@@ -169,12 +170,6 @@ export function layerGroups({
       glyph: <ChartGlyph glyph={glyphs.wind} size={14} />,
       rule: "any",
       tiles: [
-        windPart(
-          "wash",
-          "Coloured wind",
-          "Speed as colour",
-          <ColouredWindGlyph size={18} />,
-        ),
         windPart(
           "particles",
           "Particles",
@@ -201,17 +196,6 @@ export function layerGroups({
       tiles: [
         {
           ...part(
-            "foil",
-            "Tidal depth",
-            "Water at this tide",
-            <TidalDepthGlyph size={18} />,
-            { label: "About tidal depth", at: "foil" },
-          ),
-          note: null,
-          hint: layers.foil ? notes.foil : null,
-        },
-        {
-          ...part(
             "currents",
             "Currents",
             "Tidal streams",
@@ -227,24 +211,6 @@ export function layerGroups({
           <SoundingsGlyph size={18} />,
           { label: "About the depths", at: "key" },
         ),
-      ],
-    },
-    {
-      id: "weather",
-      name: "Weather",
-      glyph: <RainGlyph size={14} />,
-      rule: "over the chart",
-      tiles: [
-        {
-          ...part(
-            "rain",
-            "Rain",
-            "In the hour shown",
-            <RainGlyph size={18} />,
-            { label: "About rain", at: "rain" },
-          ),
-          isNew: true,
-        },
       ],
     },
     {
@@ -296,24 +262,6 @@ export function layerGroups({
       ],
     },
   ];
-}
-
-/**
- * Coloured wind and the tidal depth exclude each other: each paints the sea,
- * and the one reads through neither. Turning either on turns the other off.
- * Turning one off leaves the other as it was.
- */
-export function excludeWashFoil(
-  wind: WindLayers,
-  layers: ChartLayers,
-  nextWind: WindLayers,
-  nextLayers: ChartLayers,
-): { wind: WindLayers; layers: ChartLayers } {
-  if (nextWind.wash && !wind.wash && nextLayers.foil)
-    return { wind: nextWind, layers: { ...nextLayers, foil: false } };
-  if (nextLayers.foil && !layers.foil && nextWind.wash)
-    return { wind: { ...nextWind, wash: false }, layers: nextLayers };
-  return { wind: nextWind, layers: nextLayers };
 }
 
 /** One of the rail's buttons: a layer's glyph, its name, and its switch. */

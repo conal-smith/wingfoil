@@ -374,6 +374,35 @@ export async function setLayer(page: Page, name: string, on: boolean) {
   await expect(tile).toHaveAttribute("aria-pressed", String(on));
 }
 
+/** Where the map's one field is kept (force5/src/mapField.ts), "none" too. */
+export const FIELD_KEY = "wingfoil.map.field.v1";
+
+/** The map's dock (src/MapDock.tsx): the field's chips, the legend, the hours. */
+export const mapDock = (page: Page) => page.locator(".map-dock");
+
+/** The dock's group of field chips. */
+export const fieldChips = (page: Page) =>
+  page.getByRole("group", { name: "Map layer, one at a time" });
+
+/** One of the map's field chips: Wind, Waves or Weather. */
+export const fieldChip = (page: Page, name: "Wind" | "Waves" | "Weather") =>
+  fieldChips(page).getByRole("button", { name, exact: true });
+
+/**
+ * Turn a field on or off with its chip: pressed only if it is not already as
+ * asked, and then it must be.
+ */
+export async function setField(
+  page: Page,
+  name: "Wind" | "Waves" | "Weather",
+  on: boolean,
+) {
+  const chip = fieldChip(page, name);
+  if ((await chip.getAttribute("aria-pressed")) !== String(on))
+    await chip.click();
+  await expect(chip).toHaveAttribute("aria-pressed", String(on));
+}
+
 /** Settings' choice of model, by a model's id. */
 export const modelChoice = (page: Page, id: string) =>
   settingsDialog(page)

@@ -194,6 +194,13 @@ export interface FinderProps {
   onHover?: (id: string | null) => void;
   /** The time every card shows, as it changes. */
   onShown?: (time: number) => void;
+  /**
+   * The hour picked on the day's row, for every card, kept by the page so the
+   * hour bar on the map beside the list picks it too; null is the hour the
+   * day stands at. Without `onPicked` the list keeps its own.
+   */
+  picked?: number | null;
+  onPicked?: (time: number | null) => void;
   /** Where the rider is, once their browser has said; else null. */
   onPlace?: (at: { lat: number; lon: number } | null) => void;
   /** The list is drawn: the chart beside it may be made. */
@@ -288,7 +295,9 @@ export default function SpotFinder(props: FinderProps) {
   const [chosen, setChosen] = useState<string | null>(null);
   // The hour picked on that day's row, for every card; null is the hour the
   // day stands at (now, today).
-  const [picked, setPicked] = useState<number | null>(null);
+  const [ownPick, setOwnPick] = useState<number | null>(null);
+  const picked = props.onPicked ? (props.picked ?? null) : ownPick;
+  const setPicked = props.onPicked ?? setOwnPick;
   // The time under a mouse, shared by every card without drawing them again.
   const [hover] = useState(hoverStore);
 

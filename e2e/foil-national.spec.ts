@@ -1,11 +1,10 @@
 import { readFileSync } from "node:fs";
 import {
   barName,
-  closeLayers,
   expect,
-  layersRail,
+  mapDock,
   openFromMenu,
-  setLayer,
+  setField,
   test,
   timeSlider,
   type Page,
@@ -245,8 +244,8 @@ test("a national region draws on its own station's tide, answers a tap, and only
   await slider.fill(String(low.i));
   await expect(slider).toHaveValue(String(low.i));
   const atLow = await photograph(page);
-  await setLayer(page, "Tidal depth", false);
-  await closeLayers(page);
+  // Off: a field on the map in its place, Weather, clear where it is dry.
+  await setField(page, "Weather", true);
   const off = await photograph(page);
   expect(await differs(page, atHigh, off)).toBeGreaterThan(0.05);
   expect(await differs(page, atLow, off)).toBeGreaterThan(0.05);
@@ -254,8 +253,7 @@ test("a national region draws on its own station's tide, answers a tap, and only
 
   // Back on, at high water: a tap beside the spot, on the flat, is read out
   // as (tide − 1) m of water at Galway's tide.
-  await setLayer(page, "Tidal depth", true);
-  await closeLayers(page);
+  await setField(page, "Weather", false);
   await slider.fill(String(high.i));
   const spot = (await page
     .locator('.spot-marker[data-spot-id="rusheen"]')
@@ -287,7 +285,7 @@ test("a national region draws on its own station's tide, answers a tap, and only
   expect(errors).toEqual([]);
 });
 
-test("over the whole chart only the coast's glow is fetched, and Layers says to zoom in", async ({
+test("over the whole chart only the coast's glow is fetched, and its part of About the map says to zoom in", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -311,22 +309,23 @@ test("over the whole chart only the coast's glow is fetched, and Layers says to 
   await page.waitForTimeout(1000);
   expect(asked).toEqual([]);
   expect(glow).toBe(1);
-  await openFromMenu(page, "Layers");
-  const panel = layersRail(page);
-  await expect(panel.locator('[data-rail-layer="foil"]')).toHaveAttribute(
-    "aria-pressed",
-    "true",
+  // The map with no field on: its legend names the glow.
+  await expect(mapDock(page).locator('[data-map-legend="none"]')).toHaveText(
+    "Shallow water",
   );
-  await expect(panel.locator('[data-layer-note="foil"]')).toHaveText(
+  await openFromMenu(page, "About the map");
+  await page.getByRole("tab", { name: "Tidal depth" }).click();
+  await expect(page.locator("[data-foil-far]")).toContainText(
     "Zoom in for this hour's depths.",
   );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  // In to a bay's zoom, the index is read and the note goes.
+  // In to a bay's zoom, the index is read.
   const zoomIn = page.getByRole("button", { name: "Zoom in" });
   for (let i = 0; i < 3; i++) await zoomIn.click();
   await expect
     .poll(() => asked.some((p) => p.endsWith("/foildepth/index.json")))
     .toBe(true);
-  await expect(panel.locator('[data-layer-note="foil"]')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

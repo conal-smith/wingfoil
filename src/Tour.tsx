@@ -1,8 +1,8 @@
 /**
- * The tour: six cards, each with a ring round the real thing on
+ * The tour: seven cards, each with a ring round the real thing on
  * the chart it is about (the lights, a spot's week in the scrub bar, moving
- * through it, the loupe, the menu, the layers), and a last card that offers
- * Settings.
+ * through it, the loupe, the map's colours in its dock, the menu, the
+ * layers), and a last card that offers Settings.
  * Back, Next, Skip tour, and Escape leaves. Its own chunk, fetched when the
  * tour is taken, from the first visit's offer or the site menu.
  *
@@ -60,6 +60,7 @@ const TARGETS = {
   // The loupe's sheet is the whole map: its rim and the reading under it are the loupe.
   loupe: [".map-loupe .map-loupe-rim", ".map-loupe .map-loupe-foot-box"],
   menu: '[data-top-bar] [aria-label="Site menu"]',
+  field: ".map-footer .md-chips",
   layers: "#map-rail",
 } as const;
 
@@ -155,6 +156,12 @@ const STEPS: Step[] = [
       pad(union(TARGETS.loupe.map((s) => box(document.querySelector(s)))), 6),
   },
   {
+    id: "field",
+    title: "The map’s colours",
+    body: "Wind colours the map by the wind’s speed, and Weather shows the rain. One at a time: tap it again for the plain map, where the shallow water round the coast glows blue.",
+    target: () => pad(box(document.querySelector(TARGETS.field)), 4),
+  },
+  {
     id: "menu",
     title: "The menu",
     body: "The menu has the spot finder, which lists the best places to ride this week. It also has Settings, a guide to the map, and this tour.",
@@ -163,7 +170,7 @@ const STEPS: Step[] = [
   {
     id: "layers",
     title: "Map layers",
-    body: "These buttons add more to the map, such as water depth, tidal currents, rain and satellite photos. The layers button by the zoom shows and hides them. You don’t need any of this to see the wind and stars.",
+    body: "These buttons add more to the map, such as moving wind lines, tidal currents, depth soundings and satellite photos. The layers button by the zoom shows and hides them. You don’t need any of this to see the wind and stars.",
     prep: (p) => p.onLayers(true),
     target: () => pad(box(document.querySelector(TARGETS.layers)), 4),
   },

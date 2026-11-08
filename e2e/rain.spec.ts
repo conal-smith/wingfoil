@@ -1,9 +1,11 @@
 import {
+  FIELD_KEY,
   expect,
   barReady,
-  layerTile,
+  fieldChip,
+  mapDock,
   openFromMenu,
-  setLayer,
+  setField,
   test,
   timeSlider,
   type Page,
@@ -11,9 +13,9 @@ import {
 import { sampleStrip } from "./columns";
 
 /**
- * Rain, hourly: the Rain layer over the chart (off at first, and then nothing
- * of it is read, neither its frames nor its code), following the scrub bar's
- * hour. A spot's rain hour by hour is on its page. The e2e site's ICON-EU
+ * Rain, hourly: the Weather field over the chart, the rain until the sky is
+ * drawn under it (off at first, and then nothing of it is read, neither its
+ * frames nor its code), following the scrub bar's hour. A spot's rain hour by hour is on its page. The e2e site's ICON-EU
  * weather is an hourly run from HARMONIE's sample day for three days
  * (scripts/sample-weather.mjs), with a frame of rain an hour.
  */
@@ -47,8 +49,7 @@ test("the rain layer is off at first and nothing of it is loaded", async ({
   await expect(page.locator(".spot-marker").first()).toBeVisible({
     timeout: 30000,
   });
-  await openFromMenu(page, "Layers");
-  await expect(layerTile(page, "Rain")).toHaveAttribute(
+  await expect(fieldChip(page, "Weather")).toHaveAttribute(
     "aria-pressed",
     "false",
   );
@@ -65,7 +66,11 @@ test("turned on, it draws the hour shown under the chart's ink, and follows the 
   const asked = watch(page);
   await page.goto("/?spot=brandon");
   await barReady(page);
-  await setLayer(page, "Rain", true);
+  await setField(page, "Weather", true);
+  // The legend at the dock's right is the rain's ramp now.
+  await expect(
+    mapDock(page).locator('[data-map-legend="weather"]'),
+  ).toBeVisible();
 
   // The hour shown, read from its own frame: one hour's rain, under the relief.
   await expect(map(page)).toHaveAttribute(
@@ -90,25 +95,20 @@ test("turned on, it draws the hour shown under the chart's ink, and follows the 
   );
 
   expect(
-    JSON.parse(
-      (await page.evaluate(() =>
-        localStorage.getItem("wingfoil.map.layers.v1"),
-      )) ?? "{}",
-    ).rain,
-  ).toBe(true);
+    await page.evaluate((key) => localStorage.getItem(key), FIELD_KEY),
+  ).toBe("weather");
 
-  // Off again: nothing drawn.
-  await setLayer(page, "Rain", false);
+  // Off again: nothing drawn, and the shallows' legend back.
+  await setField(page, "Weather", false);
+  await expect(mapDock(page).locator('[data-map-legend="none"]')).toBeVisible();
   await expect(map(page)).not.toHaveAttribute("data-rain", /./);
   expect(errors).toEqual([]);
 });
 
 test("its part of About the map says what the hour shows", async ({ page }) => {
-  await page.addInitScript(() =>
-    localStorage.setItem(
-      "wingfoil.map.layers.v1",
-      JSON.stringify({ rain: true }),
-    ),
+  await page.addInitScript(
+    (key) => localStorage.setItem(key, "weather"),
+    FIELD_KEY,
   );
   await page.goto("/?map");
   await expect(page.locator(".spot-marker").first()).toBeVisible({
@@ -133,11 +133,9 @@ test("with no rain published the page still works, and says so", async ({
   await page.route("**/weather/icon-eu-weather.json", (route) =>
     route.fulfill({ status: 404, body: "" }),
   );
-  await page.addInitScript(() =>
-    localStorage.setItem(
-      "wingfoil.map.layers.v1",
-      JSON.stringify({ rain: true }),
-    ),
+  await page.addInitScript(
+    (key) => localStorage.setItem(key, "weather"),
+    FIELD_KEY,
   );
   await page.goto("/?map");
   await expect(page.locator(".spot-marker").first()).toBeVisible({

@@ -39,7 +39,6 @@ import {
   areasInView,
   FOIL_FULL_ZOOM,
   FOIL_MIN_ZOOM,
-  FOIL_ZOOM_NOTE,
   foilColours,
   foilRamp,
   foilReadout,
@@ -61,7 +60,16 @@ import { parseWindLayers, type WindLayers } from "../force5/src/windLayer";
 import { isFocusStyle, loupeRose, type FocusStyle } from "../force5/src/focus";
 import ScrubBar from "./ScrubBar";
 import MapControls from "./MapControls";
-import { LAYER_DEFAULTS, excludeWashFoil } from "./layerGroups";
+import { LAYER_DEFAULTS } from "./layerGroups";
+import {
+  FIELD_KEY,
+  offeredFields,
+  parseMapField,
+  shownField,
+  windWith,
+  type FieldSources,
+  type MapField,
+} from "../force5/src/mapField";
 import { tourOffered, tourSeen } from "./tourOffer";
 import { SiteMenu } from "../force5/src/SiteMenu";
 import {
@@ -80,7 +88,8 @@ import {
 import { MAP_ASK_EVENT } from "./PagesOverMap";
 import { saveChartCentre } from "./lastView";
 import { InfoPop } from "./InfoPop";
-import MapScales from "./MapScales";
+import MapDock from "./MapDock";
+import HourBar from "./HourBar";
 import useRunRefresh, {
   loadNewerRun,
   RunRecovery,
@@ -263,8 +272,15 @@ const PHONE = "(max-width: 720px)";
 const NO_NAMES: ReadonlySet<string> = new Set();
 /** Room for the chart beside the spot finder's list, as the home page has it. */
 const SPLIT = "(min-width: 1100px)";
-/** The wind beside the list: no colour and no particles (the map is plain there). */
-const PLAIN_WIND = { wash: false, particles: false } as const;
+/**
+ * What draws each of the map's fields (force5/src/mapField.ts). The wave
+ * height has no frames for the map yet, so Waves has no chip; once they are
+ * published, this says so and the chip is there.
+ */
+const FIELD_SOURCES: FieldSources = { waves: false };
+const OFFERED = offeredFields(FIELD_SOURCES);
+/** The height the map's dock takes over the scrub bar on a phone, its gap with it. */
+const MAP_DOCK_ROOM = 60;
 /** How long the chart takes to open out from beside the list, or back. */
 const OPEN_MS = 420;
 
@@ -409,6 +425,11 @@ export default function App() {
   const [listFollows, setListFollows] = useState(false);
   /** The time the cards show, which the lights beside them show too. */
   const [finderShown, setFinderShown] = useState<number | null>(null);
+  /**
+   * The hour picked on the finder's day, by a card or by the hour bar on the
+   * map beside the list; null is the hour the day stands at (now, today).
+   */
+  const [finderPicked, setFinderPicked] = useState<number | null>(null);
   /** Where the rider is, once their browser has said: the blue dot. */
   const [riderAt, setRiderAt] = useState<{ lat: number; lon: number } | null>(
     null,
@@ -471,10 +492,30 @@ export default function App() {
   const settingsShown = useFadeOut(guide === "settings");
   /** The wave models, read once the scrub bar first draws the waves. */
   const [wantMarine, setWantMarine] = useState(false);
-  const [wind, setWind] = useState<WindLayers>(() =>
+  const [savedWind, setWind] = useState<WindLayers>(() =>
     parseWindLayers(store.get(WIND_KEY), store.get(OLD_WIND_KEY)),
   );
-  const [layers, setLayers] = useState<MapLayers>(() => {
+  // The map's one field, the dock's chips' (force5/src/mapField.ts): a rider
+  // who had Coloured wind on starts on Wind, everyone else on none.
+  const [field, setField] = useState<MapField>(() =>
+    parseMapField(
+      store.get(FIELD_KEY),
+      parseWindLayers(store.get(WIND_KEY), store.get(OLD_WIND_KEY)),
+    ),
+  );
+  const fieldShown = shownField(field, OFFERED);
+  const chooseField = (next: MapField) => {
+    setField(next);
+    store.set(FIELD_KEY, next);
+    // The wind's own store says the same, for anything that reads it.
+    store.set(WIND_KEY, JSON.stringify(windWith(next, savedWind.particles)));
+  };
+  // The coloured wind is the Wind field; the particles are the rail's.
+  const wind = useMemo(
+    () => windWith(fieldShown, savedWind.particles),
+    [fieldShown, savedWind.particles],
+  );
+  const [savedLayers, setLayers] = useState<MapLayers>(() => {
     try {
       // The LiDAR layer was taken off on 2026-10-24, and the depths' three
       // switches became one, off by default, on 2026-11-03: a rider's stored
@@ -494,17 +535,21 @@ export default function App() {
         // (src/layerGroups.tsx): names a rider once hid come back.
         names: true,
         satellite: parseSatelliteOption(saved.satellite),
-        // The two exclude each other since 2026-11-06 (src/layerGroups.tsx). A
-        // rider who kept both had asked for the coloured wind: the tidal depth
-        // was on by default.
-        foil:
-          (saved.foil ?? DEFAULT_LAYERS.foil) &&
-          !parseWindLayers(store.get(WIND_KEY), store.get(OLD_WIND_KEY)).wash,
       };
     } catch {
       return DEFAULT_LAYERS;
     }
   });
+  // The tidal depth and the rain follow the field: the shallows glow with no
+  // field on, and the rain is the Weather field until the sky is drawn.
+  const layers = useMemo<MapLayers>(
+    () => ({
+      ...savedLayers,
+      foil: fieldShown === "none",
+      rain: fieldShown === "weather",
+    }),
+    [savedLayers, fieldShown],
+  );
   const saveWind = (next: WindLayers) => {
     setWind(next);
     store.set(WIND_KEY, JSON.stringify(next));
@@ -518,23 +563,14 @@ export default function App() {
     setFocusStyle(style);
     store.set(FOCUS_KEY, style);
   };
-  const saveLayers = (next: MapLayers) => {
-    setLayers(next);
+  // The rail's own: the field's two (the tidal depth, the rain) are not kept
+  // here, and the coloured wind is kept as the field.
+  const chooseLayers = ({ foil: _foil, rain: _rain, ...next }: MapLayers) => {
+    setLayers({ ...savedLayers, ...next });
     store.set(LAYERS_KEY, JSON.stringify(next));
   };
-  // Coloured wind and the tidal depth exclude each other: turning either on
-  // turns the other off.
-  const chooseWind = (next: WindLayers) => {
-    const settled = excludeWashFoil(wind, layers, next, layers);
-    saveWind(settled.wind);
-    if (settled.layers.foil !== layers.foil)
-      saveLayers({ ...layers, foil: settled.layers.foil });
-  };
-  const chooseLayers = (next: MapLayers) => {
-    const settled = excludeWashFoil(wind, layers, wind, next);
-    saveLayers({ ...next, foil: settled.layers.foil });
-    if (settled.wind.wash !== wind.wash) saveWind(settled.wind);
-  };
+  const chooseWind = (next: WindLayers) =>
+    saveWind({ wash: field === "wind", particles: next.particles });
   const controls = useRef<Controls | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [scale, setScale] = useState("");
@@ -824,8 +860,25 @@ export default function App() {
   }, []);
 
   /* ---- the map's frame follows the time, a little behind a fast scrub ---- */
+  // Beside the list, with a field on, the map is at the cards' hour, which the
+  // hour bar under it scrubs: its frames (and the rain) are that hour's. With
+  // none on, nothing is drawn from them there, so no hour is read for it. On
+  // the full chart, the chart's own.
+  const finderTime = useMemo(
+    () =>
+      finderShown === null || !strip.length
+        ? null
+        : strip[nearestColumn(strip, finderShown)].validTime,
+    [strip, finderShown],
+  );
   // The first time set goes to the map at once; a scrub after it is throttled.
-  const mapTime = useThrottled(selectedTime, 200) ?? selectedTime;
+  const mapTime =
+    useThrottled(
+      page === "chart" || finderTime === null || fieldShown === "none"
+        ? selectedTime
+        : finderTime,
+      200,
+    ) ?? selectedTime;
   const commitRun = ({ manifest: next, frame: nextFrame }: RunSwap) => {
     modelEpoch.current++;
     setManifest(next);
@@ -2439,11 +2492,26 @@ export default function App() {
       ...layers,
       depths: false,
       currents: false,
-      rain: false,
       // The stations' and buoys' own wind, beside the spots' forecast.
       live: true,
     }),
     [layers],
+  );
+  // The wind beside the list: the Wind field's colour, and no particles.
+  const plainWind = useMemo(() => windWith(fieldShown, false), [fieldShown]);
+  /** The map's dock: its field's chips and legend, and beside the list the day's hours. */
+  const mapDock = (hours: boolean) => (
+    <MapDock
+      field={fieldShown}
+      offered={OFFERED}
+      onField={chooseField}
+      phone={phone}
+      where={hours ? "finder" : "chart"}
+    >
+      {hours && finderShown !== null && (
+        <HourBar time={finderShown} now={clockNow} onTime={setFinderPicked} />
+      )}
+    </MapDock>
   );
   const mode = onChart ? "full" : split && panelBox ? "panel" : "hidden";
   const skip = !onChart ? SKIP.list : dockOpen ? SKIP.dock : SKIP.search;
@@ -2541,6 +2609,8 @@ export default function App() {
                   view={panelView}
                   onHover={hoverCard}
                   onShown={setFinderShown}
+                  picked={finderPicked}
+                  onPicked={setFinderPicked}
                   onPlace={setRiderAt}
                   onDrawn={onFinderDrawn}
                   onScreen={!onChart}
@@ -2607,6 +2677,7 @@ export default function App() {
                       −
                     </Button>
                   </div>
+                  {mapDock(true)}
                   {panelWhen && (
                     <div className="panel-foot">
                       <span data-panel-when>{panelWhen}</span>
@@ -2625,10 +2696,7 @@ export default function App() {
                     onZoomOut={() => controls.current?.zoomOut()}
                     rail={railOpen}
                     onLayers={pressLayers}
-                    notes={{
-                      foil: foilFar ? FOIL_ZOOM_NOTE : null,
-                      currents: currents.note,
-                    }}
+                    notes={{ currents: currents.note }}
                     layoutKey={`${barShown ? dockHeight : 0}`}
                     onCollapse={split ? openList : undefined}
                     wind={wind}
@@ -2684,13 +2752,14 @@ export default function App() {
                     readings={readings}
                     covered={() => !!document.querySelector(OVER_THE_CHART)}
                     onPick={tapChart}
-                    // Beside the list the map is plain: no wind, and of the
-                    // chart's layers only the tidal depth and the names.
-                    wind={onChart ? wind : PLAIN_WIND}
+                    // Beside the list the map is plain but for its field: the
+                    // coloured wind, the rain, or with neither the shallows'
+                    // glow, and the names.
+                    wind={onChart ? wind : plainWind}
                     layers={onChart ? layers : plainLayers}
                     foil={foilViews}
                     currents={onChart ? currents.features : null}
-                    rain={onChart ? rain.view : null}
+                    rain={rain.view}
                     satellite={onChart ? satellite.image : null}
                     reducedMotion={reducedMotion}
                     bottomInset={barShown ? dockHeight : 0}
@@ -2769,11 +2838,7 @@ export default function App() {
                 >
                   {/* The small print rides over the scrub bar's top edge, in its
                   own layout: never a frame behind it (map.css). */}
-                  <MapScales
-                    wind={wind.wash}
-                    depth={layers.foil && !foilFar}
-                    rain={layers.rain && !!rain.view}
-                  />
+                  {mapDock(false)}
                   <div className="map-print">
                     <InfoPop label="Sources and small print" wide>
                       {sources}
@@ -2929,9 +2994,10 @@ export default function App() {
                 rider: parseRider({ ...prefs.rider, ...r }),
               })
             }
-            // Over the scrub bar and the lane its pill rides in.
-            launcherBottom={dockHeight + 24}
-            panelBottom={dockHeight + 12}
+            // Over the scrub bar and the lane its pill rides in, and on a
+            // phone over the map's dock too, which is the screen's width there.
+            launcherBottom={dockHeight + (phone ? MAP_DOCK_ROOM : 0) + 24}
+            panelBottom={dockHeight + (phone ? MAP_DOCK_ROOM : 0) + 12}
           />
         </Suspense>
       )}

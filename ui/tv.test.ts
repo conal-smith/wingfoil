@@ -1,7 +1,15 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { UI, compileTheme, declared, holds, selector } from "./theme.testkit";
+import {
+  THEME_SOURCE,
+  UI,
+  compileTheme,
+  declared,
+  holds,
+  selector,
+} from "./theme.testkit";
+import { chipStyles } from "./Chip";
 import {
   DISABLED,
   HOVER,
@@ -372,5 +380,137 @@ describe("ui/theme.css: blur, measures and animation", () => {
     expect(css).toMatch(
       /@media \(prefers-reduced-transparency: reduce\) \{\s*\.reduced-transparency\\:bg-solid \{/,
     );
+  });
+});
+
+/* ---- the map's lit layer chips (ui/Chip.tsx `lit`) ---- */
+
+/** A colour of the theme's, `#rrggbb` or `#rrggbbaa`, in its light or dark value. */
+function themeColour(name: string, theme: "light" | "dark"): string {
+  const dark = [
+    ...THEME_SOURCE.matchAll(/:root\[data-theme="dark"\] \{([^}]*)\}/g),
+  ]
+    .map((block) => block[1])
+    .join("\n");
+  const pick = (css: string) =>
+    css.match(
+      new RegExp(`^\\s*--color-${name}:\\s*(#[0-9a-f]{6,8});`, "m"),
+    )?.[1];
+  const value = (theme === "dark" && pick(dark)) || pick(THEME_SOURCE);
+  if (!value) throw new Error(`--color-${name} is not a colour in the theme`);
+  return value;
+}
+
+/** `#rrggbb[aa]` as red, green, blue (0-255) and alpha (0-1). */
+const channels = (hex: string) => {
+  const n = (at: number) => parseInt(hex.slice(at, at + 2), 16);
+  return {
+    rgb: [n(1), n(3), n(5)],
+    alpha: hex.length > 7 ? n(7) / 255 : 1,
+  };
+};
+
+/** A colour laid at `share` over a ground, as the fill `bg-glow-*\/20` is. */
+function over(colour: string, ground: string, share = 1): number[] {
+  const top = channels(colour);
+  const under = channels(ground).rgb;
+  const a = top.alpha * share;
+  return top.rgb.map((c, i) => c * a + under[i] * (1 - a));
+}
+
+function luminance([r, g, b]: number[]): number {
+  const lin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+const contrast = (a: number[], b: number[]) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
+const GLOWS = ["wind", "waves", "weather"] as const;
+const THEMES = ["light", "dark"] as const;
+
+describe("ui/Chip.tsx: the lit chip", () => {
+  it.each(GLOWS)("every class of a %s chip resolves from the theme", (glow) => {
+    const styles = chipStyles({ variant: "lit", glow });
+    const names = `${styles.base()} ${styles.icon()}`.split(" ");
+    const css = build(names);
+    for (const name of names) expect(holds(css, name), name).toBe(true);
+  });
+
+  it("is a ghost off and glows on, with no cross and a fast fade", () => {
+    const base = chipStyles({ variant: "lit", glow: "wind" }).base();
+    for (const name of [
+      "bg-transparent",
+      "border-transparent",
+      "text-ink-muted",
+      "not-disabled:hover:bg-well",
+      "aria-pressed:bg-glow-wind/20",
+      "aria-pressed:border-glow-wind-edge",
+      "aria-pressed:text-ink",
+      "duration-fast",
+    ])
+      expect(base.split(" "), name).toContain(name);
+    // The soft chip's ink fill is gone from a lit one.
+    expect(base).not.toContain("aria-pressed:bg-inverse");
+    expect(base.split(" ")).not.toContain("bg-well");
+    const css = build(["aria-pressed:bg-glow-wind/20", "duration-fast"]);
+    expect(css).toMatch(/var\(--color-glow-wind\) 20%/);
+    expect(css).toContain("150ms");
+  });
+
+  it("the wind's glow is the wind ramp's own mid green", () => {
+    expect(themeColour("glow-wind", "light")).toBe(
+      themeColour("wind-k15", "light"),
+    );
+  });
+
+  it.each(THEMES)("its words read at 4.5:1 off and on, in %s", (theme) => {
+    const ground = themeColour("ground", theme);
+    const g = over(ground, ground);
+    const ink = over(themeColour("ink", theme), ground);
+    const muted = over(themeColour("ink-muted", theme), ground);
+    expect(contrast(muted, g), "off").toBeGreaterThanOrEqual(4.5);
+    const hover = over(themeColour("well", theme), ground);
+    expect(
+      contrast(over(themeColour("ink-2", theme), ground), hover),
+      "off, under the pointer",
+    ).toBeGreaterThanOrEqual(4.5);
+    for (const glow of GLOWS) {
+      for (const share of [0.2, 0.3]) {
+        const fill = over(themeColour(`glow-${glow}`, theme), ground, share);
+        expect(
+          contrast(ink, fill),
+          `${glow} on at ${share}`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it.each(THEMES)(
+    "its edge and icon on read at 3:1 on the ground, in %s",
+    (theme) => {
+      const ground = themeColour("ground", theme);
+      const g = over(ground, ground);
+      for (const glow of GLOWS) {
+        const icon = over(themeColour(`glow-${glow}-ink`, theme), ground);
+        expect(contrast(icon, g), `${glow} icon`).toBeGreaterThanOrEqual(3);
+        const edge = over(themeColour(`glow-${glow}-edge`, theme), ground);
+        // On white the edge is strengthened to its icon's deeper shade, so
+        // the glow still reads where a fifth of a colour is pale.
+        if (theme === "light")
+          expect(contrast(edge, g), `${glow} edge`).toBeGreaterThanOrEqual(3);
+        else expect(contrast(edge, g), `${glow} edge`).toBeGreaterThan(2);
+      }
+    },
+  );
+
+  it("the legend's shallows swatch is a theme colour", () => {
+    expect(themeColour("legend-shallow", "light")).toMatch(/^#[0-9a-f]{6}$/);
+    expect(build(["bg-legend-shallow"])).toContain("--color-legend-shallow");
   });
 });

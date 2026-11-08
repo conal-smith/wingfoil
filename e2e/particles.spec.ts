@@ -1,7 +1,9 @@
 import {
   chooseSpot,
+  FIELD_KEY,
   closeLayers,
   expect,
+  fieldChip,
   layerTile,
   layersRail,
   openFromMenu,
@@ -167,7 +169,7 @@ test("dragging carries the arrows with the map and defers field rebuilds until i
   await expectResumed(page);
 });
 
-test("the wind's two layers: the particles on and off by themselves, over the coloured wind or not, and remembered", async ({
+test("the wind's two layers: the particles on and off by themselves, over the Wind field's colour or not, and remembered", async ({
   page,
 }) => {
   await instrument(page);
@@ -180,9 +182,12 @@ test("the wind's two layers: the particles on and off by themselves, over the co
   await openFromMenu(page, "Layers");
   const panel = layersRail(page);
   const press = (name: string) =>
-    panel.getByRole("button", { name, exact: true }).click();
-  // The coloured wind under them: the particles keep drawing, in ink.
-  await press("Coloured wind");
+    name === "Wind"
+      ? fieldChip(page, "Wind").click()
+      : panel.getByRole("button", { name, exact: true }).click();
+  // The coloured wind under them, the dock's Wind: the particles keep
+  // drawing, in ink.
+  await press("Wind");
   await expect(canvas).toHaveAttribute("data-wind", "wash particles");
   await expectResumed(page);
   await expect.poll(() => inked(page)).toBeGreaterThan(100);
@@ -197,7 +202,7 @@ test("the wind's two layers: the particles on and off by themselves, over the co
   await expect(canvas).toHaveAttribute("data-wind", "wash particles");
   await expectResumed(page);
   await expect.poll(() => inked(page)).toBeGreaterThan(100);
-  await press("Coloured wind");
+  await press("Wind");
   await expect(canvas).toHaveAttribute("data-wind", "particles");
   await expectResumed(page);
   // Neither: the plain chart.
@@ -207,11 +212,14 @@ test("the wind's two layers: the particles on and off by themselves, over the co
   expect(await inked(page)).toBe(0);
   // The colour alone, kept: read back as the page mounts, and the particles
   // stay still once the chart is up again.
-  await press("Coloured wind");
+  await press("Wind");
   await expect(canvas).toHaveAttribute("data-wind", "wash");
   expect(
     await page.evaluate(() => localStorage.getItem("wingfoil.map.wind.v2")),
   ).toBe(JSON.stringify({ wash: true, particles: false }));
+  expect(
+    await page.evaluate((key) => localStorage.getItem(key), FIELD_KEY),
+  ).toBe("wind");
   await page.reload();
   await expect(canvas).toHaveAttribute("data-wind", "wash");
   await expect(page.locator(".spot-marker")).toHaveCount(149, {
@@ -258,6 +266,11 @@ test("an older chart's wind style is read into the two layers", async ({
     }, style);
     await page.reload();
     await expect(canvas, style).toHaveAttribute("data-wind", wind);
+    // A rider who had the coloured wind on starts on the Wind field.
+    await expect(fieldChip(page, "Wind"), style).toHaveAttribute(
+      "aria-pressed",
+      String(wind.includes("wash")),
+    );
   }
   // The new key wins over the old one once the rider has chosen.
   await openFromMenu(page, "Layers");

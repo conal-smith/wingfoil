@@ -170,7 +170,9 @@ else. Sizes `sm` 32px, `md` 40, `lg` 48; `icon` makes a circle and needs an
 alone; `pressed="worded"` is for a toggle that renames itself (Save, Saved).
 
 **Chips and tags.** A `Chip` is a choice you can press: a soft capsule,
-filled in ink when `pressed`, or `removable` for a filter in use. A `Tag` is a
+filled in ink when `pressed`, or `removable` for a filter in use; `lit`, for
+the map's layer chips alone, is a ghost that glows in its layer's colour when
+on (`glow` wind, waves or weather; DESIGN_PRINCIPLES.md, 2026-11-07). A `Tag` is a
 word that only describes something and cannot be pressed (Offshore, Unsure,
 now, coming): `tone` neutral, `off` (red on its tint), `ok`, or `glass` over a
 photograph. If it does nothing when pressed, it is a tag.
