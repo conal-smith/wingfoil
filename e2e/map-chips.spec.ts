@@ -15,8 +15,8 @@ import { readSample } from "./sample";
 
 /**
  * The map's field, chosen with the lit chips in its dock (src/MapDock.tsx,
- * force5/src/mapField.ts): Wind or Weather (Waves once there are wave frames
- * for the map), at most one on, the one on pressed again for none, which is
+ * force5/src/mapField.ts): Wind, Waves (only while the wave model's pointer
+ * lists frames for the map) and Weather, at most one on, the one on pressed again for none, which is
  * the plain map with the shallows glowing. The same choice on the finder's
  * map and on the full chart, kept on the device, none too. Beside the list
  * the dock has the day's hour bar, which shares the cards' hour.
@@ -73,19 +73,18 @@ function windHoursAsked(page: Page) {
   return asked;
 }
 
-test("beside the list: Wind and Weather, none on at first, one at a time, and the one on pressed again for none", async ({
+test("beside the list: Wind, Waves and Weather, none on at first, one at a time, and the one on pressed again for none", async ({
   page,
 }) => {
   await openFinder(page);
-  // No wave frames for the map yet: no Waves chip.
-  await expect(fieldChips(page).getByRole("button")).toHaveText([
-    "Wind",
-    "Weather",
-  ]);
-  await expect(fieldChip(page, "Waves")).toHaveCount(0);
+  // The e2e site's wave run lists frames: a Waves chip, once the page is idle.
+  await expect(fieldChips(page).getByRole("button")).toHaveText(
+    ["Wind", "Waves", "Weather"],
+    { timeout: 20000 },
+  );
   // A first visit: none on, the shallows' legend.
   expect(await pressed(page)).toEqual([]);
-  for (const name of ["Wind", "Weather"] as const)
+  for (const name of ["Wind", "Waves", "Weather"] as const)
     await expect(fieldChip(page, name)).toHaveAttribute(
       "aria-pressed",
       "false",
@@ -131,16 +130,68 @@ test("beside the list: Wind and Weather, none on at first, one at a time, and th
     .toEqual(["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"]);
 });
 
+test("with no wave frames listed there is no Waves chip", async ({ page }) => {
+  await page.route("**/weather/mi-swan.json", (route) =>
+    route.fulfill({ status: 404, body: "" }),
+  );
+  await openFinder(page);
+  await expect(fieldChips(page).getByRole("button")).toHaveText([
+    "Wind",
+    "Weather",
+  ]);
+  await page.waitForTimeout(3000);
+  await expect(fieldChip(page, "Waves")).toHaveCount(0);
+});
+
+test("Waves draws the wave height on the sea, its legend in metres", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await openFinder(page);
+  await expect(fieldChip(page, "Waves")).toBeVisible({ timeout: 20000 });
+  await fieldChip(page, "Waves").click();
+  expect(await pressed(page)).toEqual(["Waves"]);
+  await expect(legend(page)).toHaveAttribute("data-map-legend", "waves");
+  // The frames reach a few hours only: the ramp, or past their reach a quiet
+  // note in its place.
+  await page.waitForTimeout(1500);
+  if ((await legend(page).getAttribute("data-map-legend-note")) === null) {
+    await expect(legend(page)).toContainText("Metres");
+    await expect(legend(page).locator(".ml-marks span")).toHaveText([
+      "0",
+      "1",
+      "2",
+      "3",
+      "5+",
+    ]);
+  } else await expect(legend(page)).toHaveText(/^Wave map to [A-Z][a-z]{2}$/);
+  // The source is named in About the map, never in the dock.
+  await expect(mapDock(page)).not.toContainText("SWAN");
+  await page.goto("/?map");
+  await expect(mapDock(page)).toBeVisible({ timeout: 30000 });
+  await openFromMenu(page, "About the map");
+  await page.getByRole("tab", { name: "Waves" }).click();
+  await expect(page.locator("#map-info-waves")).toContainText(
+    "Irish Shelf SWAN",
+  );
+  expect(errors).toEqual([]);
+});
+
 test("the chips are one stop on Tab: the arrows walk them, Space and Enter press, Escape turns the field off", async ({
   page,
 }) => {
   await openFinder(page);
   const wind = fieldChip(page, "Wind");
+  const waves = fieldChip(page, "Waves");
   const weather = fieldChip(page, "Weather");
+  await expect(waves).toBeVisible({ timeout: 20000 });
   // One stop: the first chip with none on.
   await expect(wind).toHaveAttribute("tabindex", "0");
   await expect(weather).toHaveAttribute("tabindex", "-1");
   await wind.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(waves).toBeFocused();
   await page.keyboard.press("ArrowRight");
   await expect(weather).toBeFocused();
   // Round from the end to the start, and Home and End.
@@ -350,7 +401,8 @@ test.describe("on a phone", () => {
     const wind = (await fieldChip(page, "Wind").boundingBox())!;
     const weather = (await fieldChip(page, "Weather").boundingBox())!;
     expect(Math.abs(wind.width - weather.width)).toBeLessThan(2);
-    expect(wind.width).toBeGreaterThan(150);
+    // A third of the dock each, Waves standing between them.
+    expect(wind.width).toBeGreaterThan(100);
     await fieldChip(page, "Weather").tap();
     await expect(fieldChip(page, "Weather")).toHaveAttribute(
       "aria-pressed",

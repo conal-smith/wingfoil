@@ -90,8 +90,8 @@ test("on a desktop, Layers opens the rail beside the zoom, clear of the scrub ba
   // Every layer, in its group, in order: few enough to stand in a column on
   // a phone (the owner's ruling of 2026-11-02). The names are always drawn,
   // the depths one switch (the ruling of 2026-11-03); the satellite is one
-  // button for either tide; the loupe is on or off, the range ring standing
-  // in for it. Coloured wind, Tidal depth and Rain are the dock's field now.
+  // button for either tide; the loupe is on or off (the range ring went on
+  // 2026-11-08). Coloured wind, Tidal depth and Rain are the dock's field now.
   expect(await groupsOf(rail(page))).toEqual([
     ["Wind", ["Particles", "Live wind"]],
     ["Sea", ["Currents", "Depths"]],
@@ -135,14 +135,10 @@ test("the rail's switches: a layer on and off, the particles by themselves, the 
   await particles.click();
   await expect(particles).toHaveAttribute("aria-pressed", "true");
   await expect(fieldChip(page, "Wind")).toHaveAttribute("aria-pressed", "true");
-  // Round the spot: the range ring, or the loupe in its place, and pressed
-  // again the ring.
+  // Round the spot: nothing, or the loupe, and pressed again nothing.
   const loupe = railButton(page, "Loupe");
   await expect(loupe).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator(".map-focus")).toHaveAttribute(
-    "data-focus",
-    "ring",
-  );
+  await expect(page.locator(".map-focus")).toHaveAttribute("data-focus", "off");
   await loupe.click();
   await expect(loupe).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".map-focus")).toHaveAttribute(
@@ -151,10 +147,7 @@ test("the rail's switches: a layer on and off, the particles by themselves, the 
   );
   await loupe.click();
   await expect(loupe).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator(".map-focus")).toHaveAttribute(
-    "data-focus",
-    "ring",
-  );
+  await expect(page.locator(".map-focus")).toHaveAttribute("data-focus", "off");
   // The satellite, one button: high tide, then low tide, then none.
   const satellite = rail(page).locator('[data-rail-layer="satellite"]');
   await expect(satellite).toHaveAttribute("aria-pressed", "false");

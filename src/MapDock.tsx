@@ -38,6 +38,7 @@ export default function MapDock({
   field,
   offered,
   onField,
+  note = null,
   phone,
   where,
   onRoom,
@@ -48,6 +49,8 @@ export default function MapDock({
   /** The fields with a chip: those with a source to draw them. */
   offered: readonly FieldId[];
   onField: (field: MapField) => void;
+  /** Why the field draws nothing just now, said quietly in the legend. */
+  note?: string | null;
   phone: boolean;
   /** The page it is on: beside the list, or on the full chart. */
   where: "finder" | "chart";
@@ -161,7 +164,7 @@ export default function MapDock({
             </Chip>
           ))}
         </div>
-        {!phone && <MapScales field={field} />}
+        {!phone && <MapScales field={field} note={note} />}
       </div>
       {children}
     </div>

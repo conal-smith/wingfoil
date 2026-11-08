@@ -230,14 +230,9 @@ test("finding a spot flies there and focuses it, with no box over the map; Escap
   await expect(page.locator('[data-spot-id="dollymount"]')).toHaveClass(
     /\bsel\b/,
   );
-  // A range ring is drawn round it, by default, under the lights.
-  await expect(page.locator(".map-focus")).toHaveAttribute(
-    "data-focus",
-    "ring",
-  );
-  await expect(page.locator(".map-focus .map-range-label")).toHaveText(
-    /^[\d.]+ NM$/,
-  );
+  // No ring is drawn round it (2026-11-08): its light pill marks it.
+  await expect(page.locator(".map-focus")).toHaveAttribute("data-focus", "off");
+  await expect(page.locator(".map-focus > *")).toHaveCount(0);
   // The wind stays at full strength.
   await expect(page.locator(".particle-canvas")).toHaveCSS("opacity", "1");
 
@@ -569,7 +564,9 @@ test("a missing snapshot says what a rider can do, and an expired one is labelle
   const failure = page.getByRole("alert");
   await expect(failure).toContainText("The forecast could not be loaded");
   await expect(failure).not.toContainText("npm");
-  await expect(failure.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(
+    failure.getByRole("button", { name: "Try again" }),
+  ).toBeVisible();
   await expect(page.getByRole("banner")).toBeVisible();
   await page.unroute("**/weather/harmonie.json");
   await page.goto("/?map");
@@ -688,14 +685,13 @@ test("round the chosen spot: a range ring, or a loupe at a true distance, kept a
     "aria-pressed",
     "true",
   );
-  // Back to the range ring: the loupe pressed again.
+  // Back to no mark: the loupe pressed again.
   await choice.getByRole("button", { name: "Loupe" }).click();
   await closeLayers(page);
   await findSpot(page, "Brandon");
   await expect(map).toHaveClass(/is-focus/);
-  await expect(focus).toHaveAttribute("data-focus", "ring");
+  await expect(focus).toHaveAttribute("data-focus", "off");
   await expect(focus.locator(".map-loupe-rim")).toHaveCount(0);
-  await expect(focus.locator(".map-range-label")).toHaveText(/^[\d.]+ NM$/);
 });
 
 /**
@@ -734,10 +730,7 @@ test("the mark round a chosen spot moves with the chart, in the same frame", asy
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  for (const [style, mark] of [
-    ["ring", ".map-range-line"],
-    ["loupe", ".map-loupe-edge.is-inner"],
-  ]) {
+  for (const [style, mark] of [["loupe", ".map-loupe-edge.is-inner"]]) {
     await page.addInitScript(
       (style) => localStorage.setItem("wingfoil.map.focus.v1", style),
       style,
@@ -943,7 +936,9 @@ for (const device of [
         await expect(page.locator(".pick-mark")).toHaveCount(0);
         // With nothing chosen, the next tap picks the point.
         await press(page, at);
-        await expect(scrubBar(page).locator(".sb-coords")).toContainText(coords);
+        await expect(scrubBar(page).locator(".sb-coords")).toContainText(
+          coords,
+        );
         await expect(page.locator(".pick-mark")).toHaveCount(1);
       });
       return;

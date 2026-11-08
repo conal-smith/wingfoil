@@ -31,7 +31,7 @@ export interface LayerChoices {
   /** The satellite image under the chart: off, or which tide's. */
   satellite: SatelliteOption;
   onSatellite: (option: SatelliteOption) => void;
-  /** What is drawn round the chosen spot: a loupe, a range ring, or nothing. */
+  /** What is drawn round the chosen spot: the loupe, or nothing. */
   focusStyle: FocusStyle;
   onFocusStyle: (style: FocusStyle) => void;
   /**
@@ -43,7 +43,7 @@ export interface LayerChoices {
 
 /**
  * The chart a first visit opens on (src/App.tsx): the particles, the
- * shallows' glow (no field on), the names and the range ring.
+ * shallows' glow (no field on), the names, and no loupe.
  */
 export const LAYER_DEFAULTS: {
   wind: WindLayers;
@@ -70,7 +70,7 @@ export const LAYER_DEFAULTS: {
     live: false,
   },
   satellite: "off",
-  focusStyle: "ring",
+  focusStyle: "off",
 };
 
 /** One layer: its name, its glyph, whether it is on, and its switch. */
@@ -120,7 +120,7 @@ export interface LayerGroup {
  * tints, contours, soundings and the land's relief) are one switch under the
  * Sea, off until asked for (the ruling of 2026-11-03), the satellite is one
  * button that goes from high tide to low tide to none, and the loupe is on or
- * off, the range ring standing in for it when off.
+ * off (the range ring went on 2026-11-08).
  */
 export function layerGroups({
   wind,
@@ -249,7 +249,7 @@ export function layerGroups({
       id: "focus",
       name: "Round your spot",
       glyph: <LoupeGlyph size={14} />,
-      rule: "the loupe, or the range ring",
+      rule: "the loupe, or nothing",
       tiles: [
         {
           id: "focus-loupe",
@@ -257,7 +257,7 @@ export function layerGroups({
           sub: "Headings you hold",
           glyph: <LoupeGlyph size={18} />,
           on: focusStyle === "loupe",
-          press: () => onFocusStyle(focusStyle === "loupe" ? "ring" : "loupe"),
+          press: () => onFocusStyle(focusStyle === "loupe" ? "off" : "loupe"),
         },
       ],
     },

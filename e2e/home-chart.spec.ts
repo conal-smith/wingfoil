@@ -156,7 +156,7 @@ test.describe("on a wide screen", () => {
       expect(l.y).toBeGreaterThan(box.y);
       expect(l.y + l.height).toBeLessThan(box.y + box.height);
     }
-    // No loupe and no range ring beside the list, and no scrub bar: beside
+    // No loupe beside the list, and no scrub bar: beside
     // the list the time is the cards'.
     await expect(page.locator(".map-focus > *")).toHaveCount(0);
     await expect(scrubBar(page)).toHaveCount(0);
@@ -838,24 +838,39 @@ test.describe("a bead under a finger, beside the list", () => {
 test.describe("under the width for the chart beside the list", () => {
   test.use({ viewport: { width: 900, height: 860 } });
 
-  test("with the heart off, the list is the spots nearest the middle of Ireland, with no map to follow", async ({
+  test("with the heart off, the list is the spots the map shows, a switch away", async ({
     page,
   }) => {
     await page.goto("/");
-    await expect(cards(page)).toHaveCount(12, { timeout: 30000 });
-    await page.waitForTimeout(1500);
-    await expect(cards(page)).toHaveCount(12);
-    await expect(page.locator(".maplibregl-canvas")).toHaveCount(0);
-    await expect(page.locator("[data-finder-more]")).toHaveCount(0);
+    // The map first, the switch over its dock.
+    await expect(page.locator(".maplibregl-canvas")).toHaveCount(1, {
+      timeout: 30000,
+    });
+    await expect(page.locator("[data-narrow-foot]")).toHaveAttribute(
+      "data-narrow-foot",
+      "map",
+    );
+    await page
+      .getByRole("group", { name: "Map or list" })
+      .getByRole("button", { name: "List" })
+      .click();
+    await expect(page.locator("[data-narrow-foot]")).toHaveAttribute(
+      "data-narrow-foot",
+      "list",
+    );
+    await expect
+      .poll(() => cards(page).count(), { timeout: 30000 })
+      .toBeGreaterThan(0);
+    expect(await cards(page).count()).toBeLessThanOrEqual(30);
   });
 
-  test("the list alone, and the bar's Chart to the full chart, which is Spots there", async ({
+  test("the map first, and the bar's Chart to the full chart, which is Spots there", async ({
     page,
   }) => {
     await star(page, ["brandon", "keel"]);
     await page.goto("/");
     await expect(cards(page)).toHaveCount(2, { timeout: 30000 });
-    await expect(panel(page)).toHaveCount(0);
+    await expect(panel(page)).toBeVisible();
     await mapButton(page).click();
     await expect(page).toHaveURL(/\/\?map$/);
     await expect(lights(page)).toHaveCount(149, { timeout: 30000 });
@@ -877,14 +892,16 @@ test.describe("on a phone", () => {
     hasTouch: true,
   });
 
-  test("the map is made the first time Chart is pressed, and kept; the chart keeps its zoom and Layers", async ({
+  test("the map is made as the finder opens, and kept; the chart keeps its zoom and Layers", async ({
     page,
   }) => {
     await star(page, ["brandon", "keel"]);
     await page.goto("/");
     await expect(cards(page)).toHaveCount(2, { timeout: 30000 });
-    await page.waitForTimeout(1500);
-    await expect(page.locator(".maplibregl-canvas")).toHaveCount(0);
+    // The finder's map comes first under this width: one map, made once.
+    await expect(page.locator(".maplibregl-canvas")).toHaveCount(1, {
+      timeout: 30000,
+    });
     await mapButton(page).tap();
     await expect(page.locator(".maplibregl-canvas")).toHaveCount(1, {
       timeout: 30000,

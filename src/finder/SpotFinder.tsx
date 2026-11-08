@@ -34,9 +34,7 @@
  *
  * The browser is never asked where the rider is unasked: a first visit is not
  * asked, and without their place the cards give no distances. The locate
- * button on the map beside the list asks it (`locate`), and turns the heart
- * off; with no map beside the list, "Use my location" in the filter sheet
- * does.
+ * button on the map asks it (`locate`), and turns the heart off.
  *
  * The home page (since 26 October 2026). On a wide screen the chart stands
  * beside the list, drawn by src/App.tsx over the room the list leaves it
@@ -44,7 +42,8 @@
  * the rider can see (`onInView`: a pill each on the map, the rest beads),
  * what each reads (`onReadings`), at which hour, which card is under the
  * pointer and where the rider is, and it tells the list what it shows
- * (`view`). Under that width the list is alone. The
+ * (`view`). Under that width the map and the list are a switch apart
+ * (`mapped`), and the list, the heart off, is still what the map shows. The
  * cards keep one time between them, as a dashboard's charts do: the day
  * stepped to is the day on every card, and an hour picked on one card's bars
  * is picked on every card, its rose turned to it, and on the chart beside
@@ -69,7 +68,7 @@ import type { Units } from "../../force5/src/units";
 import type { Spot } from "../../force5/src/weather";
 import { modelName, STARS_CHOICES } from "../../force5/src/lead";
 import { isChartAddress } from "../../force5/src/siteNav";
-import { Heart, MapPin, SlidersHorizontal } from "lucide-react";
+import { Heart, SlidersHorizontal } from "lucide-react";
 import { Button } from "../../ui/Button";
 import { Chip } from "../../ui/Chip";
 import { Dialog } from "../../ui/Dialog";
@@ -207,6 +206,19 @@ export interface FinderProps {
   /** The chart stands beside the list, in the room it leaves on the right. */
   beside?: boolean;
   /**
+   * Under the width for that, the map is a switch away (src/App.tsx): the
+   * heart off, the list is what it shows, as beside it.
+   */
+  mapped?: boolean;
+  /**
+   * The day stepped to, and the way to step it, where the page keeps it (the
+   * phone's dock steps it too); null is the day the finder opens on.
+   */
+  chosenDay?: string | null;
+  onChosenDay?: (date: string | null) => void;
+  /** The days there are, and the one shown, as they change. */
+  onDays?: (days: { dates: readonly string[]; day: string }) => void;
+  /**
    * What the chart beside the list shows, which Nearby lists; null until
    * there is a view to follow.
    */
@@ -272,6 +284,7 @@ export default function SpotFinder(props: FinderProps) {
     phone,
     onWant,
     beside = false,
+    mapped = false,
     view = null,
     onHover,
     onInView,
@@ -296,12 +309,10 @@ export default function SpotFinder(props: FinderProps) {
   // Whether the address is to name the heart: it was pressed, or named.
   const [named, setNamed] = useState(() => kept !== null);
   // The browser is asked where the rider is only when they press the locate
-  // button (or "Use my location" in the filter sheet, with no map beside the
-  // list); a place kept from an earlier yes is read again quietly with the
-  // heart off.
-  const [asked, setAsked] = useState(false);
+  // button on the map; a place kept from an earlier yes is read again quietly
+  // with the heart off.
   const place = useRiderPlace(
-    asked || locate > 0 || (onScreen && scope === "near" && knownBefore()),
+    locate > 0 || (onScreen && scope === "near" && knownBefore()),
     locate,
   );
   useEffect(() => {
@@ -333,7 +344,9 @@ export default function SpotFinder(props: FinderProps) {
   useEffect(() => onDrawn?.(), []);
   // The day stepped to, drawn hour by hour on every card; null is the day the
   // finder opens on (today, or tomorrow once today is over).
-  const [chosen, setChosen] = useState<string | null>(null);
+  const [ownDay, setOwnDay] = useState<string | null>(null);
+  const chosen = props.chosenDay !== undefined ? props.chosenDay : ownDay;
+  const setChosen = props.onChosenDay ?? setOwnDay;
   // The hour picked on that day's row, for every card; null is the hour the
   // day stands at (now, today). App's, where it is handed in.
   const [ownPick, setOwnPick] = useState<number | null>(null);
@@ -379,7 +392,8 @@ export default function SpotFinder(props: FinderProps) {
     spots.length === 0 && !waiting && (scope === "near" || starred.length > 0);
   // Beside the chart, the heart off is what the chart shows; before it has a
   // view, and anywhere else, the list as ever.
-  const following = beside && scope === "near" && view !== null && !waiting;
+  const following =
+    (beside || mapped) && scope === "near" && view !== null && !waiting;
   // How the spots in view are ordered with the best first, by how wide the
   // view is; and how far apart a regional list's leads are.
   const widthKm = following ? viewWidthKm(view!) : 0;
@@ -422,6 +436,8 @@ export default function SpotFinder(props: FinderProps) {
   const isToday = day === dates[0];
   // An hour picked on another day is not one of this day's to show.
   const pick = picked !== null && irishDate(picked) === day ? picked : null;
+  const dayKey = `${dates.join(",")}|${day}`;
+  useEffect(() => props.onDays?.({ dates, day }), [dayKey]);
   const chooseDay = (date: string) => {
     setChosen(date === opensOn ? null : date);
     setPicked(null);
@@ -524,14 +540,6 @@ export default function SpotFinder(props: FinderProps) {
   const headId = "finder-heading";
   // "today", "tomorrow", "on Thursday": the day shown, in a sentence.
   const onTheDay = onDay(noon, now);
-  // With no map beside the list, there is no locate button: the sheet asks.
-  const canAsk =
-    !beside &&
-    scope === "near" &&
-    !known &&
-    !waiting &&
-    !place.refused &&
-    place.locates;
   const grid = s.cards({ class: beside ? undefined : s.cardsAlone() });
 
   // The cards the rider can see beside the chart: read as the cards change,
@@ -692,23 +700,6 @@ export default function SpotFinder(props: FinderProps) {
                   onChange={onModel}
                 />
               </div>
-              {canAsk && (
-                <div className={s.group()}>
-                  <p className={s.groupName()}>Location</p>
-                  <div className={s.filterRow()}>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setAsked(true);
-                        setFiltering(false);
-                      }}
-                    >
-                      <MapPin size={16} strokeWidth={1.75} aria-hidden="true" />
-                      Use my location
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
           </Dialog>
           {placesDue ? (

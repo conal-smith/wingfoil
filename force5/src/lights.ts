@@ -25,23 +25,22 @@
  * pitch, so a move takes every light by one scale and shift. A light the
  * rider is at (open, pointed at, on the keys) stays a button and is moved.
  *
- * The names beside the lights are laid out once the camera rests: see
- * `placeLabels`. So is who keeps a full mark: from the national zoom the
- * chart has no room for every ring and arrow, so a spot with no stars at the
- * hour is a small dot (src/map.css `.z-lo`), a rated one a ring with no arrow,
- * and a mark that would stand on a better one steps down to a dot of its own
- * colour. Every spot stays on the chart.
- *
- * On the Spot finder's plain map beside the list (the map's box has
- * `is-plain`) a spot is a pill or a bead, and no spot's name stands on the
- * map. A pill is a card the rider can see: each card at least half in the
- * list's view has its pill (`order`, its place among them), always, centred
- * on its spot, and where spots are close each moved the least it must to
- * stand clear, with a notch pointing at its spot (./pillPlace.ts, laid out
- * once the camera rests). It is neutral, dark with light words, and says
- * what the map shows (./pillContent.ts). Every other spot is a bead, a small
- * off-white dot, the same whatever the map shows, with a finger's reach where
- * the nearest bead is the one meant (`lt-bead`, src/map.css).
+ * On every map a spot is a pill or a bead, and no spot's name stands on the
+ * map. Beside the Spot finder's list (`mode` "cards") a pill is a card the
+ * rider can see: each card at least half in the list's view has its pill
+ * (`order`, its place among them), always. Where no list stands beside the
+ * map, on the phone's map and the full chart (`mode` "best"), the best few
+ * spots in view have one (./pillBest.ts): the most stars, then the
+ * favourites, then the map's own figure, kept apart and never two alike side
+ * by side, chosen again only when the camera rests somewhere new, so a scrub
+ * through the hours never moves them. Either way a pill is centred on its
+ * spot, and where spots are close each moved the least it must to stand
+ * clear, with a notch pointing at its spot (./pillPlace.ts, laid out once the
+ * camera rests). It is neutral, dark with light words, and says what the map
+ * shows (./pillContent.ts). Every other spot is a bead, a small off-white
+ * dot, the same whatever the map shows, with a finger's reach where the
+ * nearest bead is the one meant (`lt-bead`, src/map.css). The open spot
+ * (`sel`) always has its pill, light.
  *
  * Under the pointer, or the keys, a pill turns light, and so does a bead,
  * which becomes its light pill there (`light`), and the page outlines the
@@ -63,11 +62,11 @@ import {
   nextLight,
   pressedLight,
   tappedLight,
-  thinLights,
   type Way,
 } from "./lightHit";
 import { drawLights, lookOf, type Drawn, type Look } from "./lightsCanvas";
 import { pillHtml, pillKey, type PillParts } from "./pillContent";
+import { BEST_PILLS, bestPills, spotsNear } from "./pillBest";
 import { placePills, type Box as PillBox, type PillItem } from "./pillPlace";
 import type { Wedge } from "./rideWedge";
 import { speedShort, type Units } from "./units";
@@ -99,7 +98,20 @@ export interface LightState {
    * see in the list, or null: a bead. Placed in this order, the first least moved.
    */
   order?: number | null;
+  /**
+   * The map's own figure for the spot (the wind, the wave height, the sky),
+   * for choosing the best few where no list stands beside the map.
+   */
+  figure?: number | null;
 }
+
+/**
+ * Which spots have a pill: beside the list, the cards in view (`order`); where
+ * no list stands beside the map, the best few in view, at least `gap` pixels
+ * apart. `field` is what the pills say, so a new field chooses them again.
+ */
+export type PillMode =
+  { kind: "cards" } | { kind: "best"; gap: number; field: string };
 
 interface Entry {
   spot: Spot;
@@ -128,6 +140,10 @@ interface Entry {
   pillSays: string;
   /** Its place among the pills, or null: a bead. */
   order: number | null;
+  /** What the best few are chosen by: its stars, a favourite, the figure. */
+  stars: number | null;
+  favourite: boolean;
+  score: number | null;
   /** How far the pill stands off its spot, and its notch's side and place. */
   dx: number;
   dy: number;
@@ -151,11 +167,8 @@ const MANAGED = [
   "active",
   "named",
   "w-over",
-  "lt-thin",
 ];
 
-/** What a full mark takes on the chart from the national zoom, a little clear. */
-const FAR_REACH = 12;
 /** How long a frame of a move may spend making the lights' pictures. */
 const BUDGET_MS = 4;
 
@@ -167,29 +180,10 @@ const PILL_ROOM = 4;
 /** The base map's own names, which a light's name should not print over. */
 const PLACE_LAYERS = ["places", "places-near", "water-names"];
 
-/** Ranks a light's name for the label pass: the open spot, then the starred, then by stars. */
-function labelRank(el: HTMLElement): number {
-  if (el.classList.contains("sel")) return 100;
-  const named = el.classList.contains("named") ? 50 : 0;
-  for (let n = 5; n >= 0; n--)
-    if (el.classList.contains(`s${n}`)) return named + n;
-  return named - 1;
-}
-
-interface Box {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-/** A bead on the plain map (src/map.css), not a pill or a ring. */
+/** A bead (src/map.css), not a pill. */
 const isBead = (el: HTMLElement) => el.classList.contains("lt-bead");
-
-const overlaps = (a: Box, b: Box, pad = 1) =>
-  a.left < b.right + pad &&
-  b.left < a.right + pad &&
-  a.top < b.bottom + pad &&
-  b.top < a.bottom + pad;
+/** How near a tap two spots stand for it to be either's: a bead's reach. */
+const CROWD_REACH = 22;
 
 /** The plain map's pill (written by `update`) and bead (src/map.css). */
 const PILL_HTML = `<span class="lt-pill" aria-hidden="true"></span><span class="lt-bead-dot" aria-hidden="true"></span>`;
@@ -236,6 +230,8 @@ export interface Lights {
    * list no pill stands there, as no camera move puts a spot there.
    */
   foot(px: number): void;
+  /** Which spots have a pill: the cards in view, or the best few. */
+  mode(mode: PillMode): void;
   destroy(): void;
 }
 
@@ -246,122 +242,17 @@ export function createLights(
   onSelect: (spot: Spot, bead: boolean) => void,
   /** A mouse comes onto a light (its place), or leaves it (null). */
   onHover?: (spot: Spot | null) => void,
-  /** The chosen light's name is pressed: its place's own page. */
-  onOpen?: (spot: Spot) => void,
+  /**
+   * A tap where two spots or more stand within a bead's reach, off any pill:
+   * the spots there, the nearest first, for the page to offer by name.
+   * Without it, the nearest is chosen.
+   */
+  onCrowd?: (spots: Spot[]) => void,
 ): Lights {
   const entries = new Map<string, Entry>();
-  /**
-   * The names, laid out greedily: the open spot's first, then the starred
-   * ones', then the rest by their stars. Each takes its usual side of its
-   * light, or the other side, where neither another light's ring, a name
-   * already placed nor one of the base map's place names is in the way; a
-   * name with room on neither side is left off (its light still says its
-   * stars, and its title its name). The open spot's name always shows, on
-   * whichever side is clearer. Run when the camera comes to rest, and after
-   * the lights change, never per frame.
-   */
   let laid = "";
   let dirty = true;
-  const laidOut = ({ classList: c }: HTMLElement) =>
-    `${c.contains("lab-hide")}${c.contains("lab-left")}${c.contains("lt-thin")}`;
-  const placeLabels = () => {
-    const frame = map.getContainer().getBoundingClientRect();
-    const layers = PLACE_LAYERS.filter((id) => map.getLayer(id));
-    // A ring sits inside its button's square.
-    const inset = 3;
-    const rings: { el: HTMLElement; box: Box }[] = [];
-    // The Live wind layer's pills (./readingPills.ts): a name is not printed
-    // over a reading either.
-    const readings: Box[] = [
-      ...map.getContainer().querySelectorAll<HTMLElement>(".obs"),
-    ].map((el) => el.getBoundingClientRect());
-    const shown: { el: HTMLElement; ring: Box; lab: Box; rank: number }[] = [];
-    const before = new Map<Entry, string>();
-    for (const entry of entries.values()) {
-      const { el } = entry;
-      before.set(entry, laidOut(el));
-      el.classList.remove("lab-hide", "lab-left", "lt-thin");
-    }
-    // A crowded coast first: what a better mark stands on steps down to a dot
-    // (./lightHit `thinLights`), and a dot has no name to lay out. From the
-    // national zoom only the rated have a full mark to lose.
-    if (map.getContainer().classList.contains("z-lo")) {
-      const crowd = [...entries]
-        .filter(([, { el }]) =>
-          el.matches(".s1, .s2, .s3, .s4, .s5, .sel, .lit"),
-        )
-        .map(([id, { el, x, y }]) => ({
-          id,
-          x,
-          y,
-          halfW: FAR_REACH,
-          halfH: FAR_REACH,
-          rank: labelRank(el) + (el.matches(".sel, .lit") ? 200 : 0),
-        }));
-      for (const id of thinLights(crowd))
-        entries.get(id)?.el.classList.add("lt-thin");
-    }
-    for (const { el } of entries.values()) {
-      const r = el.getBoundingClientRect();
-      if (
-        r.right < frame.left ||
-        r.left > frame.right ||
-        r.bottom < frame.top ||
-        r.top > frame.bottom
-      )
-        continue;
-      // The ring, not the button's whole square.
-      const ring = {
-        left: r.left + inset,
-        top: r.top + inset,
-        right: r.right - inset,
-        bottom: r.bottom - inset,
-      };
-      rings.push({ el, box: ring });
-      const lab = el.querySelector<HTMLElement>(".lt-lab");
-      if (!lab || lab.offsetParent === null) continue;
-      const b = lab.getBoundingClientRect();
-      shown.push({
-        el,
-        ring,
-        lab: { left: b.left, top: b.top, right: b.right, bottom: b.bottom },
-        rank: labelRank(el),
-      });
-    }
-    shown.sort((a, b) => b.rank - a.rank);
-    const placed: Box[] = [];
-    const free = (el: HTMLElement, box: Box) =>
-      !placed.some((p) => overlaps(p, box)) &&
-      !rings.some((ring) => ring.el !== el && overlaps(ring.box, box)) &&
-      !readings.some((reading) => overlaps(reading, box)) &&
-      !(
-        layers.length &&
-        map.queryRenderedFeatures(
-          [
-            [box.left - frame.left, box.top - frame.top],
-            [box.right - frame.left, box.bottom - frame.top],
-          ],
-          { layers },
-        ).length
-      );
-    for (const { el, ring, lab, rank } of shown) {
-      // The same name on the light's other side: mirrored about its centre.
-      const cx = (ring.left + ring.right) / 2;
-      const left = {
-        ...lab,
-        left: 2 * cx - lab.right,
-        right: 2 * cx - lab.left,
-      };
-      if (free(el, lab)) placed.push(lab);
-      else if (free(el, left)) {
-        el.classList.add("lab-left");
-        placed.push(left);
-      } else if (rank >= 100) placed.push(lab);
-      else el.classList.add("lab-hide");
-    }
-    for (const [entry, was] of before)
-      if (laidOut(entry.el) !== was) entry.rev++;
-  };
+  let pillMode: PillMode = { kind: "cards" };
   /** The map's own controls and the rider's mark, which no pill stands on. */
   const walls = (frame: DOMRect): PillBox[] =>
     [
@@ -404,17 +295,72 @@ export function createLights(
     return out;
   };
   /**
-   * Beside the list: each card in view a pill, placed clear of the others
-   * (./pillPlace.ts) where the camera rests, and every other spot a bead.
-   * A bead or a station's reading a pill stands on gives it the place.
+   * Where no list stands beside the map: the best few spots in view
+   * (./pillBest.ts), the open spot always among them. Chosen again only when
+   * the camera rests somewhere new, the field changes, the open spot does, or
+   * the stars first come in: never through a scrub of the hours.
    */
-  const placeFinderPills = () => {
+  let best: { key: string; ids: string[] } = { key: "", ids: [] };
+  const bestInView = (camera: string, frame: DOMRect): Entry[] => {
+    if (pillMode.kind !== "best") return [];
+    const open = [...entries.values()].find((e) =>
+      e.el.classList.contains("sel"),
+    );
+    const rated = [...entries.values()].some((e) => e.stars !== null);
+    const key = `${camera}|${boxW}x${boxH}|${footRoom}|${pillMode.gap}|${pillMode.field}|${open?.spot.id ?? ""}|${rated}`;
+    if (key !== best.key) {
+      const room = {
+        l: PILL_ROOM,
+        t: PILL_ROOM,
+        r: boxW - PILL_ROOM,
+        b: boxH - footRoom - PILL_ROOM,
+      };
+      best = {
+        key,
+        ids: bestPills(
+          [...entries.values()]
+            .filter((e) => e.x >= 0 && e.x <= boxW && e.y >= 0 && e.y <= boxH)
+            .map((e) => ({
+              id: e.spot.id,
+              x: e.x,
+              y: e.y,
+              w: e.pill.offsetWidth,
+              h: e.pill.offsetHeight,
+              stars: e.stars,
+              favourite: e.favourite,
+              figure: e.score,
+              says: e.pillSays,
+              name: e.spot.name,
+            })),
+          {
+            most: BEST_PILLS,
+            gap: pillMode.gap,
+            room,
+            walls: walls(frame),
+            keep: open?.spot.id ?? null,
+          },
+        ),
+      };
+    }
+    return best.ids.flatMap((id) => entries.get(id) ?? []);
+  };
+  /**
+   * Each spot that has one a pill, placed clear of the others
+   * (./pillPlace.ts) where the camera rests, and every other spot a bead:
+   * beside the list, the cards in view, in the list's order; elsewhere, the
+   * best few. A bead or a station's reading a pill stands on gives it the
+   * place.
+   */
+  const placeAllPills = (camera: string) => {
     const box = map.getContainer();
     const frame = box.getBoundingClientRect();
     const items: PillItem[] = [];
-    const wanted = [...entries.values()]
-      .filter((e) => e.order !== null && e.pillSays)
-      .sort((a, b) => a.order! - b.order!);
+    const wanted =
+      pillMode.kind === "best"
+        ? bestInView(camera, frame).filter((e) => e.pillSays)
+        : [...entries.values()]
+            .filter((e) => e.order !== null && e.pillSays)
+            .sort((a, b) => a.order! - b.order!);
     for (const e of wanted)
       items.push({
         id: e.spot.id,
@@ -489,7 +435,9 @@ export function createLights(
   const thinReadings = () => {
     const box = map.getContainer();
     const frame = box.getBoundingClientRect();
-    const taken = [...pillBoxes, ...names()];
+    // On the full chart a reading gives way to a pill only.
+    const beside = pillMode.kind === "cards";
+    const taken = beside ? [...pillBoxes, ...names()] : [...pillBoxes];
     for (const reading of box.querySelectorAll<HTMLElement>(".obs-mark")) {
       const r = reading.getBoundingClientRect();
       const at = {
@@ -499,7 +447,9 @@ export function createLights(
         b: r.bottom - frame.top,
       };
       // Cut by the map's edge or in the dock's room: not shown at all.
-      const out = at.l < 0 || at.t < 0 || at.r > boxW || at.b > boxH - footRoom;
+      const out =
+        beside &&
+        (at.l < 0 || at.t < 0 || at.r > boxW || at.b > boxH - footRoom);
       const under =
         out ||
         taken.some(
@@ -513,49 +463,17 @@ export function createLights(
       if (!under) taken.push(at);
     }
   };
-  /** Back on the chart: no pill, no bead, nothing moved off its spot. */
-  const clearFinderPills = () => {
-    for (const entry of entries.values()) {
-      const { el, pill } = entry;
-      if (
-        !el.matches(".lt-pilled, .lt-bead, .lt-under") &&
-        !entry.dx &&
-        !entry.dy &&
-        !entry.notch
-      )
-        continue;
-      el.classList.remove("lt-pilled", "lt-bead", "lt-under");
-      entry.dx = entry.dy = 0;
-      entry.notch = "";
-      moveTo(el, entry.x, entry.y);
-      delete pill.dataset.n;
-      entry.rev++;
-    }
-    pillBoxes = [];
-    for (const reading of map
-      .getContainer()
-      .querySelectorAll(".obs-mark.obs-under"))
-      reading.classList.remove("obs-under");
-  };
-  const plain = () => map.getContainer().classList.contains("is-plain");
-  /** The names on the chart, or the pills beside the list, where the camera rests. */
+  /** The pills where the camera rests. */
   const layout = () => {
     const camera = `${map.getZoom().toFixed(3)}|${map.getCenter().toArray().join(",")}`;
     if (!dirty && camera === laid) {
-      if (plain()) thinReadings();
+      thinReadings();
       return;
     }
     laid = camera;
     dirty = false;
-    if (plain()) {
-      for (const { el } of entries.values())
-        el.classList.remove("lab-hide", "lab-left", "lt-thin");
-      placeFinderPills();
-      thinReadings();
-    } else {
-      clearFinderPills();
-      placeLabels();
-    }
+    placeAllPills(camera);
+    thinReadings();
   };
   let queued = 0;
   const queue = () => {
@@ -919,6 +837,9 @@ export function createLights(
       pill: el.querySelector<HTMLElement>(".lt-pill")!,
       pillSays: "",
       order: null,
+      stars: null,
+      favourite: false,
+      score: null,
       dx: 0,
       dy: 0,
       notch: "",
@@ -926,24 +847,37 @@ export function createLights(
     };
     el.addEventListener("click", (event) => {
       event.stopPropagation();
-      // The name beside the chosen light is the way to its page: the scrub
-      // bar under the chart has no name or link of its own.
+      // Where no list stands beside the map, a finger's tap off any pill with
+      // two spots or more within a bead's reach is the page's to ask which. A
+      // mouse is precise enough to mean the one it is on.
+      const finger =
+        (event as PointerEvent).pointerType === "touch" ||
+        window.matchMedia("(pointer: coarse)").matches;
       if (
-        onOpen &&
-        el.classList.contains("sel") &&
-        (event.target as Element).closest?.(".lt-lab")
-      )
-        return onOpen(spot);
+        onCrowd &&
+        event.detail &&
+        finger &&
+        pillMode.kind === "best" &&
+        !el.classList.contains("lt-pilled")
+      ) {
+        const frame = map.getContainer().getBoundingClientRect();
+        const near = spotsNear(
+          [...entries.values()]
+            .filter((e) => !e.el.classList.contains("lt-under"))
+            .map((e) => ({ id: e.spot.id, x: e.x, y: e.y })),
+          event.clientX - frame.left,
+          event.clientY - frame.top,
+          CROWD_REACH,
+        );
+        if (near.length >= 2)
+          return onCrowd(near.flatMap((id) => byId.get(id) ?? []));
+      }
       press(meant(spot, el, event));
     });
-    el.addEventListener("pointerenter", (event) => {
-      if (event.pointerType !== "mouse" || plain()) return;
-      onHover?.(spot);
-    });
-    // Beside the list: a pill is the one under the pointer; over a bead's
-    // reach, the nearest bead, until its light pill is under the pointer.
+    // A pill is the one under the pointer; over a bead's reach, the nearest
+    // bead, until its light pill is under the pointer.
     el.addEventListener("pointermove", (event) => {
-      if (event.pointerType !== "mouse" || !plain()) return;
+      if (event.pointerType !== "mouse") return;
       const onPill = (event.target as Element).closest?.(".lt-pill");
       hover(
         isBead(el) && !onPill
@@ -953,17 +887,14 @@ export function createLights(
     });
     el.addEventListener("pointerleave", (event) => {
       if (event.pointerType !== "mouse") return;
-      if (!plain()) return onHover?.(null);
       // Onto another light: its own move takes the hover.
       const next = (event.relatedTarget as Element | null)?.closest?.(".lt");
       if (next && layer.contains(next)) return;
       hover(null);
     });
-    el.addEventListener("focus", () => {
-      if (plain()) hover(entry);
-    });
+    el.addEventListener("focus", () => hover(entry));
     el.addEventListener("blur", () => {
-      if (plain() && hovered === entry) hover(null);
+      if (hovered === entry) hover(null);
     });
     // As MapLibre's markers do: a press on a light neither drags it as an
     // image nor moves the focus.
@@ -1016,6 +947,11 @@ export function createLights(
         const entry = entries.get(spot.id);
         if (!entry) continue;
         const s = states.get(spot.id);
+        // What the best few are chosen by, whether or not the look changed.
+        entry.stars =
+          s && !s.pending && !s.dark && s.stars !== null ? s.stars : null;
+        entry.favourite = named.has(spot.id);
+        entry.score = s?.figure ?? null;
         const on = spot.id === selected;
         const w = s?.wedge;
         const key = s
@@ -1110,6 +1046,12 @@ export function createLights(
     foot(px) {
       if (px === footRoom) return;
       footRoom = px;
+      dirty = true;
+      queue();
+    },
+    mode(next) {
+      if (JSON.stringify(next) === JSON.stringify(pillMode)) return;
+      pillMode = next;
       dirty = true;
       queue();
     },

@@ -16,7 +16,7 @@ import {
 } from "./fixtures";
 
 async function inForce(page: Page) {
-  // The loupe round the spot, not the range ring, so it has a foot box.
+  // The loupe round the spot, so it has a foot box.
   await page.addInitScript(() =>
     localStorage.setItem("wingfoil.map.focus.v1", "loupe"),
   );
@@ -57,11 +57,12 @@ test("in Force the scrub bar's pill reads the force and the loupe draws its glyp
   // Kept on reload.
   await page.reload();
   await chooseSpot(page, "brandon");
-  await expect(
-    barPill(page).locator('[data-cell="wind"] b'),
-  ).toHaveText(/^F\d{1,2}$/, {
-    timeout: 30000,
-  });
+  await expect(barPill(page).locator('[data-cell="wind"] b')).toHaveText(
+    /^F\d{1,2}$/,
+    {
+      timeout: 30000,
+    },
+  );
 });
 
 test("in Force the spot page's figures are forces, written F4", async ({

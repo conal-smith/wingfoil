@@ -185,3 +185,31 @@ export function pillHtml(p: PillParts | null): string {
     p.sky && !p.sky.first ? sky : "",
   ].join("");
 }
+
+/** How fine a sky is, for choosing between spots: the sun high, rain low. */
+const FINE: Record<WeatherIcon, number> = {
+  clear: 10,
+  partly: 7,
+  cloudy: 4,
+  fog: 3,
+  drizzle: 2,
+  showers: 2,
+  rain: 1,
+  snow: 1,
+  thunder: 0,
+};
+
+/**
+ * The figure a spot's pill is about, as a number to rank spots by where the
+ * map has room for a few pills only (./pillBest.ts): the wind with none on
+ * or Wind, the wave height with Waves (none inland), and with Weather how
+ * fine the sky is, less the rain. Null where nothing is known.
+ */
+export function pillFigure(field: PillField, r: PillReading): number | null {
+  if (field === "waves") return r.inland ? null : (r.sea?.height ?? null);
+  if (field === "weather")
+    return r.sky === null && r.rain === null
+      ? null
+      : (r.sky ? FINE[r.sky] : 5) - (r.rain ?? 0);
+  return r.windKn;
+}

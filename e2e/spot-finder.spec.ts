@@ -115,9 +115,24 @@ const useMyLocation = async (page: Page) => {
       .click();
     return;
   }
-  await openFilters(page);
-  await page.getByRole("button", { name: "Use my location" }).click();
-  await expect(page.getByRole("dialog", { name: "Filter" })).toHaveCount(0);
+  // Under that width the map has it too, over the dock; the list follows.
+  await page
+    .getByRole("group", { name: "Map or list" })
+    .getByRole("button", { name: "Map" })
+    .click();
+  await page
+    .locator("[data-narrow-foot]")
+    .getByRole("button", { name: "Use my location" })
+    .click();
+  await toList(page);
+};
+/** Under the width for the list beside the map: the list, from the map. */
+const toList = async (page: Page) => {
+  const list = page
+    .getByRole("group", { name: "Map or list" })
+    .getByRole("button", { name: "List" });
+  if ((await list.getAttribute("aria-pressed")) !== "true") await list.click();
+  await expect(list).toHaveAttribute("aria-pressed", "true");
 };
 const cards = (page: Page) => page.locator("[data-spot-card]");
 /** The heart at the list's head: on, the favourites; off, the spots in view. */
@@ -146,6 +161,9 @@ const openFilters = async (page: Page) => {
 async function openFinder(page: Page, path = "/") {
   await page.clock.setFixedTime(AFTERNOON);
   await page.goto(path);
+  // Under the width for the map beside the list the map comes first: the
+  // list is a switch away.
+  if (page.viewportSize()!.width < 1100) await toList(page);
   await expect(finder(page)).toBeVisible({ timeout: 30000 });
 }
 
@@ -481,7 +499,7 @@ test.describe("on a desktop", () => {
     page,
     context,
   }) => {
-    // Under the width for the map beside the list: the list follows no view.
+    // Under the width for the map beside the list: the map a switch away.
     await page.setViewportSize({ width: 800, height: 900 });
     await context.grantPermissions(["geolocation"]);
     await context.setGeolocation(DUBLIN);
@@ -608,7 +626,7 @@ test.describe("on a desktop", () => {
     await expect(filters(page)).toBeHidden();
   });
 
-  test("the top bar's search finds a spot by name, from every spot, and opens its page", async ({
+  test("the top bar's search finds a spot by name, from every spot, and chooses it on the map", async ({
     page,
   }) => {
     await star(page, ["brandon", "dollymount"]);
@@ -650,7 +668,15 @@ test.describe("on a desktop", () => {
     expect(active).toBeTruthy();
     await expect(page.locator(`[id="${active}"]`)).toContainText("Brandon Bay");
     await search(page).press("Enter");
-    await expect(page).toHaveURL(/\/spot\/brandon$/, { timeout: 30000 });
+    // The map flies to it, its pill light, and its card is outlined in view;
+    // the page stays the finder.
+    await expect(
+      page.locator('.spot-marker.sel[data-spot-id="brandon"]'),
+    ).toHaveCount(1, { timeout: 30000 });
+    await expect(
+      page.locator('[data-spot-card="brandon"][data-found]'),
+    ).toBeInViewport({ timeout: 30000 });
+    expect(new URL(page.url()).pathname).toBe("/");
   });
 
   test("the browser is never asked unasked: only the locate button asks", async ({
@@ -764,7 +790,7 @@ test.describe("on a desktop", () => {
   test("a first visit with the location refused lists the spots nearest the middle of Ireland, and never asks again", async ({
     page,
   }) => {
-    // Under the width for the map beside the list: the list follows no view.
+    // Under the width for the map beside the list: the map a switch away.
     await page.setViewportSize({ width: 800, height: 900 });
     // No permission: the browser says no, once asked.
     await openFinder(page);
@@ -816,10 +842,10 @@ test.describe("on a desktop", () => {
     await expect(page.locator("[data-finder-empty]")).toHaveCount(0);
   });
 
-  test("a browser that never answers: after a few seconds, the spots nearest the middle of Ireland", async ({
+  test("a browser that never answers: after a few seconds, the spots on the map", async ({
     page,
   }) => {
-    // Under the width for the map beside the list: the list follows no view.
+    // Under the width for the map beside the list: the map a switch away.
     await page.setViewportSize({ width: 800, height: 900 });
     await unanswered(page, DUBLIN);
     await openFinder(page);
@@ -827,7 +853,10 @@ test.describe("on a desktop", () => {
     await expect(page.locator("[data-finder-empty]")).toHaveText(
       "Finding spots nearby…",
     );
-    await expect(cards(page)).toHaveCount(12, { timeout: 30000 });
+    // Under this width too the list is the map's spots, the heart off.
+    await expect
+      .poll(() => cards(page).count(), { timeout: 30000 })
+      .toBeGreaterThan(0);
     // A late answer still brings the spots round the rider.
     await page.evaluate(() =>
       (window as unknown as { answerWhere: () => void }).answerWhere(),
@@ -837,21 +866,22 @@ test.describe("on a desktop", () => {
     });
   });
 
-  test("a rider with nothing within 30 km is told so", async ({
+  test("a rider with nothing within 30 km has the map round them and the nearest spots", async ({
     page,
     context,
   }) => {
-    // Under the width for the map beside the list: the list follows no view.
+    // Under the width for the map beside the list: the map a switch away.
     await page.setViewportSize({ width: 800, height: 900 });
     await context.grantPermissions(["geolocation"]);
     await context.setGeolocation(ATHLONE);
     await openFinder(page);
     await useMyLocation(page);
-    await expect(page.locator("[data-finder-empty]")).toHaveText(
-      "No spots within 30 km of you.",
-      { timeout: 30000 },
-    );
-    await expect(cards(page)).toHaveCount(0);
+    // The list is the map's, and the map opens round them and the few
+    // nearest spots: never empty.
+    await expect
+      .poll(() => cards(page).count(), { timeout: 30000 })
+      .toBeGreaterThan(0);
+    expect(await cards(page).count()).toBeLessThanOrEqual(30);
   });
 
   test("with favourites, opens on them and does not ask where the rider is", async ({
@@ -917,7 +947,7 @@ test.describe("on a desktop", () => {
   test("nearby, refused, looks round where the chart was, and never asks again", async ({
     page,
   }) => {
-    // Under the width for the map beside the list: the list follows no view.
+    // Under the width for the map beside the list: the map a switch away.
     await page.setViewportSize({ width: 800, height: 900 });
     await star(page, ["brandon"]);
     // No permission: the browser says no.
@@ -933,7 +963,6 @@ test.describe("on a desktop", () => {
     await expect(cards(page).filter({ hasText: "Dollymount" })).toHaveCount(1, {
       timeout: 30000,
     });
-    await expect(cards(page)).toHaveCount(12);
     await expect
       .poll(() =>
         page.evaluate(() =>
@@ -1255,6 +1284,7 @@ test.describe("on a phone", () => {
     ).toContainText("Keel Beach");
     await page.getByRole("button", { name: "Cancel" }).tap();
     await expect(page.getByRole("listbox", { name: "Spots" })).toHaveCount(0);
+    await toList(page);
     // ‹ Day ›, the heart and the filter share a row, in that order, on the
     // screen.
     const day = (await days(page).boundingBox())!;
@@ -1275,6 +1305,7 @@ test.describe("on a phone", () => {
   }) => {
     await star(page, ["brandon", "keel"]);
     await openFinder(page);
+    await toList(page);
     await rated(page);
     const a = (await cards(page).first().boundingBox())!;
     expect(a.x).toBeGreaterThanOrEqual(0);
@@ -1312,10 +1343,20 @@ test.describe("on a phone", () => {
     await expect(cards(page).filter({ hasText: "Dollymount" })).toHaveCount(1);
   });
 
-  test("a first visit on a phone with the location refused still lists spots", async ({
+  test("a first visit on a phone with the location refused still lists spots: the map's", async ({
     page,
   }) => {
     await openFinder(page);
-    await expect(cards(page)).toHaveCount(12, { timeout: 30000 });
+    await toList(page);
+    await expect(finder(page)).toHaveAttribute("data-scope", "near");
+    await expect
+      .poll(() => cards(page).count(), { timeout: 30000 })
+      .toBeGreaterThan(0);
+    expect(await cards(page).count()).toBeLessThanOrEqual(30);
+    // No "Use my location" in the filter sheet: the map has the button.
+    await openFilters(page);
+    await expect(
+      page.getByRole("dialog").getByRole("button", { name: "Use my location" }),
+    ).toHaveCount(0);
   });
 });

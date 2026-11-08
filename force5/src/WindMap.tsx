@@ -26,7 +26,12 @@ import { THEME_EVENT } from "../../shared/web/theme";
 import { archiveUrl, pmtilesTile } from "./archives";
 import { releaseReplacedColorRamps } from "./colorRelief";
 import { forecastUrl } from "./urls";
-import { createLights, type LightState, type Lights } from "./lights";
+import {
+  createLights,
+  type LightState,
+  type Lights,
+  type PillMode,
+} from "./lights";
 import { createReadingPills, type ReadingPills } from "./readingPills";
 import type { WindStation } from "./windObs";
 import {
@@ -35,7 +40,6 @@ import {
   dialDrawing,
   footBox,
   metresPerPixel,
-  rangeRing,
   roseDrawing,
   roseFitRadius,
   roseRadius,
@@ -67,6 +71,7 @@ import {
 import type { Frame, Spot } from "./weather";
 import type { CurrentFeature } from "./currents";
 import type { RainView } from "./rain";
+import type { WaveView } from "./waveField";
 import type { Units } from "./units";
 
 maplibregl.setWorkerUrl(workerUrl);
@@ -183,11 +188,11 @@ type Props = {
   named: ReadonlySet<string>;
   lightLabel: (spot: Spot, state: LightState | undefined) => string;
   selectedId: string | null;
-  /** Where the loupe or the range ring is laid (a spot or a tapped point), or null. */
+  /** Where the loupe is laid (a spot or a tapped point), or null. */
   focus: { lon: number; lat: number } | null;
-  /** The rider's choice of mark round the focus: a loupe, a range ring, or none. */
+  /** The rider's choice of mark round the focus: the loupe, or none. */
   focusStyle: FocusStyle;
-  /** The rider's speed units, which the range ring's and the rose's distances follow (NM with knots). */
+  /** The rider's speed units, which the rose's distances follow (NM with knots). */
   units: Units;
   /** The loupe's ride rose for the dock's hour at the focus, or null with no wind to show. */
   rose: LoupeRose | null;
@@ -204,10 +209,17 @@ type Props = {
    */
   currents?: readonly CurrentFeature[] | null;
   /**
-   * The Rain layer's picture at the hour shown, or null with the layer off or
-   * nothing to draw. Its drawing code is loaded the first time there is one.
+   * The Weather field's sky and rain at the hour shown, or null with the
+   * field off or nothing to draw. Its drawing code is loaded the first time
+   * there is one.
    */
   rain?: RainView | null;
+  /**
+   * The Waves field's wave height at the hour shown, or null with the field
+   * off or nothing to draw. Its drawing code is loaded the first time there
+   * is one.
+   */
+  waves?: WaveView | null;
   /** The satellite image to draw under the chart's lines, or null for none. */
   satellite?: SatelliteImage | null;
   reducedMotion: boolean;
@@ -218,6 +230,13 @@ type Props = {
   onSelect: (spot: Spot, bead: boolean) => void;
   /** A mouse comes onto a light (its place), or leaves it (null). */
   onHoverSpot?: (spot: Spot | null) => void;
+  /**
+   * A tap with two spots or more within a bead's reach of it, where no list
+   * stands beside the map: the spots there, the nearest first.
+   */
+  onCrowd?: (spots: Spot[]) => void;
+  /** Which spots have a pill (./lights.ts): the cards in view, or the best few. */
+  pills: PillMode;
   /**
    * The name beside the chosen spot, or beside the point tapped, is pressed:
    * its own page.
@@ -285,10 +304,7 @@ const WORLD = [
 
 const SVG = "http://www.w3.org/2000/svg";
 
-/**
- * The wash's layers, a band of it apiece (focus.ts `washHoles`): the first,
- * "focus", the loupe's, the rest the ring's as it feathers out.
- */
+/** The wash's layers, a band of it apiece (focus.ts `washHoles`): the loupe's. */
 const WASH_LAYERS = Array.from({ length: WASH_BANDS }, (_, i) =>
   i ? `focus-${i}` : "focus",
 );
@@ -617,33 +633,6 @@ function drawForces(
   }
 }
 
-/** The range ring at the origin, `r` pixels out, with its distance written up and to the right. */
-function drawRange(g: SVGGElement, r: number, label: string) {
-  svgEl(g, "circle", { class: "map-range-halo", r });
-  svgEl(g, "circle", { class: "map-range-line", r });
-  for (const [x, y] of [
-    [0, -1],
-    [1, 0],
-    [0, 1],
-    [-1, 0],
-  ])
-    svgEl(g, "line", {
-      class: "map-range-tick",
-      x1: x * (r - 6),
-      y1: y * (r - 6),
-      x2: x * (r + 6),
-      y2: y * (r + 6),
-    });
-  write(
-    svgEl(g, "text", {
-      class: "map-range-label",
-      x: Math.cos(-0.95) * r + 8,
-      y: Math.sin(-0.95) * r - 6,
-    }),
-    label,
-  );
-}
-
 function ring(lon: number, lat: number, metres: number, n = 56) {
   const out: number[][] = [];
   for (let i = 0; i <= n; i++) {
@@ -726,6 +715,7 @@ export default function WindMap(props: Props) {
     foil,
     currents = null,
     rain = null,
+    waves = null,
     satellite = null,
     reducedMotion,
     bottomInset,
@@ -1246,25 +1236,52 @@ export default function WindMap(props: Props) {
     };
   }, [ready, currents]);
 
-  // Rain: one image source and one raster layer under the chart's ink
-  // (rainLayer.ts), whose code is fetched the first time there is rain to draw.
-  const rainLayer = useRef<typeof import("./rainLayer") | null>(null);
+  // The sky and its rain: one image source and one raster layer under the
+  // chart's ink (skyLayer.ts), whose code is fetched the first time there is
+  // a sky to draw.
+  const skyLayer = useRef<typeof import("./skyLayer") | null>(null);
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
     if (!rain) {
-      rainLayer.current?.hideRain(map);
+      skyLayer.current?.hideSky(map);
       return;
     }
     let live = true;
-    import("./rainLayer").then((layer) => {
-      rainLayer.current = layer;
-      if (live && mapRef.current === map) layer.drawRain(map, rain);
+    import("./skyLayer").then((layer) => {
+      skyLayer.current = layer;
+      if (live && mapRef.current === map) layer.drawSky(map, rain);
     });
     return () => {
       live = false;
     };
   }, [ready, rain]);
+
+  // The waves: likewise one picture under the ink (waveLayer.ts), drawn
+  // afresh when the theme changes, as its colours do.
+  const waveLayer = useRef<typeof import("./waveLayer") | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    if (!waves) {
+      waveLayer.current?.hideWaves(map);
+      return;
+    }
+    let live = true;
+    const draw = () => {
+      if (live && mapRef.current === map)
+        waveLayer.current?.drawWaves(map, waves);
+    };
+    import("./waveLayer").then((layer) => {
+      waveLayer.current = layer;
+      draw();
+    });
+    window.addEventListener(THEME_EVENT, draw);
+    return () => {
+      live = false;
+      window.removeEventListener(THEME_EVENT, draw);
+    };
+  }, [ready, waves]);
 
   // The satellite image: one raster source and layer per area and tide, made
   // the first time it is wanted and kept, hidden when another tide is chosen
@@ -1385,10 +1402,11 @@ export default function WindMap(props: Props) {
       spots,
       (spot, bead) => latest.current.onSelect(spot, bead),
       (spot) => latest.current.onHoverSpot?.(spot),
-      (spot) => latest.current.onOpenPage?.(spot),
+      (spots) => latest.current.onCrowd?.(spots),
     );
     lightsRef.current.light(lit.current);
     lightsRef.current.foot(latest.current.bottomInset);
+    lightsRef.current.mode(latest.current.pills);
     return () => {
       lightsRef.current?.destroy();
       lightsRef.current = null;
@@ -1404,10 +1422,15 @@ export default function WindMap(props: Props) {
     );
   }, [ready, spots, lights, selectedId, named, units, props.lightLabel]);
 
-  // No pill beside the list stands in the dock's room at the map's foot.
+  // No pill stands in the dock's room at the map's foot.
   useEffect(() => {
     lightsRef.current?.foot(bottomInset);
   }, [ready, spots, bottomInset]);
+  const pills = props.pills;
+  const pillsKey = JSON.stringify(pills);
+  useEffect(() => {
+    lightsRef.current?.mode(pills);
+  }, [ready, spots, pillsKey]);
 
   // The plain map's pills, from the map box's class (src/map.css).
   const plain = !!props.plain;
@@ -1464,12 +1487,10 @@ export default function WindMap(props: Props) {
     };
   }, [ready, you?.lon, you?.lat]);
 
-  // Focus: a loupe laid on the chart round the chosen spot, or a range ring,
-  // with a light wash of paper beyond it; or, as the rider chooses, nothing.
-  // Both are distances on the chart and scale with it through a zoom: the
-  // loupe's rose reaches half a nautical mile or a kilometre (focus.ts
-  // `roseScale`), the ring a round distance chosen again whenever the camera
-  // rests. Zoomed far out the rose stops at ROSE_MIN_PX, a compass with the
+  // Focus: a loupe laid on the chart round the chosen spot, with a light wash
+  // of paper beyond it; or, as the rider chooses, nothing. It is a distance
+  // on the chart and scales with it through a zoom: the rose reaches half a
+  // nautical mile or a kilometre (focus.ts `roseScale`). Zoomed far out the rose stops at ROSE_MIN_PX, a compass with the
   // wind and nothing inside; zoomed in past the screen its bezel runs off it,
   // and the box at its foot is held in view. A pan only moves the glass, and
   // a zoom stretches it, until the stretch would show or the camera rests
@@ -1499,12 +1520,12 @@ export default function WindMap(props: Props) {
     let foot: SVGGElement | null = null;
     if (spot && style !== "off") {
       const mark = document.createElement("div");
-      mark.className = style === "loupe" ? "map-loupe" : "map-range";
+      mark.className = "map-loupe";
       sheet = document.createElementNS(SVG, "svg");
       sheet.setAttribute("class", "map-sheet");
       g = svgEl(sheet, "g") as SVGGElement;
       mark.append(sheet);
-      if (style === "loupe") {
+      {
         footSheet = document.createElementNS(SVG, "svg");
         footSheet.setAttribute("class", "map-sheet is-foot");
         foot = svgEl(footSheet, "g", {
@@ -1514,11 +1535,10 @@ export default function WindMap(props: Props) {
       }
       lens.append(mark);
     }
-    /** The mark's radius on screen, and the ring's distance, written as the rider reads it. */
+    /** The mark's radius on screen. */
     let r = 0;
     /** The radius it stands at on the screen now, its sheet stretched to it through a zoom. */
     let shown = 0;
-    let range = { metres: 0, label: "" };
     const scale = roseScale(units);
     /** Whether the rose is drawn to scale (not held at its smallest). */
     let toScale = false;
@@ -1622,7 +1642,7 @@ export default function WindMap(props: Props) {
         ? Math.abs(now - r) > 0.05
         : now / r < STRETCH[0] || now / r > STRETCH[1]);
     /**
-     * Over the spot, wherever the camera has it; the ring at its distance.
+     * Over the spot, wherever the camera has it.
      * The sheet is moved as a layer of its own (src/map.css), so a pan
      * paints nothing again. At rest it stands on whole pixels, the rest
      * drawn in, as sharp as it was.
@@ -1638,27 +1658,19 @@ export default function WindMap(props: Props) {
         "transform",
         `translate(${(q.x - x).toFixed(2)} ${(q.y - y).toFixed(2)})`,
       );
-      if (style === "ring") {
-        shown = range.metres / mpp();
-        if (stale(shown, still)) {
-          r = shown;
-          redraw(g, () => drawRange(g!, r, range.label));
-        }
-      } else {
-        const next = roseRadius(scale.metres, mpp());
-        shown = next.r;
-        if (next.toScale !== toScale || stale(shown, still)) {
-          r = shown;
-          toScale = next.toScale;
-          drawRose();
-        }
+      const next = roseRadius(scale.metres, mpp());
+      shown = next.r;
+      if (next.toScale !== toScale || stale(shown, still)) {
+        r = shown;
+        toScale = next.toScale;
+        drawRose();
       }
       const k = Math.abs(shown - r) > 0.05 ? shown / r : 1;
       sheet.style.transform =
         k === 1
           ? `translate(${x}px, ${y}px)`
           : `translate(${x}px, ${y}px) scale(${k.toFixed(4)})`;
-      if (style === "loupe") {
+      {
         pinFoot(q, x, y, still);
         // The hole in the wash is a distance on the chart, under the rim's
         // band through most of a zoom: in one it is cut again only when its
@@ -1668,17 +1680,12 @@ export default function WindMap(props: Props) {
         if (!still && (edge < shown || edge > shown + LOUPE_BAND * k)) wash();
       }
     };
-    /** Sized for the map: the glass to its shorter side, the ring's distance to the zoom too. */
+    /** Sized for the map: the glass to the zoom. */
     const measure = () => {
       if (!spot || !g) {
         wash();
         return;
       }
-      const box = map.getContainer();
-      const width = box.clientWidth;
-      const visible = box.clientHeight - latest.current.bottomInset - 70;
-      if (style !== "loupe")
-        range = rangeRing(mpp(), Math.min(width, visible), units);
       place();
       wash();
       names();
@@ -1734,8 +1741,8 @@ export default function WindMap(props: Props) {
       map.off("resize", measure);
     };
   }, [ready, focus?.lon, focus?.lat, focusStyle, units]);
-  // The dock's height is the map's visible height: the ring is sized to it,
-  // and the rose's foot box kept above it.
+  // The dock's height is the map's visible height: the rose's foot box is
+  // kept above it.
   useEffect(() => remeasure.current(), [bottomInset]);
   // The dock's hour, or the rider, changed: the rose, and only the rose.
   const roseKey = rose ? JSON.stringify(rose) : "";

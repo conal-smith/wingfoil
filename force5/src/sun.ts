@@ -112,6 +112,39 @@ export function sunTimes(
   };
 }
 
+/**
+ * The sun's height at `time` (UTC milliseconds) as a function of the place:
+ * degrees above the horizon, negative below it. The geometric height, with
+ * no refraction: what darkens a sky is the sun's depth below the horizon,
+ * and the half degree refraction adds at the horizon itself matters to no
+ * shade of it. Worked out once for the instant, so a grid of places costs a
+ * few sines each.
+ */
+export function sunElevationAt(
+  time: number,
+): (latitude: number, longitude: number) => number {
+  const { declination, equationOfTime } = solarPosition(julianDay(time));
+  const minutes = (time - startOfUtcDay(new Date(time))) / 60000;
+  const sinD = Math.sin(rad(declination));
+  const cosD = Math.cos(rad(declination));
+  return (latitude, longitude) => {
+    // Minutes of true solar time at the place, then the sun's hour angle.
+    const solar = minutes + equationOfTime + 4 * longitude;
+    const angle = rad(solar / 4 - 180);
+    const sinE =
+      Math.sin(rad(latitude)) * sinD +
+      Math.cos(rad(latitude)) * cosD * Math.cos(angle);
+    return deg(Math.asin(Math.max(-1, Math.min(1, sinE))));
+  };
+}
+
+/** The sun's height at a place and instant, in degrees above the horizon. */
+export const sunElevation = (
+  latitude: number,
+  longitude: number,
+  time: number,
+) => sunElevationAt(time)(latitude, longitude);
+
 export interface NightInterval {
   from: Date;
   to: Date;

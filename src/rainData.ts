@@ -1,14 +1,16 @@
-// What the Rain layer draws at one hour, read on demand: imported by
-// src/useRain.ts only once the layer is on, so none of it is in the page a
-// rider who just wants the wind loads. It reads ICON-EU weather's pointer
-// (kept for five minutes, as the forecast manifests are) and the frames the
-// hour shown needs, then the hours either side of it; every frame read is
-// kept for the run, so going back through the hours reads nothing. A frame is
-// some 25–30 KB on the wire: an hour's rain over the whole ICON-EU crop, which
-// is a few KB of it, and the total cloud the same frame carries for the sky.
+// What the Weather field draws at one hour, the sky's cloud and the rain over
+// it, read on demand: imported by src/useRain.ts only once the field is on, so
+// none of it is in the page a rider who just wants the wind loads. It reads
+// ICON-EU weather's pointer (kept for five minutes, as the forecast manifests
+// are) and the frames the hour shown needs, then the hours either side of it;
+// every frame read is kept for the run, so going back through the hours reads
+// nothing. A frame is some 25–30 KB on the wire: an hour's rain over the
+// whole ICON-EU crop, which is a few KB of it, and the total cloud the same
+// frame carries for the sky.
 import {
   RAIN_URL,
   RAIN_VARIABLE,
+  framesCarryCloud,
   rainFrameUrl,
   rainFramesFor,
   rainIntervals,
@@ -17,6 +19,7 @@ import {
   type RainFrame,
   type RainView,
 } from "../force5/src/rain";
+import { meanCloud } from "../force5/src/sky";
 import {
   validateWeatherManifest,
   type WeatherManifest,
@@ -26,6 +29,8 @@ import { forecastUrl } from "../force5/src/urls";
 import { clock, dayShort } from "./strip";
 
 const MANIFEST_MS = 5 * 60000;
+/** How far a column's time may sit past the last step and still be on it. */
+const SLACK_MS = 60000;
 /** How many hours after the one shown are read behind it, and before it. */
 const AHEAD = 3;
 const BEHIND = 1;
@@ -115,7 +120,12 @@ export async function rainAt(from: number, to: number): Promise<RainAt> {
   const intervals = rainIntervals(manifest.frames);
   const wet = intervals.filter(({ start, end }) => end > start);
   const reach = wet.length ? wet[wet.length - 1].end : null;
-  const shown = rainFramesFor(manifest.frames, from, to);
+  // Past the last step nothing is drawn, not even the part of a long column
+  // the run still reaches: the legend says how far the map goes instead.
+  const shown =
+    reach !== null && to > reach + SLACK_MS
+      ? []
+      : rainFramesFor(manifest.frames, from, to);
   if (!shown.length)
     return {
       view: null,
@@ -131,11 +141,18 @@ export async function rainAt(from: number, to: number): Promise<RainAt> {
     const spans = rainIntervals(shown);
     return {
       view: {
-        key: `${manifest.base}|${shown.map((info) => info.hour).join(",")}`,
+        // The hour too: the sky's night is worked out for it, and an hour
+        // inside a longer step shows that step's rain under its own sun.
+        key: `${manifest.base}|${shown.map((info) => info.hour).join(",")}|${to}`,
         grid: manifest.grid!,
         rates: rainRates(read_),
+        // The sky's cloud, where the run's frames carry it; else the rain alone.
+        cloud: framesCarryCloud(manifest)
+          ? meanCloud(read_, manifest.grid!)
+          : null,
         from: spans[0].start,
         to: spans[spans.length - 1].end,
+        time: to,
       },
       note: null,
       reach,
