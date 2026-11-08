@@ -151,9 +151,9 @@ test("a spot page lists its warnings, and orange and red stand in for the stars"
   await expect(details).toHaveAttribute("aria-expanded", "true");
   await expect(items.nth(1).getByText(/^Wind warning: /)).toBeVisible();
   await expect(words).toBeVisible();
-  // The source, under the group.
+  // The source, at the end of each line on a window this wide.
   await expect(
-    group.getByRole("link", { name: "the latest at met.ie" }),
+    group.getByRole("link", { name: "met.ie", exact: true }).first(),
   ).toHaveAttribute("href", "https://www.met.ie/warnings");
   await shot(page, "spot-page-warnings");
 

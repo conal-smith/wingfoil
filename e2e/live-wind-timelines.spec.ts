@@ -61,14 +61,16 @@ test.describe("the spot page", () => {
       await winds.first().evaluate((el) => getComputedStyle(el).fill),
     ).toBe("rgb(233, 178, 0)");
     // Its own entry in the key's Wind group.
+    await page.locator('[data-disclosure="key"] summary').click();
     await expect(page.locator("[data-measured-key]")).toHaveText(
       "Measured at Belmullet 1 km, wind and gust",
     );
   });
 
-  test("at Now the readout's wind is the station's last reading, and says where and when; other hours keep the forecast", async ({
+  test("at Now a phone's reading is the station's last, and says where and when; other hours keep the forecast", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/spot/belmullet");
     await expect(page.locator("[data-readout]")).toBeVisible({
       timeout: 30000,
@@ -82,10 +84,10 @@ test.describe("the spot page", () => {
     await expect(readoutWind(page).locator("[data-readout-source]")).toHaveText(
       "· Belmullet 1 km, 22:00",
     );
-    // An hour tomorrow, under the pointer: the forecast, from nowhere else.
-    await page.locator("[data-spot-graph]").scrollIntoViewIfNeeded();
-    const box = (await page.locator("[data-spot-graph]").boundingBox())!;
-    await page.mouse.move(box.x + box.width * 0.75, box.y + 80);
+    // An hour tomorrow, under the playhead: the forecast, from nowhere else.
+    await page
+      .locator("[data-spot-graph]")
+      .evaluate((el) => (el.scrollLeft += 400));
     await expect(page.locator("[data-readout]")).not.toContainText("Now");
     await expect(value).not.toHaveAttribute("data-measured", /.*/);
     await expect(
@@ -97,7 +99,7 @@ test.describe("the spot page", () => {
     page,
   }) => {
     await page.goto("/spot/brandon");
-    await expect(page.locator("[data-readout]")).toBeVisible({
+    await expect(page.locator("[data-graph-svg]")).toBeVisible({
       timeout: 30000,
     });
     await expect(page.locator("[data-measured]")).toHaveCount(0);
