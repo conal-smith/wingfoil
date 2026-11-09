@@ -73,9 +73,8 @@ describe("display preferences", () => {
   it("keeps a wave model the site publishes, and reads the finest otherwise", () => {
     expect(defaultPrefs().waveModel).toBeNull();
     const stored = (waveModel: unknown) =>
-      loadPrefs(
-        fakeStorage({ [PREFS_KEY]: JSON.stringify({ waveModel }) }),
-      ).waveModel;
+      loadPrefs(fakeStorage({ [PREFS_KEY]: JSON.stringify({ waveModel }) }))
+        .waveModel;
     expect(stored("mi-swan")).toBe("mi-swan");
     expect(stored("blend")).toBe("blend");
     expect(stored("harmonie")).toBeNull();
@@ -206,6 +205,16 @@ describe("display preferences", () => {
     expect(stored(undefined)).toBe("show");
     expect(stored(false)).toBe("show");
     expect(stored("dark")).toBe("show");
+  });
+  it("reads the waves in feet unless the reader has chosen metres", () => {
+    expect(defaultPrefs().waveUnits).toBe("ft");
+    const stored = (waveUnits: unknown) =>
+      loadPrefs(fakeStorage({ [PREFS_KEY]: JSON.stringify({ waveUnits }) }))
+        .waveUnits;
+    expect(stored("m")).toBe("m");
+    expect(stored("ft")).toBe("ft");
+    expect(stored(undefined)).toBe("ft");
+    expect(stored("yards")).toBe("ft");
   });
   it("merges partial and unknown stored values over the defaults", () => {
     const storage = fakeStorage({

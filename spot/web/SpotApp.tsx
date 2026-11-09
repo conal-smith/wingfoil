@@ -336,7 +336,10 @@ function SpotPage({
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(timer);
   }, []);
-  const { units, blendModels, waveModel } = useMemo(() => loadPrefs(), []);
+  const { units, blendModels, waveModel, waveUnits } = useMemo(
+    () => loadPrefs(),
+    [],
+  );
   // Whether the week shows the hours after dark (Settings), kept on the
   // device and followed as it changes.
   const nightHours = useNightHours();
@@ -349,6 +352,7 @@ function SpotPage({
       forecast={forecast}
       rider={rider}
       units={units}
+      waveUnits={waveUnits}
       nightHours={nightHours}
       now={now}
       at={at}

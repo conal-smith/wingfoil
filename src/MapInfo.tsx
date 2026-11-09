@@ -21,6 +21,7 @@ import {
   satelliteTidesLine,
 } from "../force5/src/satellite";
 import { STARS_HREF } from "../force5/src/siteNav";
+import type { WaveUnits } from "../force5/src/units";
 import { windBand, type Rider } from "../force5/src/stars";
 import { windColor } from "../force5/src/weather";
 import {
@@ -166,7 +167,7 @@ export interface MapInfoProps {
    * The Waves field: whether it is on, and what it draws at the hour shown
    * (or why it draws nothing there).
    */
-  waves?: { on: boolean; line: string | null };
+  waves?: { on: boolean; line: string | null; units?: WaveUnits };
   sources: ReactNode;
   /** "Satellite: high tide (≈4.6 m)" while the image is on, else null. */
   satellite?: string | null;
@@ -526,16 +527,25 @@ function WeatherPart({ on, line }: { on: boolean; line: string | null }) {
 }
 
 /** The Waves field: what its colours mean, and where they come from. */
-function WavesPart({ on, line }: { on: boolean; line: string | null }) {
+function WavesPart({
+  on,
+  line,
+  units = "ft",
+}: {
+  on: boolean;
+  line: string | null;
+  units?: WaveUnits;
+}) {
   return (
     <>
       <p className="mi-lede">
         How high the waves are on the sea at the hour shown.
       </p>
       <h4>
-        The colours <small>wave height, metres</small>
+        The colours{" "}
+        <small>wave height, {units === "ft" ? "feet" : "metres"}</small>
       </h4>
-      <WaveScale />
+      <WaveScale units={units} />
       <p data-waves-line>
         {on
           ? (line ?? "Reading…")

@@ -64,7 +64,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ViewBounds } from "../../force5/src/squares";
 import type { Rider } from "../../force5/src/stars";
-import type { Units } from "../../force5/src/units";
+import type { Units, WaveUnits } from "../../force5/src/units";
 import type { Spot } from "../../force5/src/weather";
 import { modelName, STARS_CHOICES } from "../../force5/src/lead";
 import { isChartAddress } from "../../force5/src/siteNav";
@@ -194,6 +194,7 @@ export interface FinderProps {
   onToggleStar: (id: string) => void;
   rider: Rider;
   units: Units;
+  waveUnits: WaveUnits;
   reducedMotion: boolean;
   phone: boolean;
   /**
@@ -280,6 +281,7 @@ export default function SpotFinder(props: FinderProps) {
     onToggleStar,
     rider,
     units,
+    waveUnits,
     reducedMotion,
     phone,
     onWant,
@@ -751,6 +753,7 @@ export default function SpotFinder(props: FinderProps) {
                         now={now}
                         rider={rider}
                         units={units}
+                        waveUnits={waveUnits}
                         starred={starred.includes(item.spot.id)}
                         phone={phone}
                         reducedMotion={reducedMotion}

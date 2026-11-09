@@ -296,7 +296,7 @@ describe("what ui/ exports", () => {
 
   it.each([
     ["Button", buttonStyles, "variant", [...VARIANTS]],
-    ["Button", buttonStyles, "size", ["sm", "md", "lg"]],
+    ["Button", buttonStyles, "size", ["xs", "sm", "md", "lg"]],
     ["Button", buttonStyles, "icon", ["true"]],
     ["Button", buttonStyles, "pressed", ["true", "worded"]],
     ["Card", cardStyles, "kind", ["soft", "float"]],

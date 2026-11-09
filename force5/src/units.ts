@@ -40,6 +40,51 @@ export const scaleUnits = (units: Units): ScaleUnits =>
 
 export const convert = (speed: number, units: Units) => speed * FACTORS[units];
 
+/* ---- wave heights ---- */
+
+/**
+ * The units a wave height is shown in. Every stored height stays in metres;
+ * tide and depth are metres always. Feet are the default: most riders read a
+ * sea in them.
+ */
+export type WaveUnits = "ft" | "m";
+
+export const WAVE_UNITS: readonly {
+  id: WaveUnits;
+  label: string;
+  name: string;
+}[] = [
+  { id: "ft", label: "ft", name: "Feet" },
+  { id: "m", label: "m", name: "Metres" },
+];
+
+export const isWaveUnits = (value: unknown): value is WaveUnits =>
+  WAVE_UNITS.some((unit) => unit.id === value);
+
+export const FEET_PER_METRE = 3.28084;
+
+/**
+ * A height as a figure in a row: "3" or "<1" in whole feet, "0.7" in metres
+ * to a tenth. A sea under half a foot rounds to no feet at all, so it says
+ * "<1", not 0.
+ */
+export function waveFigure(metres: number, units: WaveUnits): string {
+  if (units === "m") return metres.toFixed(1);
+  const feet = Math.round(metres * FEET_PER_METRE);
+  return feet < 1 ? "<1" : String(feet);
+}
+
+/** A height with its unit: "3 ft", "under 1 ft" or "0.7 m". */
+export function waveText(metres: number, units: WaveUnits): string {
+  if (units === "m") return `${metres.toFixed(1)} m`;
+  const feet = Math.round(metres * FEET_PER_METRE);
+  return feet < 1 ? "under 1 ft" : `${feet} ft`;
+}
+
+/** Two heights as a range with its unit: "1–3 ft", "<1–2 ft", "0.5–0.9 m". */
+export const waveRange = (low: number, high: number, units: WaveUnits) =>
+  `${waveFigure(low, units)}–${waveFigure(high, units)} ${units}`;
+
 export const unitLabel = (units: Units) =>
   UNITS.find((unit) => unit.id === units)?.label ?? units;
 

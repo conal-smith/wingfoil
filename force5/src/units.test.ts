@@ -15,6 +15,10 @@ import {
   unitLabel,
   unitName,
   type Units,
+  isWaveUnits,
+  waveFigure,
+  waveRange,
+  waveText,
 } from "./units";
 import { convert as convertFromWeather } from "./weather";
 
@@ -66,7 +70,6 @@ describe("display units", () => {
     const units: Units = "kn";
     expect(convertFromWeather(10, units)).toBe(convert(10, units));
   });
-
 });
 
 describe("Force (Beaufort)", () => {
@@ -123,5 +126,36 @@ describe("Force (Beaufort)", () => {
     expect(scaleUnits("bft")).toBe("kn");
     expect(scaleUnits("m/s")).toBe("m/s");
     expect(convert(10, "bft")).toBe(convert(10, "kn"));
+  });
+});
+
+describe("wave heights", () => {
+  it("are whole feet by figure and by words", () => {
+    expect(waveFigure(1.2, "ft")).toBe("4");
+    expect(waveText(1.2, "ft")).toBe("4 ft");
+    expect(waveText(0.31, "ft")).toBe("1 ft");
+  });
+
+  it("say under a foot rather than none", () => {
+    expect(waveFigure(0.1, "ft")).toBe("<1");
+    expect(waveText(0.1, "ft")).toBe("under 1 ft");
+    expect(waveText(0, "ft")).toBe("under 1 ft");
+  });
+
+  it("are metres to a tenth when the rider asks", () => {
+    expect(waveFigure(1.24, "m")).toBe("1.2");
+    expect(waveText(1.24, "m")).toBe("1.2 m");
+  });
+
+  it("run as a range with one unit", () => {
+    expect(waveRange(0.3, 0.9, "ft")).toBe("1–3 ft");
+    expect(waveRange(0.1, 0.9, "ft")).toBe("<1–3 ft");
+    expect(waveRange(0.5, 0.9, "m")).toBe("0.5–0.9 m");
+  });
+
+  it("know their units", () => {
+    expect(isWaveUnits("ft")).toBe(true);
+    expect(isWaveUnits("m")).toBe(true);
+    expect(isWaveUnits("yd")).toBe(false);
   });
 });

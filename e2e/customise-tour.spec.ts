@@ -112,6 +112,7 @@ test("Settings holds the rider's settings on one page and saves them, and the li
   await expect(settings.locator(".st-row .st-kick")).toHaveText([
     "Weight",
     "Units",
+    "Wave height",
     "Model",
     "Wave model",
     "Hours",

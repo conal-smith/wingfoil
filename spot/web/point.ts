@@ -50,6 +50,31 @@ export interface PointPlace {
   lender: RidingSpot | null;
 }
 
+/** How many riding places a riding place's page lists, and how far round. */
+export const SPOT_NEARBY = 9;
+export const SPOT_NEARBY_KM = 30;
+
+/**
+ * The riding places round a riding place, for the strip under its name,
+ * nearest first: within reach, and the nearest however far, so the strip
+ * always has somewhere to go.
+ */
+export function spotsAround(
+  spots: readonly RidingSpot[],
+  here: RidingSpot,
+): NearbySpot[] {
+  return spots
+    .filter((spot) => spot.id !== here.id)
+    .map((spot) => ({
+      id: spot.id,
+      name: spot.name,
+      distance_km: Math.round(distanceKm(here, spot) * 10) / 10,
+    }))
+    .sort((a, b) => a.distance_km - b.distance_km || a.id.localeCompare(b.id))
+    .filter((near, i) => i === 0 || near.distance_km <= SPOT_NEARBY_KM)
+    .slice(0, SPOT_NEARBY);
+}
+
 /**
  * The point at `lat`, `lon` among the riding places `spots`: its own place
  * (in the nearest place's county, which is what a reader would call the

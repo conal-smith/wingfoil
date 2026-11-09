@@ -6,7 +6,7 @@ import {
   type PillReading,
 } from "../force5/src/pillContent";
 import type { TideEvent } from "../force5/src/tides";
-import { speedShort, type Units } from "../force5/src/units";
+import { speedShort, type Units, type WaveUnits } from "../force5/src/units";
 import type { Spot } from "../force5/src/weather";
 import { Button } from "../ui/Button";
 import { Link } from "../ui/Link";
@@ -69,6 +69,7 @@ const SpotPeek = forwardRef<
     time: number | null;
     now: number;
     units: Units;
+    waveUnits: WaveUnits;
     kind: "peek" | "card";
     /** The spot's own page. */
     href: string;
@@ -86,6 +87,7 @@ const SpotPeek = forwardRef<
     time,
     now,
     units,
+    waveUnits,
     kind,
     href,
     onClose,
@@ -132,7 +134,9 @@ const SpotPeek = forwardRef<
           {reading.inland ? (
             <span className="sp-none">None inland</span>
           ) : (
-            <Figures html={pillHtml(pillContent("waves", reading, units))} />
+            <Figures
+              html={pillHtml(pillContent("waves", reading, units, waveUnits))}
+            />
           )}
         </dd>
         <dt>Weather</dt>

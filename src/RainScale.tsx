@@ -1,4 +1,5 @@
 import { RAIN_KEY_MM } from "../force5/src/rain";
+import { FEET_PER_METRE, type WaveUnits } from "../force5/src/units";
 import { SKY_NIGHT, SKY_STOPS, WAVE_STOPS } from "../force5/src/fieldStops";
 
 /**
@@ -95,17 +96,19 @@ export function SkyScale() {
 }
 
 /** The waves' key: the wave height at each of the theme's stops, in metres. */
-export function WaveScale() {
-  const heights = WAVE_STOPS.map(({ metres }) => metres);
+export function WaveScale({ units = "ft" }: { units?: WaveUnits }) {
+  const said = (metres: number) =>
+    units === "ft" ? Math.round(metres * FEET_PER_METRE) : metres;
+  const heights = WAVE_STOPS.map(({ metres }) => said(metres));
   const last = heights[heights.length - 1];
   return (
     <SwatchScale
       data-wave-key
-      label={`Wave height scale, metres: faint at 0, stronger through ${heights.slice(1, -1).join(", ")}, strongest at ${last} and over`}
-      unit="m"
+      label={`Wave height scale, ${units === "ft" ? "feet" : "metres"}: faint at 0, stronger through ${heights.slice(1, -1).join(", ")}, strongest at ${last} and over`}
+      unit={units}
       steps={WAVE_STOPS.map(({ metres, token }) => ({
         colour: laid(token),
-        figure: `${metres}${metres === last ? "+" : ""}`,
+        figure: `${said(metres)}${said(metres) === last ? "+" : ""}`,
       }))}
     />
   );

@@ -1,4 +1,5 @@
 import { CloudSun, Waves, Wind } from "lucide-react";
+import type { WaveUnits } from "../force5/src/units";
 import {
   useLayoutEffect,
   useRef,
@@ -39,6 +40,7 @@ export default function MapDock({
   offered,
   onField,
   note = null,
+  waveUnits = "ft",
   phone,
   where,
   onRoom,
@@ -46,6 +48,8 @@ export default function MapDock({
 }: {
   /** The field the map draws. */
   field: MapField;
+  /** The wave scale's unit (Settings). */
+  waveUnits?: WaveUnits;
   /** The fields with a chip: those with a source to draw them. */
   offered: readonly FieldId[];
   onField: (field: MapField) => void;
@@ -164,7 +168,9 @@ export default function MapDock({
             </Chip>
           ))}
         </div>
-        {!phone && <MapScales field={field} note={note} />}
+        {!phone && (
+          <MapScales field={field} note={note} waveUnits={waveUnits} />
+        )}
       </div>
       {children}
     </div>

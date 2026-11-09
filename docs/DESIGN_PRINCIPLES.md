@@ -182,7 +182,10 @@ pointer (`min-h-touch`). A control drawn smaller keeps its drawn size and grows
 its hit area instead, down the block axis only when its neighbours are close
 along the inline one.
 
-**Focus.** One ring, for the keyboard only: 2px of `focus`, the chart's
+**Focus.** One ring, for the keyboard only (a control pressed with a mouse
+lets the focus go, so a key pressed later does not ring it,
+ui/useClickLeavesNoRing.ts; the spot page's graphs carry it on the cursor's
+tag, never round the graph): 2px of `focus`, the chart's
 magenta, 2px clear of the control (`RING` in `ui/tv.ts`), on every control. A
 field whose box holds the focus takes an ink edge and a soft ring of the
 accent instead; a search field only lifts a step (`raised`), with no edge or
@@ -736,10 +739,10 @@ tide), a reading an hour lacks saying "–"; the strip draws the wind and the
 stars, and under them a lane each for the waves and the tide. The card beside
 the spot's pill opens its page (2026-11-08; a tapped point has its name beside
 its mark); a tap off the spot lets it go, the bar's forecast with it, and
-the next tap picks a point. The spot page's readout over its graph is cells in
-fixed places too, held in view on a phone, where the band names float over the
-hours instead of taking a column and the hours scrolled under a playhead are
-the hour read out. The layers' rail lost what does not change a rider's day,
+the next tap picks a point. The spot page's readout over its graph was cells in
+fixed places too, held in view on a phone (gone, 2026-11-09), where the band
+names floated over the hours instead of taking a column and the hours scrolled
+under a playhead are the hour read out. The layers' rail lost what does not change a rider's day,
 so it stands whole in a column on a phone: the chart's own parts (depth
 tints, contours, relief, names) are always drawn, the satellite is one button
 from high tide to low to none, and the loupe is on or off (with it off, no
@@ -863,16 +866,13 @@ the hours' left edge hid the first figures under them, the stars and a
 warning's mark ran into the Gusts cell, the top of the graph looked cut off
 under the readout, and a finger on the graph could not move it. The band
 names now take a column of their own on a phone too, 60 px, in the caption's
-size, so no figure is ever under one. With the readout held over the graph,
-a band's name is held just below the readout's foot while any of its band is
-still in view, and a hairline marks the foot once the graph runs under it, so
-the graph reads as passing under the readout rather than as clipped. The
+size, so no figure is ever under one. (The readout over the graph, and the
+names held below its foot, went on 2026-11-09.) The
 graph takes the browser's own touch handling: a sideways drag scrolls the
 hours under the playhead and an upward one scrolls the page. It had been
 held to sideways pans alone, so a drag whose first movement was upward, as a
 finger's often is, moved nothing at all, and the page could only be scrolled
-from above the graph. In the
-readout the stars are two cells wide on a phone, with room for the mark. The
+from above the graph. The
 Models band is on the tens either side of the week's model winds, 52 px tall
 rather than 72 px on a scale from calm to 36 kn, so its lines fill it instead
 of a strip of mostly empty band.
@@ -896,12 +896,10 @@ Waves left the wind's bands for the new section; the wind's readout keeps
 the sea on one line. Sheltered water, which the open sea's waves do not
 reach, has no Waves section, as its year has no waves.
 
-The readouts stay apart: wind values and wave values never share a card. On
-a phone one readout is held at the top, the wind's while the Wind section is
-on screen and the waves' once the Waves section passes the middle of what the
-readout leaves of the screen, with a Wind | Waves switch that takes the page
-to each; each blend's models and the blend sit in it as a strip. On a desktop
-each section has its own readout, and a card beside the pointer lists that
+The readings stay apart: wind values and wave values never share a card. On
+a phone each graph's tag says its own (2026-11-09; the readout held at the top
+is gone). On a desktop
+each section had its own readout (gone with the bar, 2026-11-08), and a card beside the pointer lists that
 section's models and blend alone; a click holds the hour and the arrow keys
 step it. Several crossing lines cannot all be told apart by colour, so the
 global models' lines (ECMWF, GFS and their wave models) are dashed as well,
@@ -956,6 +954,116 @@ their own water the further out they are, and the faint wash leaves what they
 keep a few pixels at most. An island in the sea is a hole in the sea's
 polygon, so its outline is the coast's and stays; the tiles drop the smallest
 at the widest zooms.
+
+**2026-11-08 — The spot page is the forecast: small cards, no bar, one label.**
+The owner, over a run of notes: too much sat above the forecast, "a waste of
+space", and the eye is at the pointer, not at a bar above the graph. Top to
+bottom the page is now the name and Save; a thin line of the nearby spots
+(wind, today's best stars, the spot itself on a capsule, replacing the row of
+cards and the column beside the picture); warnings and notices each on one
+thin line (`Notice compact`, the Met Éireann attribution at its end or under
+them); the day cards, with their mini graphs and no "Models agree" or
+"Offshore", and two arrows at the end of their row; then small Stars now,
+Wind now and Waves now cards beside a small satellite picture with its rose
+and its tide switch; then Wind and Waves. The cards always say now. Only the
+picture follows the hour under the pointer. With no stars now the Stars card
+says the next, "Next ★★★ Wed 08:00", and goes there. "Water at the launch",
+"Light left" and the Next stars band are gone; the launch depth is said only
+with the tide, in the label, and the factual note under
+The spot stays. "Sea" goes everywhere in favour of Waves.
+
+There is no bar of readings over the graphs. Over a row the pointer brings a
+small label, time first, then only what that row says that is not easily read
+from the screen: stars with the wing or why none, wind with gust, arrow and
+gust factor, every model with the blend last, sky in words, rain, tide with
+its next turn and the launch, current, waves with their period and range, or
+one swell alone while the others fade. The large card, with its model lines
+and Models range, is gone, replacing the card of 2026-11-02. A phone has no
+pointer: see 2026-11-09. The day names are in a row at the top of each graph
+(2026-11-09), held to the screen while each day is on it, each with its first
+and last light where it has the room; the foot keeps the hours alone. A cursor
+with the hour on a tag runs through both graphs; the line for now is red, as
+the mark rule asks. A click holds the
+hour: moving the pointer no longer moves it, but up and down still reads the
+other rows at that hour, and the column's tint deepens, so nothing is drawn
+beside a figure that could cut it. Esc, the cross inside the tag or a click on
+the held hour lets go. The arrow keys step the hour, up and
+down the rows, Home goes back to now. The strip of days marks the day under
+the cursor and outlines the days on screen, whole cards only (2026-11-09),
+following the graphs as they scroll. The scroll bar is gone: the arrows, a mouse drag past a few pixels, a
+wheel or a trackpad move the hours.
+
+Night is darker than day in both themes: `night` over the card, ink at 4.5%
+in the light theme and black at 30% in the dark, where ink would lighten it;
+faint parallel lines rise through it at 45°, 8 px apart (6 on a phone), ink at
+6% and 7%; figures over them have a halo of the night's own colour, a ring
+never a plate, so a line beside a figure still reads. Hidden
+nights draw neither. The gust is its own figure, raised and in the gust's
+colour beside the wind's, not yellow, which is Met Éireann's, raised clear of
+the speed and a figure's width away, so a windy hour reads as two numbers; the
+Gusts row and its factor go, the factor said in the label and the Table, a
+gust that costs a star marked by a short bar under the figures, never through
+them. The bands' rail labels stay
+inside the rail ("Models" for both the wind and wave blends).
+
+Wave heights take a setting of their own (`waveUnits`, Settings, "Wave
+height", feet by default): whole feet, "under 1 ft" when small ("<1" in a row
+of figures), on every wave and swell height drawn from the forecast, the map's
+pills and legends and the finder's bars and the chart's scrub bar included.
+Tide and depth stay in metres, and so does the wave climate under The spot,
+whose numbers are from a different source and its own size classes.
+
+**2026-11-09 — The now band is short, and the graphs carry their own days.**
+The owner asked for "a couple of small cards" and "a little version of our
+satellite image". The Stars now, Wind now and Waves now cards and the picture
+are now one row as tall as a 96 px square of picture; beside the square, on the
+same card, the hour the rose reads, its wind, and the High tide | Low tide
+switch, so nothing lies over the picture. The rest of each card is used: on a
+wide window the figure stands on the left and what qualifies it on the right.
+The Stars card says what is true now ("Dark", "No stars", or the stars with
+the wing), then the next stars, the time alone a link. On a phone the stars
+take a row, wind and waves share one, and the picture's card another.
+
+Each graph has its own row of day names as its first row, on the graph's
+hours, in place of one row above the Wind title. Under the names, along the
+top of the plot, is a rail with nothing else on it: the red Now and the
+cursor's tag ride there, so neither can cover a name or a figure. A held
+hour's cross is inside its tag. On a desktop the tag stands on the graph the
+pointer is over.
+
+A phone keeps no block of readings: its tag at the playhead says the hour,
+then that graph's reading ("Tue 14:00 · 9 g14 kn", "Tue 14:00 · 2 ft 6 s"). A
+tap on a row brings the same small label a pointer does, and rides with the
+playhead; a second tap puts it away. The launch depth is in that label's tide
+reading alone.
+
+The strip's outline goes round whole day cards, a sliver under 48 px not
+counted. A day whose name does not fit whole in what is left of it, to the
+window's right edge as to its left, has no name, nor a daylight range without
+one. The Sky and Direction rows keep every sixth hour where a group would
+touch the next. The plot fades at its two edges and a figure that would be cut
+there is not drawn; the lines and areas run on under it. The cursor's line
+breaks at the figures of its hour, so it never strikes through what it points
+to. The strips of nearby spots and days fade at their right edge, their last
+card resting clear of it. A swell row past the lead model's split says so once
+in words, and the label over it says the same: a split not forecast is not a
+calm sea. The Direction rows name their figures in the rail (kn, gust; ft). On
+a phone a warning's first line is its level and kind, its coast under the
+chevron with the rest. The star row draws only hours with
+stars; an hour with none says why in its label. Below 1180 px the warning's credit is
+the same short line as beside it on a wide window.
+
+The nearby spots are the riding places within 30 km, nine at most, and the
+nearest however far: a riding place's page had been given none, so the strip
+had never drawn. It stands under the name and Save, as the order above has it.
+
+**2026-11-08 — The spot page's graphs start with the forecast.** This changes
+the ruling of 2026-11-07 that the page's graph starts at Irish midnight: the
+graphs and the strip's outline start at the first hour any model has wind, or
+at now if that is still to come, and never draw empty hours before it. Today
+stays whole in the data (2026-10-25) and in the hours after the first wind;
+nothing of it is drawn where there is nothing to draw. The table keeps its day
+from midnight.
 
 ---
 

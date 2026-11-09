@@ -17,7 +17,12 @@ import {
 import type { ForecastSource } from "../../mcp/api/httpSource";
 import { pointFromId } from "../../force5/src/siteNav";
 import { siteSource } from "../../shared/web/forecastSource";
-import { pointForecast, pointPlace, type PointPlace } from "./point";
+import {
+  pointForecast,
+  pointPlace,
+  spotsAround,
+  type PointPlace,
+} from "./point";
 import {
   REPORT_DAYS,
   HOUR,
@@ -123,7 +128,11 @@ export function useSpotForecast(
         perModel: true,
         from: { model, then },
       });
-      return { kind: "ready", spot, forecast } as const;
+      return {
+        kind: "ready",
+        spot,
+        forecast: { ...forecast, nearby: spotsAround(spots, spot) },
+      } as const;
     })().then(
       (next) => {
         if (current) setState(next);

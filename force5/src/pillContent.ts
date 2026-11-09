@@ -20,7 +20,13 @@
 import { skyGlyph, type GlyphDef } from "../../shared/web/glyphSet";
 import type { MapField } from "./mapField";
 import type { WeatherIcon } from "./presentWeather";
-import { speedShort, unitLabel, type Units } from "./units";
+import {
+  speedShort,
+  unitLabel,
+  waveFigure,
+  type Units,
+  type WaveUnits,
+} from "./units";
 
 /** The map's field: the colour laid over it, or none (./mapField.ts). */
 export type PillField = MapField;
@@ -89,6 +95,7 @@ export function pillContent(
   field: PillField,
   r: PillReading,
   units: Units,
+  waveUnits: WaveUnits = "ft",
 ): PillParts | null {
   const wind = r.windKn === null ? "–" : speedShort(r.windKn, units);
   if (field === "waves") {
@@ -96,7 +103,7 @@ export function pillContent(
     return {
       arrow: r.sea ? going(r.sea.direction) : null,
       sky: null,
-      figure: r.sea ? r.sea.height.toFixed(1) : "–",
+      figure: r.sea ? waveFigure(r.sea.height, waveUnits) : "–",
       unit: null,
       sup: r.sea?.period == null ? null : `${Math.round(r.sea.period)}s`,
     };

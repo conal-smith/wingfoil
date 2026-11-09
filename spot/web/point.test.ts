@@ -6,6 +6,7 @@ import {
   pointHours,
   pointLines,
   pointPlace,
+  spotsAround,
 } from "./point";
 
 const HOUR = 3600000;
@@ -16,6 +17,16 @@ const spots: RidingSpot[] = [
   { id: "near", name: "Near Bay", county: "Dublin", lat: 53.35, lon: -6.2 },
   { id: "next", name: "Next Pier", county: "Dublin", lat: 53.3, lon: -6.13 },
 ];
+
+describe("spotsAround", () => {
+  it("lists the others nearest first, never the place itself", () => {
+    expect(spotsAround(spots, spots[1]).map((n) => n.id)).toEqual(["next"]);
+  });
+
+  it("keeps the nearest however far, so a lone place has a strip", () => {
+    expect(spotsAround(spots, spots[0]).map((n) => n.id)).toEqual(["near"]);
+  });
+});
 
 describe("pointPlace", () => {
   it("names the point by its place, nearest riding places first", () => {

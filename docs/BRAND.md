@@ -143,7 +143,10 @@ from 720px, with `optical-display`.
   the chosen segment and a switch's thumb. A card on a page casts none.
 - **Flat.** No gradients, sheens, lit edges, paper grain, frames or double,
   heavy or ink rules. A control does not nudge when pressed.
-- **Night hours.** `hatch` is a fine diagonal hatch for the dark hours.
+- **Night hours.** `hatch` is a fine diagonal hatch for the dark hours. On the
+  spot page's graphs the night is `night` over the card (darker than the day
+  in both themes), with parallel lines in `night-hatch` rising at 45°, 8 px
+  apart (6 on a phone).
 - **Icons** are one set of line icons at a 1.75 stroke, rounded (lucide), and
   the site's own glyph set (`shared/web/glyphSet.ts`, drawn by `ChartGlyph`)
   for the weather, the wind and the dock's rows.

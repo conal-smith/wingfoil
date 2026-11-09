@@ -1094,7 +1094,9 @@ pointer `weather/blend.json` (about 1 kB compressed) and a run directory beside 
   bearing, the agreement as it was then, and which model it was (`carryToday` in
   `src/spotBlend.ts`). A carried hour is added to that model's `columns`, so the dock's
   near run reaches back to midnight; the source's `run` still names the newest run.
-  **Yesterday is not kept**: nothing before today's Irish midnight is ever carried, so
+  The spot page's graphs draw from the first hour with any wind, not from midnight
+  (the ruling of 8 November 2026): an empty stretch is left out, the hours with wind
+  are all kept. **Yesterday is not kept**: nothing before today's Irish midnight is ever carried, so
   the first blend after midnight starts the day afresh. Nothing is carried from a blend
   built for another order of models, when the new blend has no HARMONIE run, or for a
   model it no longer reads. The format is unchanged (schema 2; the carried hours are
@@ -1190,8 +1192,8 @@ square, each holding its places under `spotWaveBlend` (`force5/src/waveBlend.ts`
   hour it was worked out, and `maxAgeHours` is 3.
 - **Who reads it.** The site's reader is `useWaveBlend` (`shared/web/useWaveBlend.ts`), with
   `loadWaveBlend` and `waveBlendHours` for one place's hours; it treats a blend older
-  than six hours as none. The spot page draws it in its Waves section's Wave blend
-  band, readout and card (`spot/web/report/blends.ts`), beside every wave model's own
+  than six hours as none. The spot page draws it in its Waves section's Models
+  band and its label (`spot/web/report/blends.ts`), beside every wave model's own
   line; the headline there stays one model's own, the finest at each hour or the
   rider's pick (Settings), handed on past its run (`waveLeadOrder`), with that
   model's own partitions, unless the rider picks the blend itself (`WAVE_BLEND`). With no blend, the per-model lines and the headline stand

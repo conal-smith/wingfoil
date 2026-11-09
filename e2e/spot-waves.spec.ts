@@ -15,7 +15,7 @@ import { MODELS, withWaves } from "./waveFixtures";
 const heading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Brandon Bay", exact: true });
 
-test("the week is a Wind section and a Waves section, each with its own readout", async ({
+test("the week is a Wind section and a Waves section, on one clock", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -27,23 +27,15 @@ test("the week is a Wind section and a Waves section, each with its own readout"
   const waves = page.locator('[data-week-section="waves"]');
   await expect(wind.getByRole("heading", { name: "Wind" })).toBeVisible();
   await expect(waves.getByRole("heading", { name: "Waves" })).toBeVisible();
-  // The wind's readout says no wave but its one line of sea; the waves' says
-  // no wind.
-  const windOut = page.locator("[data-readout]");
-  const waveOut = page.locator("[data-wave-readout]");
-  await expect(windOut.locator("[data-readout-sea]")).toContainText(/\d\.\d m/);
-  await expect(windOut).not.toContainText("Swell");
-  await expect(waveOut).toContainText("Swell 1");
-  await expect(waveOut).toContainText("Swell 2");
-  await expect(waveOut).toContainText("Wind sea");
-  await expect(waveOut).not.toContainText("Gust factor");
-  // Sea and Waves have left the wind's bands for the waves'.
+  // No bar of readings over either on a desktop: the label says the hour.
+  await expect(page.locator("[data-readout]")).toHaveCount(0);
+  await expect(page.locator("[data-wave-readout]")).toHaveCount(0);
+  // Waves have left the wind's bands for the waves'.
   await expect(wind.locator("[data-band-name]")).toHaveText([
     "Stars",
     "Wind",
     "Direction",
-    "Wind blend",
-    "Gusts",
+    "Models",
     "Sky",
     "Rain",
     "Tide",
@@ -53,7 +45,7 @@ test("the week is a Wind section and a Waves section, each with its own readout"
     "Waves",
     "Direction",
     "Period",
-    "Wave blend",
+    "Models",
     "Swell 1",
     "Swell 2",
     "Wind sea",
@@ -93,13 +85,14 @@ test("the week is a Wind section and a Waves section, each with its own readout"
       .locator('path[data-model="ecmwf"]')
       .evaluate((path) => path.getAttribute("stroke-dasharray")),
   ).toBeTruthy();
+  await page.locator('[data-disclosure="key"] summary').click();
   const legend = page.locator("[data-wave-models-legend]");
   for (const name of ["Met Office", "MI SWAN", "GFS-Wave", "ECMWF", "Blend"])
     await expect(legend).toContainText(name);
   expect(errors).toEqual([]);
 });
 
-test("over a section, a card lists that section's models and blend, and only those", async ({
+test("over a section's Models row, the label lists that section's models and blend, and only those", async ({
   page,
 }) => {
   await withWaves(page);
@@ -108,46 +101,87 @@ test("over a section, a card lists that section's models and blend, and only tho
   const windGraph = page.locator("[data-spot-graph]");
   await windGraph.scrollIntoViewIfNeeded();
   const windBox = (await windGraph.boundingBox())!;
-  await page.mouse.move(windBox.x + windBox.width * 0.4, windBox.y + 260);
+  await page.mouse.move(windBox.x + windBox.width * 0.15, windBox.y + 200);
   const windCard = page.locator('[data-card="wind"]');
   await expect(windCard).toBeVisible();
-  await expect(windCard).toContainText("Wind blend");
   await expect(windCard).toContainText("HARMONIE");
   await expect(windCard).toContainText("Blend");
   await expect(windCard).not.toContainText("SWAN");
   await expect(page.locator('[data-card="waves"]')).toHaveCount(0);
+  const tag = page.locator("[data-cursor-tag]");
+  const hour = await tag.textContent();
 
   const waveGraph = page.locator("[data-wave-graph]");
   await waveGraph.scrollIntoViewIfNeeded();
   const waveBox = (await waveGraph.boundingBox())!;
-  await page.mouse.move(waveBox.x + waveBox.width * 0.4, waveBox.y + 200);
+  await page.mouse.move(waveBox.x + waveBox.width * 0.4, waveBox.y + 210);
   const waveCard = page.locator('[data-card="waves"]');
   await expect(waveCard).toBeVisible();
-  await expect(waveCard).toContainText("Wave blend");
   for (const name of ["Met Office", "MI SWAN", "GFS-Wave", "ECMWF", "Blend"])
     await expect(waveCard).toContainText(name);
-  await expect(waveCard).toContainText("Models range");
+  await expect(waveCard).not.toContainText("Models range");
   await expect(waveCard).not.toContainText("HARMONIE");
   await expect(windCard).toHaveCount(0);
-  // Both sections read the same hour.
-  const hour = await page
-    .locator("[data-wave-readout] [data-readout-hour]")
-    .textContent();
-  await expect(page.locator("[data-readout] [data-readout-hour]")).toHaveText(
-    hour!,
-  );
+  // One cursor, on one hour, whichever section the pointer is over.
+  await expect(tag).toHaveCount(1);
+  expect(hour).toBeTruthy();
+  const over = await tag.textContent();
 
   // A click holds the hour; the arrow keys step it.
-  await page.mouse.click(waveBox.x + waveBox.width * 0.4, waveBox.y + 200);
+  await page.mouse.click(waveBox.x + waveBox.width * 0.4, waveBox.y + 210);
   await page.mouse.move(waveBox.x + waveBox.width + 40, waveBox.y - 40);
-  await expect(
-    page.locator("[data-wave-readout] [data-readout-hour]"),
-  ).toHaveText(hour!);
+  await expect(tag).toHaveText(over!);
   await waveGraph.focus();
   await page.keyboard.press("ArrowRight");
+  await expect(tag).not.toHaveText(over!);
+});
+
+test("over a swell, its own reading, and the other swells fade", async ({
+  page,
+}) => {
+  await withWaves(page);
+  await page.goto("/spot/brandon");
+  await expect(heading(page)).toBeVisible({ timeout: 30000 });
+  const name = page
+    .locator('[data-week-section="waves"] [data-band-name]')
+    .filter({ hasText: "Swell 1" });
+  const graph = page.locator("[data-wave-graph]");
+  await graph.scrollIntoViewIfNeeded();
+  const box = (await graph.boundingBox())!;
+  const y = (await name.boundingBox())!.y + 6;
+  await page.mouse.move(box.x + box.width * 0.4, y);
+  const card = page.locator('[data-card="waves"]');
+  await expect(card).toHaveAttribute("data-card-band", "swell1");
+  await expect(card.locator('[data-card-part="swell1"]')).toContainText(
+    /(ft|under 1)/,
+  );
   await expect(
-    page.locator("[data-wave-readout] [data-readout-hour]"),
-  ).not.toHaveText(hour!);
+    page.locator('[data-wave-svg] [data-band="swell2"]'),
+  ).toHaveAttribute("opacity", "0.4");
+});
+
+test("Settings says feet or metres, and every wave height follows", async ({
+  page,
+}) => {
+  await withWaves(page);
+  await page.goto("/spot/brandon");
+  await expect(heading(page)).toBeVisible({ timeout: 30000 });
+  // Feet for everyone until asked otherwise.
+  const waves = page.locator("[data-now-waves]");
+  await expect(waves).toContainText(/( ft|under 1 ft)/);
+  const svg = page.locator("[data-wave-svg]");
+  await expect(svg).not.toContainText(/\d m/);
+  await openFromMenu(page, "Settings");
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await settings
+    .getByRole("group", { name: "Wave height", exact: true })
+    .getByRole("button", { name: "Metres" })
+    .click();
+  await saveSettings(page);
+  await page.goto("/spot/brandon");
+  await expect(heading(page)).toBeVisible({ timeout: 30000 });
+  await expect(waves).toContainText(/\d\.\d m/);
+  await expect(svg).toContainText(/\d m/);
 });
 
 test("with no wave blend published, each model's line and the leading model alone", async ({
@@ -166,16 +200,14 @@ test("with no wave blend published, each model's line and the leading model alon
   await expect(
     svg.locator('[data-band="waves"] path[data-wave-height]'),
   ).toHaveAttribute("d", /^M/);
-  await expect(
-    page.locator("[data-wave-readout] [data-readout-waves]"),
-  ).toContainText(/\d\.\d m/);
+  await page.locator('[data-disclosure="key"] summary').click();
   await expect(page.locator("[data-wave-models-legend]")).not.toContainText(
     "Blend",
   );
   const graph = page.locator("[data-wave-graph]");
   await graph.scrollIntoViewIfNeeded();
   const box = (await graph.boundingBox())!;
-  await page.mouse.move(box.x + box.width * 0.4, box.y + 200);
+  await page.mouse.move(box.x + box.width * 0.4, box.y + 210);
   const card = page.locator('[data-card="waves"]');
   await expect(card).toContainText("MI SWAN");
   await expect(card).not.toContainText("Blend");
@@ -214,10 +246,7 @@ test("a rider's own wave model leads the waves, handed on past its run", async (
     "data-wave-handover",
     "ecmwf-wave",
   );
-  // GFS-Wave's own swell and wind sea, never a second swell it has not got.
-  await expect(page.locator("[data-wave-readout]")).not.toContainText(
-    "Swell 2 0",
-  );
+  await page.locator('[data-disclosure="key"] summary').click();
   await expect(page.locator("[data-wave-legend]")).toContainText(
     "Wave height: GFS-Wave",
   );
@@ -242,27 +271,22 @@ test("a rider who picks the blends in Settings reads the wind and the waves from
   await saveSettings(page);
   await page.goto("/spot/brandon");
   await expect(heading(page)).toBeVisible({ timeout: 30000 });
+  await page.locator('[data-disclosure="key"] summary').click();
   // An hour every model reaches: the headline wind is the blend's.
   const graph = page.locator("[data-spot-graph]");
   await graph.scrollIntoViewIfNeeded();
   const box = (await graph.boundingBox())!;
-  await page.mouse.move(box.x + box.width * 0.3, box.y + 260);
+  await page.mouse.move(box.x + box.width * 0.3, box.y + 150);
   const blendKey = page.locator(
     '[data-models-legend] [data-model-key="blend"] b',
   );
   await expect(blendKey).toHaveText(/\d+/);
-  const wind = await page.locator("[data-readout-wind] b").textContent();
-  expect(wind).toMatch(new RegExp(`^${await blendKey.textContent()}\\b`));
+  await expect(page.locator('[data-card="wind"] b').first()).toHaveText(
+    new RegExp(`^${await blendKey.textContent()}\\b`),
+  );
   // No "from here": the blend hands over to nothing.
   await expect(page.locator("[data-graph-svg]")).not.toContainText("from here");
   // The waves likewise, where the blend is published.
-  const waveKey = page.locator(
-    '[data-wave-models-legend] [data-model-key="blend"] b',
-  );
-  await expect(waveKey).toHaveText(/\d\.\d/);
-  await expect(
-    page.locator("[data-wave-readout] [data-readout-waves]"),
-  ).toContainText(`${await waveKey.textContent()} m`);
   await expect(page.locator("[data-wave-legend]")).toContainText(
     "Wave height: the blend",
   );
@@ -324,6 +348,7 @@ test("a rider's ECMWF leads to its end: no flipping between its steps, and a val
   await expect(svg.locator("[data-wave-handover]")).toHaveCount(0);
   const end = await reach(page, 'path[data-model="ecmwf-wave"]');
   expect(await reach(page, "path[data-wave-height]")).toBeCloseTo(end, -1);
+  await page.locator('[data-disclosure="key"] summary').click();
   await expect(page.locator("[data-wave-legend]")).toContainText(
     "Wave height: ECMWF Wave",
   );
@@ -334,11 +359,11 @@ test("a rider's ECMWF leads to its end: no flipping between its steps, and a val
   const box = (await graph.boundingBox())!;
   const card = page.locator('[data-card="waves"]');
   for (let i = 0; i < 6; i++) {
-    await page.mouse.move(box.x + 300 + i * 28, box.y + 200);
+    await page.mouse.move(box.x + 300 + i * 28, box.y + 210);
     await expect(card).toBeVisible();
-    await expect(
-      card.locator("tr, div").filter({ hasText: "ECMWF" }).last(),
-    ).toContainText(/\d\.\d m/);
+    await expect(card.locator('[data-card-model="ecmwf-wave"]')).toContainText(
+      /( ft|under 1 ft)/,
+    );
   }
 });
 
@@ -382,56 +407,21 @@ test.describe("on a phone", () => {
     hasTouch: true,
   });
 
-  test("one readout, the wind's until the waves come up, with a switch to each", async ({
+  test("each graph's tag says its own reading of the hour under the playhead", async ({
     page,
   }) => {
     await withWaves(page);
     await page.goto("/spot/brandon");
     await expect(heading(page)).toBeVisible({ timeout: 30000 });
     await expect(page.locator("[data-graph-svg]")).toBeVisible();
-    const readout = page.locator("[data-readout]");
-    const switcher = readout.getByRole("group", {
-      name: "What the readout shows",
-    });
-    const windPane = readout.locator('[data-pane="wind"]');
-    const wavePane = readout.locator('[data-pane="waves"]');
-    // One readout, held at the top over both sections.
-    await expect(page.locator("[data-readout]")).toHaveCount(1);
-    await page
-      .locator('[data-week-section="wind"]')
-      .evaluate((el) =>
-        scrollTo(0, scrollY + el.getBoundingClientRect().top - 300),
-      );
-    await expect(
-      switcher.getByRole("button", { name: "Wind" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(windPane).toBeVisible();
-    await expect(wavePane).toBeHidden();
-    await expect(windPane.locator("[data-strip-model]")).toHaveCount(5);
-    // The waves' section past the middle of the screen: the readout turns.
-    await page
-      .locator('[data-week-section="waves"]')
-      .evaluate((el) =>
-        scrollTo(0, scrollY + el.getBoundingClientRect().top - 320),
-      );
-    await expect(
-      switcher.getByRole("button", { name: "Waves" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(wavePane).toBeVisible();
-    await expect(windPane).toBeHidden();
-    await expect(wavePane).toContainText("Wave blend");
-    await expect(wavePane.locator("[data-strip-model]")).toHaveCount(5);
-    await expect(wavePane).not.toContainText("Gust factor");
-    // Wind takes the page back to the wind's section, and the readout with it.
-    await switcher.getByRole("button", { name: "Wind" }).click();
-    await expect(windPane).toBeVisible();
-    await expect
-      .poll(() =>
-        page
-          .locator("[data-spot-graph]")
-          .evaluate((el) => el.getBoundingClientRect().top < innerHeight),
-      )
-      .toBe(true);
+    await expect(page.locator("[data-readout]")).toHaveCount(0);
+    // The wind on the wind's graph, the waves on the waves', never each other's.
+    await expect(page.locator('[data-cursor-tag="wind"]')).toHaveText(
+      /^Now · \d+( g\d+)? kn$/,
+    );
+    await expect(page.locator('[data-cursor-tag="waves"]')).toHaveText(
+      /^Now · (under )?\d* ?ft/,
+    );
     // The hours scroll as one: dragging the waves moves the wind.
     await page
       .locator("[data-wave-graph]")
@@ -443,16 +433,16 @@ test.describe("on a phone", () => {
       .toBe(900);
   });
 
-  test("on sheltered water the readout has no switch", async ({ page }) => {
+  test("on sheltered water there is no waves graph to read", async ({
+    page,
+  }) => {
     await page.goto("/spot/malahide-estuary");
     await expect(page.locator("[data-graph-svg]")).toBeVisible({
       timeout: 30000,
     });
     await page.locator('[data-disclosure="year"] summary').click();
     await expect(page.locator("[data-climate-sheltered]")).toBeAttached();
-    await expect(
-      page.getByRole("group", { name: "What the readout shows" }),
-    ).toHaveCount(0);
+    await expect(page.locator('[data-cursor-tag="waves"]')).toHaveCount(0);
     await expect(page.locator('[data-week-section="waves"]')).toHaveCount(0);
   });
 });

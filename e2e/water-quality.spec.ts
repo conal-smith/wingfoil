@@ -97,7 +97,7 @@ test("a spot page lists its bathing water notice, which stands in for the stars"
     items.first().getByRole("link", { name: "The council’s notice" }),
   ).toHaveAttribute("href", /beaches\.ie\/wp-content\/files\/\/notice\//);
   await expect(
-    group.getByRole("link", { name: "the latest at beaches.ie" }),
+    group.getByRole("link", { name: "beaches.ie", exact: true }).first(),
   ).toHaveAttribute("href", "https://www.beaches.ie");
 
   await openDay(page, monday(12));
@@ -144,7 +144,6 @@ test("with the notice in force, the Your stars card and the week say why there a
   await page.goto("/spot/portmarnock");
   const card = page.locator("[data-your-stars]");
   await expect(card).toContainText("Bathing prohibited", { timeout: 30000 });
-  await expect(card).toContainText("No stars while it lasts");
   await expect(card.locator('[data-notice-mark="water"]')).toBeVisible();
   await expect(card).not.toContainText("Not rated");
   await expect(page.locator("[data-water-notice]").first()).toContainText(
@@ -154,13 +153,14 @@ test("with the notice in force, the Your stars card and the week say why there a
   const monday = page.locator('[data-day-card="2026-09-14"]');
   await expect(monday.locator('[data-notice-mark="water"]')).toBeVisible();
   await expect(monday).toContainText("Water");
-  // And the graph's readout, on an hour under it.
+  // And the label on the Stars row, on an hour under it.
   await page.locator("[data-spot-graph]").scrollIntoViewIfNeeded();
   await monday.click();
   const graph = (await page.locator("[data-spot-graph]").boundingBox())!;
-  await page.mouse.move(graph.x + graph.width * 0.35, graph.y + 80);
+  const svg = (await page.locator("[data-graph-svg]").boundingBox())!;
+  await page.mouse.move(graph.x + graph.width * 0.35, svg.y + 18);
   await expect(
-    page.locator('[data-readout] [data-notice-mark="water"]'),
+    page.locator('[data-card="wind"] [data-notice-mark="water"]'),
   ).toBeVisible();
 });
 

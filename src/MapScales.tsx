@@ -1,4 +1,5 @@
 import { PALETTE, windColor } from "../force5/src/weather";
+import { FEET_PER_METRE, type WaveUnits } from "../force5/src/units";
 import type { MapField } from "../force5/src/mapField";
 import { RAIN_STOPS } from "../force5/src/rain";
 // The stops alone, not the drawing: that is fetched once a field is on.
@@ -78,7 +79,10 @@ const rainStops = () =>
     ({ token }, i) => `var(${token}) ${percent(i / (RAIN_STOPS.length - 1))}`,
   ).join(", ");
 
-const LEGENDS: Record<Exclude<MapField, "none">, () => Legend> = {
+const LEGENDS: Record<
+  Exclude<MapField, "none">,
+  (waveUnits: WaveUnits) => Legend
+> = {
   wind: () => ({
     ramps: [
       {
@@ -91,19 +95,24 @@ const LEGENDS: Record<Exclude<MapField, "none">, () => Legend> = {
       "Wind in knots: blue under 10, green 10 to 20, yellow by 30, red by 40",
   }),
   // The wave height's own ramp, the one the finder's cards draw.
-  waves: () => ({
-    ramps: [
-      {
-        unit: "Metres",
-        stops: waveStops(),
-        marks: WAVE_MARKS.map((m, i) =>
-          i === WAVE_MARKS.length - 1 ? `${m}+` : `${m}`,
-        ),
-      },
-    ],
-    spoken:
-      "Wave height in metres: faint at 0, stronger through 1, 2 and 3, strongest at 5 and over",
-  }),
+  waves: (waveUnits) => {
+    const feet = waveUnits === "ft";
+    const marks = WAVE_MARKS.map((m) =>
+      feet ? Math.round(m * FEET_PER_METRE) : m,
+    );
+    return {
+      ramps: [
+        {
+          unit: feet ? "Feet" : "Metres",
+          stops: waveStops(),
+          marks: marks.map((m, i) =>
+            i === marks.length - 1 ? `${m}+` : `${m}`,
+          ),
+        },
+      ],
+      spoken: `Wave height in ${feet ? "feet" : "metres"}: faint at 0, stronger through ${marks[1]}, ${marks[2]} and ${marks[3]}, strongest at ${marks[4]} and over`,
+    };
+  },
   // The sky by its cloud and the sun, and the rain an hour laid over it.
   weather: () => ({
     ramps: [
@@ -156,9 +165,11 @@ function RampBar({ ramp }: { ramp: Ramp }) {
 export default function MapScales({
   field,
   note = null,
+  waveUnits = "ft",
 }: {
   field: MapField;
   note?: string | null;
+  waveUnits?: WaveUnits;
 }) {
   if (field === "none")
     return (
@@ -173,7 +184,7 @@ export default function MapScales({
         {note}
       </p>
     );
-  const legend = LEGENDS[field]();
+  const legend = LEGENDS[field](waveUnits);
   return (
     <figure
       className="map-legend"

@@ -89,13 +89,17 @@ describe("with Wind on", () => {
 
 describe("with Waves on", () => {
   it("is the sea's arrow, its height and its period", () => {
-    expect(pillContent("waves", reading(), "kn")).toEqual({
+    expect(pillContent("waves", reading(), "kn", "m")).toEqual({
       arrow: 90,
       sky: null,
       figure: "1.2",
       unit: null,
       sup: "8s",
     });
+  });
+
+  it("is in whole feet by default", () => {
+    expect(pillContent("waves", reading(), "kn")?.figure).toBe("4");
   });
 
   it("is no pill at all where the sea's waves do not reach", () => {

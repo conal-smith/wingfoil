@@ -114,6 +114,9 @@ const COLOURS: Record<string, string> = {
   "now-marker": "#bf6546",
   gust: "#e0803a",
   "gust-ink": "#a34d12",
+  night: "color-mix(in srgb, #111114 4.5%, transparent)",
+  "night-hatch": "color-mix(in srgb, #111114 6%, transparent)",
+  "night-ground": "color-mix(in srgb, #111114 4.5%, #f5f5f7)",
   // The weather's state, and nothing else: the sun is the buoy's yellow.
   "weather-sun": "#e9b200",
   "weather-rain": "#3a7fb0",
@@ -356,6 +359,14 @@ describe("ui/theme.css: the values", () => {
     const darkBlock = dark.slice(0, dark.indexOf("\n}"));
     for (const name of names(darkBlock))
       expect(known.has(name), name).toBe(true);
+  });
+
+  // Night is darker than the day in both themes: ink over the light theme's
+  // card, black over the dark theme's, where ink is white and would lighten it.
+  it("draws the night darker than the day in the dark theme too", () => {
+    const dark = readFileSync(THEME, "utf8").split("/* ==== dark")[1];
+    expect(dark).toContain("--color-night: color-mix(in srgb, #000 30%");
+    expect(dark).toContain("--color-night-ground: color-mix(in srgb, #000 30%");
   });
 
   it("holds exactly those colours and the wind ramp, no others", () => {

@@ -1,6 +1,6 @@
 // Display preferences for the forecast dock. Persistence is best effort:
 // private browsing, blocked storage and quota errors must never break the page.
-import { isUnits, type Units } from "./units";
+import { isUnits, isWaveUnits, type Units, type WaveUnits } from "./units";
 import {
   DOWNWIND_DEFAULT,
   UPWIND_DEFAULT,
@@ -60,6 +60,8 @@ export interface Prefs {
    */
   touchedRows: RowKey[];
   units: Units;
+  /** The units a wave or swell height is shown in: feet by default. */
+  waveUnits: WaveUnits;
   /** Models feeding the blend, separate from the single map model. */
   blendModels: string[];
   view: ForecastView;
@@ -166,6 +168,7 @@ export const defaultPrefs = (): Prefs => ({
   },
   touchedRows: [],
   units: "kn",
+  waveUnits: "ft",
   blendModels: windModels().map((model) => model.id),
   view: "blend",
   nightHours: "show",
@@ -378,6 +381,9 @@ export function loadPrefs(
         ? ROW_KEYS.filter((key) => stored.touchedRows!.includes(key))
         : defaults.touchedRows,
       units: isUnits(stored.units) ? stored.units : defaults.units,
+      waveUnits: isWaveUnits(stored.waveUnits)
+        ? stored.waveUnits
+        : defaults.waveUnits,
       blendModels:
         kept &&
         kept.every((id) => typeof id === "string") &&

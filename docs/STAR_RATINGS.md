@@ -40,7 +40,7 @@ HARMONIE, then ECMWF, and the published blend of the lights
 (`src/spotBlend.ts`) stays the default's: a rider on the blend has their hours
 worked out from the models, as any other choice does. The forecast server
 gives the blend beside every hour's headline (`blend_kn`), which is what the
-spot page's Wind blend row draws.
+spot page's Models row draws.
 
 The rule is `force5/src/lead.ts` (`starsFromAt`, `leadFor`, `pickModel`,
 `leadModels`), shared by every surface that rates:
@@ -141,8 +141,9 @@ on the same scale, and the hour takes the lower of the two; the stars that
 costs are outlined, and the reason says "Gusts: 1 star off." Riders judge a
 gust by how strong it is, not by its ratio to the mean, so there is no
 gust-factor penalty and no "how much does gusty wind bother you" setting
-any more. The dock's gust factor row is a figure to read, tinted only where
-the gust, so read, costs a star or is past too much.
+any more. The gust factor is a figure to read, in the spot page's label and
+Table, and the hours whose gust, so read, costs a star or is past too much are
+tinted behind the wind and gust figures.
 
 The agreed table (ours, cross-shore), asserted in `stars.test.ts`:
 

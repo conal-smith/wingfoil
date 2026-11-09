@@ -45,6 +45,7 @@ export const buttonStyles = tv({
         "border-line bg-ground text-pen-ink not-disabled:hover:bg-warn-ground disabled:text-pen-ink",
     },
     size: {
+      xs: "h-5 gap-1 px-1.5",
       sm: "h-control-sm gap-1.5 px-3",
       md: "h-control-md px-4",
       lg: "h-control-lg px-5.5 text-prose",
@@ -63,6 +64,7 @@ export const buttonStyles = tv({
     },
   },
   compoundVariants: [
+    { icon: true, size: "xs", class: "w-5" },
     { icon: true, size: "sm", class: "w-control-sm" },
     { icon: true, size: "md", class: "w-control-md" },
     { icon: true, size: "lg", class: "w-control-lg" },
