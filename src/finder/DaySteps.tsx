@@ -2,8 +2,8 @@
  * The day the spot finder shows, and the way to the others: ‹ Today ›, a
  * day a press, from today to the fifth day after it (finder.ts
  * `cardDates`). Each end's arrow is off where there is no day past it. The
- * day is said plainly: Today, Tomorrow, then the weekday ("Thursday"), its
- * date beside it in grey. The arrow keys step it too while either button
+ * day is said plainly: Today, Tomorrow, then the weekday ("Thursday"), past
+ * a phone's width its date beside it in grey. The arrow keys step it too while either button
  * holds the focus, and the focus stays in the control when an end turns its
  * button off.
  *
@@ -22,9 +22,10 @@ const styles = tv({
     // The head's first part, as wide as the heart and the filter leave it:
     // an arrow at either end, the day between them.
     base: "flex min-w-0 flex-1 items-center gap-2",
-    day: "m-0 flex min-w-0 flex-1 items-baseline justify-center gap-2 truncate text-center font-body",
+    day: "m-0 flex min-w-0 flex-1 items-baseline justify-center gap-2 text-center font-body whitespace-nowrap",
     name: "text-prose font-semibold text-ink",
-    date: "text-body text-ink-muted",
+    // A phone has the day's name alone.
+    date: "text-body text-ink-muted max-wide:hidden",
   },
 });
 
@@ -98,6 +99,7 @@ export function DaySteps({
     >
       <Button
         ref={back}
+        variant="quiet"
         icon
         size="sm"
         aria-label="Previous day"
@@ -113,6 +115,7 @@ export function DaySteps({
       </p>
       <Button
         ref={on}
+        variant="quiet"
         icon
         size="sm"
         aria-label="Next day"

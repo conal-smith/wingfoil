@@ -2656,41 +2656,35 @@ export default function App() {
       </>
     );
   };
-  /** The phone's and the tablet's two views: the map, or the list. */
+  /** The phone's and the tablet's two views: a button to the one not shown. */
   const viewSwitch = (inBar: boolean) => (
     <div
       className={inBar ? "nf-switch in-bar" : "nf-switch"}
-      role="group"
-      aria-label="Map or list"
       data-map-wall={inBar ? undefined : true}
       data-view-switch
     >
       <Button
         variant="quiet"
         size="sm"
-        pressed={!narrowList}
         onClick={() => {
-          setNarrowList(false);
-          window.scrollTo(0, 0);
+          if (narrowList) {
+            setNarrowList(false);
+            window.scrollTo(0, 0);
+          } else {
+            setNarrowList(true);
+            setPeekId(null);
+            setCrowd(null);
+          }
         }}
-        data-view="map"
+        data-view={narrowList ? "map" : "list"}
       >
-        {!inBar && <MapIcon size={14} strokeWidth={1.75} aria-hidden="true" />}
-        Map
-      </Button>
-      <Button
-        variant="quiet"
-        size="sm"
-        pressed={narrowList}
-        onClick={() => {
-          setNarrowList(true);
-          setPeekId(null);
-          setCrowd(null);
-        }}
-        data-view="list"
-      >
-        {!inBar && <List size={14} strokeWidth={1.75} aria-hidden="true" />}
-        List
+        {!inBar &&
+          (narrowList ? (
+            <MapIcon size={14} strokeWidth={1.75} aria-hidden="true" />
+          ) : (
+            <List size={14} strokeWidth={1.75} aria-hidden="true" />
+          ))}
+        {narrowList ? "Map" : "List"}
       </Button>
     </div>
   );
@@ -3408,7 +3402,7 @@ export default function App() {
                 peekOf(peekSpot, "peek", () => setPeekId(null))}
               {!narrowList && chooser}
               {!phone && viewSwitch(false)}
-              {mapDock(!narrowList)}
+              {!narrowList && mapDock(true)}
             </div>
           )}
         </>

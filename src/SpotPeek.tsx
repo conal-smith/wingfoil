@@ -51,12 +51,12 @@ function Figures({ html }: { html: string }) {
 
 /**
  * One spot at the hour the map shows, where no list stands beside the map:
- * its name, then its wind, waves, weather and tide, and its stars. On the
- * phone it is the peek above the dock, opened by a tap on a pill, whose
- * second tap opens the spot (`peek`); on the full chart, wider than a phone,
- * a card beside the pill tapped, a small pointer at it (`card`, placed by
- * force5/src/cardPlace.ts), never over it. The figures are the pills' own, so the card and the pill
- * read alike.
+ * its name, a link to its page, then its wind, waves, weather and tide, and
+ * its stars. On the phone it is a small peek above the dock, opened by a tap
+ * on a pill, whose second tap opens the spot (`peek`); on the full chart,
+ * wider than a phone, a card beside the pill tapped, a small pointer at it
+ * (`card`, placed by force5/src/cardPlace.ts), never over it. The figures are
+ * the pills' own, so the card and the pill read alike.
  */
 const SpotPeek = forwardRef<
   HTMLDivElement,
@@ -110,7 +110,9 @@ const SpotPeek = forwardRef<
     >
       <div className="sp-head">
         <div className="sp-name">
-          <b>{spot.name}</b>
+          <Link href={href} data-peek-open>
+            {spot.name}
+          </Link>
           {spot.county && <span>Co. {spot.county}</span>}
         </div>
         <Button
@@ -165,9 +167,6 @@ const SpotPeek = forwardRef<
           </span>
         )}
         {time !== null && <em>{hourWords(time, now)}</em>}
-        <Link className="sp-open" href={href} data-peek-open>
-          {kind === "peek" ? "Tap again to open" : "Open the spot"}
-        </Link>
       </div>
     </div>
   );

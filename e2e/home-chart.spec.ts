@@ -851,7 +851,7 @@ test.describe("under the width for the chart beside the list", () => {
       "map",
     );
     await page
-      .getByRole("group", { name: "Map or list" })
+      .locator("[data-view-switch]")
       .getByRole("button", { name: "List" })
       .click();
     await expect(page.locator("[data-narrow-foot]")).toHaveAttribute(

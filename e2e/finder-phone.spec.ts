@@ -19,9 +19,7 @@ const AFTERNOON = new Date(SAMPLE_CLOCK.getTime() - 7.5 * 3600000);
 
 const foot = (page: Page) => page.locator("[data-narrow-foot]");
 const switchTo = (page: Page, name: "Map" | "List") =>
-  page
-    .getByRole("group", { name: "Map or list" })
-    .getByRole("button", { name });
+  page.locator("[data-view-switch]").getByRole("button", { name });
 const pills = (page: Page) => page.locator(".spot-marker.lt-pilled");
 const peek = (page: Page) => page.locator("[data-spot-peek]");
 
@@ -46,12 +44,13 @@ async function openMap(page: Page) {
     .toBeGreaterThan(0);
 }
 
-test("the map opens first, then the list, the chips at the foot of the screen", async ({
+test("the map opens first, then the list, which has no dock", async ({
   page,
 }) => {
   await openMap(page);
   await expect(foot(page)).toHaveAttribute("data-narrow-foot", "map");
-  await expect(switchTo(page, "Map")).toHaveAttribute("aria-pressed", "true");
+  await expect(switchTo(page, "List")).toBeVisible();
+  await expect(switchTo(page, "Map")).toHaveCount(0);
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
   // The dock: the day, then the chips the screen's width, then the hours'
   // track as wide as the dock; no legend, no zoom buttons, and the map's own
@@ -103,11 +102,17 @@ test("the map opens first, then the list, the chips at the foot of the screen", 
   });
   await expect(page.locator("[data-finder-heart]")).toBeVisible();
   await expect(foot(page).locator("[data-hour-bar]")).toHaveCount(0);
-  const chipAfter = (await chips.first().boundingBox())!;
-  // Down into the room the hours' track had under them.
-  expect(chipAfter.y).toBeGreaterThan(chipBox.y);
-  expect(chipAfter.y + chipAfter.height).toBeLessThanOrEqual(844);
-  const switchAfter = (await switchTo(page, "List").boundingBox())!;
+  await expect(foot(page).locator("[data-map-field]")).toHaveCount(0);
+  // The day by its name alone, whole.
+  await page.getByRole("button", { name: "Next day" }).tap();
+  const day = page.locator("[data-finder-day]");
+  await expect
+    .poll(() => day.evaluate((el: HTMLElement) => el.innerText.trim()))
+    .toBe("Tomorrow");
+  expect(await day.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  const switchAfter = (await switchTo(page, "Map").boundingBox())!;
   const bar = (await page.locator("[data-top-bar]").boundingBox())!;
   expect(switchAfter.y + switchAfter.height).toBeLessThanOrEqual(
     bar.y + bar.height,
@@ -127,7 +132,8 @@ test("a phone has no full chart: its links land on the map or the spot", async (
 }) => {
   await page.goto("/?map");
   await expect(page).toHaveURL(/\/$/);
-  await expect(switchTo(page, "Map")).toHaveAttribute("aria-pressed", "true");
+  await expect(switchTo(page, "List")).toBeVisible();
+  await expect(switchTo(page, "Map")).toHaveCount(0);
   const bar = page.locator("[data-top-bar]");
   await expect(bar.getByRole("link", { name: "Chart" })).toHaveCount(0);
   await bar.getByRole("button", { name: "Site menu" }).tap();
@@ -203,6 +209,14 @@ test("a pill tapped turns light and peeks; tapped again it opens its spot", asyn
   ).toHaveCount(1);
   for (const row of ["Wind", "Waves", "Weather", "Tide"])
     await expect(peek(page).getByText(row, { exact: true })).toBeVisible();
+  // A small card, its name the link, and no words about tapping.
+  await expect(peek(page).locator("a")).toHaveCount(1);
+  await expect(peek(page).locator("[data-peek-open]")).toHaveAttribute(
+    "href",
+    new RegExp(`/spot/${id}`),
+  );
+  await expect(peek(page)).not.toContainText("Tap again");
+  expect((await peek(page).boundingBox())!.width).toBeLessThanOrEqual(256);
   // Above the dock, and on the screen.
   const box = (await peek(page).boundingBox())!;
   const dockBox = (await foot(page).locator("[data-hour-bar]").boundingBox())!;
