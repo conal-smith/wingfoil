@@ -5,7 +5,7 @@ import { SAMPLE_WEATHER } from "./sample";
 /**
  * The wind as measured beside the forecast (force5/src/windObs.ts
  * `pairStation`): a spot's nearest weather station or buoy, within 25 km,
- * drawn on the spot page's wind up to now and said by its readout at Now, by
+ * drawn on the spot page's wind up to now and said by its tag at Now, by
  * the scrub bar's readout at and before now, and by the finder's cards on
  * today. Belmullet's beach has Met Éireann's Belmullet station a kilometre
  * away; Brandon Bay has none within reach.
@@ -23,7 +23,7 @@ const kn = (mps: number) =>
 const BELMULLET = OBS.stations.ME_03976;
 
 const graph = (page: Page) => page.locator("[data-graph-svg]");
-const readoutWind = (page: Page) => page.locator("[data-readout-wind]");
+const windTag = (page: Page) => page.locator('[data-cursor-tag="wind"]');
 
 test.describe("the spot page", () => {
   test.use({ viewport: { width: 1440, height: 1000 } });
@@ -67,32 +67,23 @@ test.describe("the spot page", () => {
     );
   });
 
-  test("at Now a phone's reading is the station's last, and says where and when; other hours keep the forecast", async ({
+  test("at Now a phone's tag is the station's last; other hours keep the forecast", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/spot/belmullet");
-    await expect(page.locator("[data-readout]")).toBeVisible({
-      timeout: 30000,
-    });
-    await expect(page.locator("[data-readout]")).toContainText("Now");
-    const value = readoutWind(page).locator("b");
+    const value = windTag(page);
+    await expect(value).toContainText("Now", { timeout: 30000 });
     await expect(value).toHaveAttribute("data-measured", "ME_03976");
     await expect(value).toHaveText(
-      new RegExp(`^${kn(BELMULLET.latest.speed)}( g\\d+)? kn [NESW]{1,3}$`),
-    );
-    await expect(readoutWind(page).locator("[data-readout-source]")).toHaveText(
-      "· Belmullet 1 km, 22:00",
+      new RegExp(`^Now · ${kn(BELMULLET.latest.speed)}( g\\d+)? kn$`),
     );
     // An hour tomorrow, under the playhead: the forecast, from nowhere else.
     await page
       .locator("[data-spot-graph]")
       .evaluate((el) => (el.scrollLeft += 400));
-    await expect(page.locator("[data-readout]")).not.toContainText("Now");
+    await expect(value).not.toContainText("Now");
     await expect(value).not.toHaveAttribute("data-measured", /.*/);
-    await expect(
-      readoutWind(page).locator("[data-readout-source]"),
-    ).toHaveCount(0);
   });
 
   test("a spot with no station within reach draws and says only the forecast", async ({
@@ -104,9 +95,6 @@ test.describe("the spot page", () => {
     });
     await expect(page.locator("[data-measured]")).toHaveCount(0);
     await expect(page.locator("[data-measured-key]")).toHaveCount(0);
-    await expect(
-      readoutWind(page).locator("[data-readout-source]"),
-    ).toHaveCount(0);
   });
 });
 
@@ -117,17 +105,13 @@ test.describe("on a phone", () => {
     hasTouch: true,
   });
 
-  test("the spot page's readout and graph say the measured wind too", async ({
+  test("the spot page's tag and graph say the measured wind too", async ({
     page,
   }) => {
     await page.goto("/spot/belmullet");
-    await expect(page.locator("[data-readout]")).toBeVisible({
+    await expect(windTag(page)).toHaveAttribute("data-measured", "ME_03976", {
       timeout: 30000,
     });
-    await expect(readoutWind(page).locator("b")).toHaveAttribute(
-      "data-measured",
-      "ME_03976",
-    );
     await expect(
       graph(page).locator('[data-measured="ME_03976"] [data-measured-wind]'),
     ).not.toHaveCount(0);

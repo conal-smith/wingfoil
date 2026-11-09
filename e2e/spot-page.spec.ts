@@ -91,7 +91,19 @@ test("a spot page is a spot report: the name, now, the week, one graph, and the 
   await expect(now).toContainText("Waves now");
   await expect(now).not.toContainText("Water at the launch");
   await expect(now).not.toContainText("Sea");
-  // The week, a card a day, and the graph on one clock with its readout.
+  // The nearby spots come after the name, and before the days.
+  const order = await page.evaluate(() => {
+    const top = (sel: string) =>
+      document.querySelector(sel)!.getBoundingClientRect().top;
+    return {
+      name: top("h1"),
+      near: top("[data-nearby-strip]"),
+      days: top("[data-day-card]"),
+    };
+  });
+  expect(order.near).toBeGreaterThan(order.name);
+  expect(order.days).toBeGreaterThan(order.near);
+  // The week, a card a day, and the graph on one clock.
   const days = page.locator("[data-day-card]");
   await expect.poll(() => days.count()).toBeGreaterThan(2);
   // As many days as the forecast reaches, up to ECMWF's fifteen.
@@ -173,6 +185,13 @@ test("a click holds the hour until it is let go, and the strip follows the hour"
   await page.mouse.click(box.x + box.width * 0.5, y);
   await expect(page.locator("[data-held-hour]").first()).toBeAttached();
   const held = await tag.textContent();
+  // The tag and the Now tag have a lane of their own, under the day names.
+  const names = (await page.locator('[data-day-heads="wind"]').boundingBox())!;
+  for (const mark of [tag, page.locator('[data-now-tag="wind"]')])
+    if (await mark.count())
+      expect((await mark.boundingBox())!.y).toBeGreaterThanOrEqual(
+        names.y + names.height - 1,
+      );
   // Moving over the graph leaves the hour held, and off it too.
   await page.mouse.move(box.x + box.width * 0.8, y);
   await expect(tag).toHaveText(held!);
@@ -198,6 +217,11 @@ test("a click holds the hour until it is let go, and the strip follows the hour"
   );
   const frame = await page.locator("[data-day-window]").boundingBox();
   expect(frame!.width).toBeGreaterThan(100);
+  // Whole cards: the outline starts where a day's card starts.
+  const lefts = await page
+    .locator("[data-day-card]")
+    .evaluateAll((cards) => cards.map((c) => c.getBoundingClientRect().left));
+  expect(lefts.some((left) => Math.abs(left - frame!.x) < 1)).toBe(true);
 });
 
 test("the graphs start where the wind does, with no empty hours before it", async ({
@@ -290,64 +314,6 @@ test("a wheel or a trackpad over the graph reads out the hour that comes under t
   await expect(chip).toHaveText(scrolled ?? "");
 });
 
-/**
- * Where every cell of the readout stands, with the pill itself, the graph's
- * top and the key under it, in the page's own pixels.
- */
-const readoutLayout = (page: Page) =>
-  page.evaluate(() => {
-    const at = (el: Element | null) => {
-      const r = el!.getBoundingClientRect();
-      return [r.x, r.y + scrollY, r.width, r.height].map(Math.round).join(",");
-    };
-    const readout = document.querySelector("[data-readout]")!;
-    return {
-      cells: [...readout.children].map(at),
-      pill: at(readout.querySelector("span")),
-      graph: at(document.querySelector("[data-spot-graph]")),
-      key: at(document.querySelector('[data-disclosure="key"]')),
-    };
-  });
-
-for (const width of [390])
-  test(`the phone's readout holds still as the hours change, dark or rated, at ${width}px`, async ({
-    page,
-  }) => {
-    await withTides(page);
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/spot/brandon");
-    await expect(heading(page)).toBeVisible({ timeout: 30000 });
-    const graph = page.locator("[data-spot-graph]");
-    const readout = page.locator("[data-readout]");
-    await expect(page.locator("[data-graph-svg]")).toBeVisible();
-    // The readout and the top of the graph in view, so nothing scrolls the
-    // page while the hours are moved through.
-    await readout.evaluate((el) =>
-      scrollTo(0, scrollY + el.getBoundingClientRect().top - 60),
-    );
-    // The sample opens at night: the readout is now, and dark.
-    await expect(readout).toContainText("Now");
-    await expect(readout).toContainText("Dark");
-    const still = await readoutLayout(page);
-    const box = (await graph.boundingBox())!;
-    const seen = { rated: false, dark: false, hour: false };
-    const steps = 24;
-    for (let i = 1; i < steps; i++) {
-      await graph.evaluate(
-        (el, f) => (el.scrollLeft = (el.scrollWidth - el.clientWidth) * f),
-        i / steps,
-      );
-      await page.waitForTimeout(60);
-      const text = (await readout.textContent()) ?? "";
-      if (!text.startsWith("Now")) seen.hour = true;
-      if (/Dark/.test(text)) seen.dark = true;
-      if (await readout.locator("[data-stars]").count()) seen.rated = true;
-      expect(await readoutLayout(page), `at "${text}"`).toEqual(still);
-    }
-    // The hours moved through were dark and rated both.
-    expect(seen).toEqual({ rated: true, dark: true, hour: true });
-  });
-
 for (const width of [1440, 390])
   test(`the hours after dark can be left out of the week, the days side by side, at ${width}px`, async ({
     page,
@@ -359,15 +325,13 @@ for (const width of [1440, 390])
     const svg = page.locator("[data-graph-svg]");
     const graph = page.locator("[data-spot-graph]");
     const phone = width < 600;
-    const readout = page.locator("[data-readout]");
+    const playhead = page.locator('[data-cursor-tag="wind"]');
     const legend = page.locator("[data-legend]");
     const openKey = () =>
       page.locator('[data-disclosure="key"] summary').click();
     /** The hour under the cursor on a desktop, the playhead's on a phone. */
     const hourText = async () =>
-      (phone
-        ? await readout.locator("[data-readout-hour]").textContent()
-        : await page.locator("[data-cursor-tag]").textContent()) ?? "";
+      (await page.locator("[data-cursor-hour]").first().textContent()) ?? "";
     /** Moves along the hours by a fraction of the graph, as a rider would. */
     const along = async (f: number) => {
       if (phone) {
@@ -388,10 +352,7 @@ for (const width of [1440, 390])
     // the key.
     await expect(svg.locator("[data-night]").first()).toBeAttached();
     await expect(legend).toContainText("Dark");
-    if (phone) {
-      await expect(readout).toContainText("Now");
-      await expect(readout).toContainText("Dark");
-    }
+    if (phone) await expect(playhead).toContainText("Now");
 
     await openFromMenu(page, "Settings");
     const hours = page.getByRole("group", { name: "Hours", exact: true });
@@ -418,13 +379,10 @@ for (const width of [1440, 390])
     for (const small of ["00", "03", "21"]) expect(ticks).not.toContain(small);
     // Now is after dark, so a phone reads Monday's first light instead.
     if (phone) {
-      await expect(readout).not.toContainText("Now");
-      await expect(readout).toContainText(/Mon \d{2}:\d{2}/);
-      await expect(readout).not.toContainText("Dark");
-      await readout.evaluate((el) =>
-        scrollTo(0, scrollY + el.getBoundingClientRect().top - 60),
-      );
-    } else await graph.scrollIntoViewIfNeeded();
+      await expect(playhead).not.toContainText("Now");
+      await expect(playhead).toContainText(/Mon \d{2}:\d{2}/);
+    }
+    await graph.scrollIntoViewIfNeeded();
     // And the hour never lands in the night, however far the hours go.
     for (let i = 1; i < 16; i++) {
       await along(i / 16);
@@ -1129,10 +1087,10 @@ for (const [id, station] of [
   ["belmullet", "ME_03976"],
   ["brandon", null],
 ] as const) {
-  test(`the Wind now card, the readout at Now and the picture's rose say the same wind, ${station ? "as measured" : "the forecast's"}, at ${id}`, async ({
+  test(`the Wind now card, the phone's tag at Now and the picture's rose say the same wind, ${station ? "as measured" : "the forecast's"}, at ${id}`, async ({
     page,
   }) => {
-    // A phone: its readout is the one that says the hour in cells.
+    // A phone: its tag is the one that says the wind at the hour.
     await page.setViewportSize({ width: 390, height: 844 });
     // A picture of each place, so its rose and its line are drawn.
     await withPictures(page);
@@ -1153,27 +1111,20 @@ for (const [id, station] of [
       }),
     );
     await page.goto(`/spot/${id}`);
-    const readout = page.locator("[data-readout]");
-    await expect(readout).toContainText("Now", { timeout: 30000 });
+    const readWind = page.locator('[data-cursor-tag="wind"]');
+    await expect(readWind).toContainText("Now", { timeout: 30000 });
     const card = page.locator("[data-now]");
     const cardWind = card.locator("[data-now-wind]");
-    const readWind = page.locator("[data-readout-wind] b");
     const foot = page.locator("[data-photo-loupe] [data-loupe-foot]");
     await expect(cardWind).toBeVisible();
     await expect(foot).toBeVisible();
     if (station) {
-      // All the station's last reading; the card and the readout say where
-      // and when.
+      // All the station's last reading; the card says where and when.
       await expect(cardWind).toHaveAttribute("data-measured", station);
       await expect(readWind).toHaveAttribute("data-measured", station);
       await expect(foot).toHaveAttribute("data-measured", station);
       await expect(card.locator("[data-now-source]")).toHaveText(
         "· Belmullet 1 km, 22:00",
-      );
-      await expect(card.locator("[data-now-source]")).toHaveText(
-        (await page
-          .locator("[data-readout-wind] [data-readout-source]")
-          .textContent())!,
       );
     } else {
       // No station within reach: both the forecast, from nowhere else.
@@ -1186,13 +1137,12 @@ for (const [id, station] of [
     const readText = await readWind.textContent();
     expect(figures(cardText).length).toBeGreaterThan(0);
     expect(figures(cardText)).toEqual(figures(readText));
-    expect(
-      point(await card.locator("[data-now-direction]").textContent()),
-    ).toBe(point(readText));
     // The picture's line: "ENE 4 g6 · offshore", the same wind, gust and way.
     const footText = await foot.textContent();
     expect(figures(footText)).toEqual(figures(readText));
-    expect(point(footText)).toBe(point(readText));
+    expect(point(footText)).toBe(
+      point(await card.locator("[data-now-direction]").textContent()),
+    );
     // And the same word for the shore as the card, where it has one.
     const shoreWord = (text: string | null) =>
       (text ?? "").match(
@@ -1250,7 +1200,9 @@ test.describe("on a phone, the week graph", () => {
     page.evaluate(() => ({
       left: document.querySelector("[data-spot-graph]")!.scrollLeft,
       top: Math.round(scrollY),
-      hour: document.querySelector("[data-readout]")!.textContent!.slice(0, 9),
+      hour: document.querySelector(
+        '[data-cursor-tag="wind"] [data-cursor-hour]',
+      )!.textContent,
     }));
   /** Where the hours and the page come to rest, once a fling has run out. */
   const settled = async (page: Page) => {
@@ -1270,16 +1222,15 @@ test.describe("on a phone, the week graph", () => {
     await page.goto("/spot/brandon");
     await expect(heading(page)).toBeVisible({ timeout: 30000 });
     const graph = page.locator("[data-spot-graph]");
-    const readout = page.locator("[data-readout]");
     await expect(page.locator("[data-graph-svg]")).toBeVisible();
     // Everything above the graph in, so nothing moves the page but a finger.
     await page.waitForLoadState("networkidle");
-    await readout.evaluate((el) =>
-      scrollTo(0, scrollY + el.getBoundingClientRect().top),
-    );
+    await page
+      .locator('[data-week-section="wind"]')
+      .evaluate((el) => scrollTo(0, scrollY + el.getBoundingClientRect().top));
     const box = (await graph.boundingBox())!;
     // Across the graph, from its wind row to its current: the hours move
-    // under the playhead and the readout follows, and the page stays put.
+    // under the playhead and its tag follows, and the page stays put.
     for (const down of [60, 180, 300, 400]) {
       const before = await settled(page);
       const y = box.y + down;
@@ -1306,14 +1257,13 @@ test.describe("on a phone, the week graph", () => {
     expect((await settled(page)).left).toBe(before.left);
   });
 
-  test("the band names stand beside the hours, never over them, and clear of the readout", async ({
+  test("the band names stand beside the hours, never over them", async ({
     page,
   }) => {
     await withTides(page);
     await page.goto("/spot/brandon");
     await expect(heading(page)).toBeVisible({ timeout: 30000 });
     const graph = page.locator("[data-spot-graph]");
-    const readout = page.locator("[data-readout]");
     await expect(page.locator("[data-graph-svg]")).toBeVisible();
     const names = page.locator('[data-week-section="wind"] [data-band-name]');
     await expect(names).toHaveText([
@@ -1338,100 +1288,37 @@ test.describe("on a phone, the week graph", () => {
       expect(box.right).toBeLessThanOrEqual(left);
       expect(box.left).toBeGreaterThanOrEqual(0);
     }
-    // The page scrolled until the top of the wind band is under the readout,
-    // which is held at the top of the screen: the band's name is held below
-    // the readout's foot rather than going under it.
-    const wind = names.getByText("Wind", { exact: true });
-    await readout.evaluate((el) =>
-      scrollTo(0, scrollY + el.getBoundingClientRect().top),
-    );
-    const foot = await readout.evaluate(
-      (el) => el.parentElement!.getBoundingClientRect().bottom,
-    );
-    const svgTop = (await page.locator("[data-graph-svg]").boundingBox())!.y;
-    // 48px of the 96px wind band, which starts 30px down, under the readout.
-    await page.evaluate((by) => scrollBy(0, by), svgTop + 30 + 48 - foot);
-    await expect
-      .poll(async () => (await wind.boundingBox())!.y)
-      .toBeGreaterThanOrEqual(foot - 0.5);
-    expect((await wind.boundingBox())!.y).toBeLessThan(foot + 4);
   });
 
-  test("the readout's stars have room for a warning's mark beside them", async ({
+  test("a finger reads the hour at the playhead, and a tap asks a row for its label", async ({
     page,
   }) => {
-    // A yellow small-craft warning over the rated hours of the next two days.
-    const at = (hours: number) => new Date(clock + hours * HOUR).toISOString();
-    const runTime =
-      new Date(clock - HOUR).toISOString().slice(0, 14) + "00:00.000Z";
-    await page.route("**/marine/warnings.json", (route) =>
-      route.fulfill({
-        json: {
-          schemaVersion: 1,
-          kind: "warnings",
-          model: "warnings",
-          run: runTime.slice(0, 13).replace(/[-T]/g, ""),
-          runTime,
-          generatedAt: runTime.replace(":00.000Z", ":25.000Z"),
-          sourceUrl: "https://www.met.ie/Open_Data/json/warning_ALL.json",
-          attribution: "Weather warnings from Met Éireann (met.ie), CC BY 4.0",
-          licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
-          warnings: [
-            {
-              id: 1,
-              capId: "test.yellow",
-              type: "small-craft",
-              level: "yellow",
-              severity: "Moderate",
-              certainty: "Likely",
-              status: "Warning",
-              issued: at(-10),
-              updated: at(-10),
-              onset: at(5),
-              expiry: at(60),
-              headline: "Small Craft warning for all coasts of Ireland",
-              description: "<p>Southwest winds will reach force 6.</p>",
-              regions: ["EI816", "EI817", "EI818"],
-            },
-          ],
-        },
-      }),
-    );
     await withTides(page);
     await page.goto("/spot/brandon");
     await expect(heading(page)).toBeVisible({ timeout: 30000 });
-    const graph = page.locator("[data-spot-graph]");
-    const readout = page.locator("[data-readout]");
-    const mark = readout.locator("[data-notice-mark]");
     await expect(page.locator("[data-graph-svg]")).toBeVisible();
-    await readout.evaluate((el) =>
-      scrollTo(0, scrollY + el.getBoundingClientRect().top),
+    // No bar of readings: the tag is the hour first, then the row's wind.
+    await expect(page.locator("[data-readout]")).toHaveCount(0);
+    const tag = page.locator('[data-cursor-tag="wind"]');
+    await expect(tag).toHaveText(/^Now · \d+( g\d+)? kn$/);
+    await page
+      .locator("[data-spot-graph]")
+      .evaluate((el) => (el.scrollLeft += 400));
+    await expect(tag).toHaveText(/^\w{3} \d{2}:\d{2} · \d+( g\d+)? kn$/);
+    // The tide's row brought up the screen, then a tap on it.
+    const svg = page.locator("[data-graph-svg]");
+    await page.evaluate(
+      (to) => scrollBy(0, to),
+      (await svg.boundingBox())!.y + 340 - 400,
     );
-    // Along the hours until one under the warning is read out.
-    for (let i = 0; i < 100 && !(await mark.count()); i++) {
-      await graph.evaluate(
-        (el, f) => (el.scrollLeft = (el.scrollWidth - el.clientWidth) * f),
-        i / 100,
-      );
-      await page.waitForTimeout(20);
-    }
-    await expect(mark).toHaveCount(1);
-    await expect(readout.locator("[data-stars]")).toBeVisible();
-    const room = await mark.evaluate((el) => {
-      const cell = el.closest("[data-readout] > *")!.getBoundingClientRect();
-      const box = el.getBoundingClientRect();
-      const wind = document
-        .querySelector("[data-readout-wind]")!
-        .getBoundingClientRect();
-      return {
-        inCell: box.left >= cell.left && box.right <= cell.right,
-        clear:
-          box.right <= wind.left ||
-          box.left >= wind.right ||
-          box.bottom <= wind.top ||
-          box.top >= wind.bottom,
-      };
-    });
-    expect(room).toEqual({ inCell: true, clear: true });
+    const label = page.locator('[data-card="wind"]');
+    const x = (await page.locator("[data-spot-graph]").boundingBox())!.x + 120;
+    const y = (await svg.boundingBox())!.y + 340;
+    await page.touchscreen.tap(x, y);
+    await expect(label).toHaveAttribute("data-card-band", "tide");
+    await expect(label).toContainText(/\d\.\d m/);
+    // A second tap on the row puts the label away.
+    await page.touchscreen.tap(x, y);
+    await expect(label).toHaveCount(0);
   });
 });

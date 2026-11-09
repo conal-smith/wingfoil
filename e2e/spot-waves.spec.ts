@@ -407,54 +407,21 @@ test.describe("on a phone", () => {
     hasTouch: true,
   });
 
-  test("one reading of the hour under the playhead, the wind's until the waves come up, with a switch to each", async ({
+  test("each graph's tag says its own reading of the hour under the playhead", async ({
     page,
   }) => {
     await withWaves(page);
     await page.goto("/spot/brandon");
     await expect(heading(page)).toBeVisible({ timeout: 30000 });
     await expect(page.locator("[data-graph-svg]")).toBeVisible();
-    const readout = page.locator("[data-readout]");
-    const switcher = readout.getByRole("group", {
-      name: "What the readout shows",
-    });
-    const windPane = readout.locator('[data-pane="wind"]');
-    const wavePane = readout.locator('[data-pane="waves"]');
-    // One readout, held at the top over both sections.
-    await expect(page.locator("[data-readout]")).toHaveCount(1);
-    await page
-      .locator('[data-week-section="wind"]')
-      .evaluate((el) =>
-        scrollTo(0, scrollY + el.getBoundingClientRect().top - 300),
-      );
-    await expect(
-      switcher.getByRole("button", { name: "Wind" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(windPane).toBeVisible();
-    await expect(wavePane).toBeHidden();
-    // The waves' section past the middle of the screen: the readout turns.
-    await page
-      .locator('[data-week-section="waves"]')
-      .evaluate((el) =>
-        scrollTo(0, scrollY + el.getBoundingClientRect().top - 320),
-      );
-    await expect(
-      switcher.getByRole("button", { name: "Waves" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await expect(wavePane).toBeVisible();
-    await expect(windPane).toBeHidden();
-    await expect(wavePane).toContainText("Waves");
-    await expect(wavePane).not.toContainText("Gust factor");
-    // Wind takes the page back to the wind's section, and the readout with it.
-    await switcher.getByRole("button", { name: "Wind" }).click();
-    await expect(windPane).toBeVisible();
-    await expect
-      .poll(() =>
-        page
-          .locator("[data-spot-graph]")
-          .evaluate((el) => el.getBoundingClientRect().top < innerHeight),
-      )
-      .toBe(true);
+    await expect(page.locator("[data-readout]")).toHaveCount(0);
+    // The wind on the wind's graph, the waves on the waves', never each other's.
+    await expect(page.locator('[data-cursor-tag="wind"]')).toHaveText(
+      /^Now · \d+( g\d+)? kn$/,
+    );
+    await expect(page.locator('[data-cursor-tag="waves"]')).toHaveText(
+      /^Now · (under )?\d* ?ft/,
+    );
     // The hours scroll as one: dragging the waves moves the wind.
     await page
       .locator("[data-wave-graph]")
@@ -466,16 +433,16 @@ test.describe("on a phone", () => {
       .toBe(900);
   });
 
-  test("on sheltered water the readout has no switch", async ({ page }) => {
+  test("on sheltered water there is no waves graph to read", async ({
+    page,
+  }) => {
     await page.goto("/spot/malahide-estuary");
     await expect(page.locator("[data-graph-svg]")).toBeVisible({
       timeout: 30000,
     });
     await page.locator('[data-disclosure="year"] summary').click();
     await expect(page.locator("[data-climate-sheltered]")).toBeAttached();
-    await expect(
-      page.getByRole("group", { name: "What the readout shows" }),
-    ).toHaveCount(0);
+    await expect(page.locator('[data-cursor-tag="waves"]')).toHaveCount(0);
     await expect(page.locator('[data-week-section="waves"]')).toHaveCount(0);
   });
 });
