@@ -764,7 +764,9 @@
 .map-canvas .lt.lt-pilled .lt-pill,
 .map-canvas .lt:is(.lit, .sel) .lt-pill,
 .map-canvas .lt:focus-visible .lt-pill {
-  visibility: visible;
+  /* Not `visible`, which would show through the map hidden under a page
+     opened over it (src/PagesOverMap.tsx). */
+  visibility: inherit;
 }
 /* Placed, the pill is its button's box. */
 .map-canvas .lt.lt-pilled .lt-pill {
@@ -1863,8 +1865,9 @@
 /* The map or the list (src/App.tsx `narrow`), the map first: under the top
    bar a map the height of the screen, or the list scrolling the page. Either
    way the foot stays: the Map | List switch, a small dark pill, over the
-   dock, which is the day and its hours (on the map only) and the three
-   chips the screen's width. No legend and no zoom buttons: two fingers zoom. */
+   dock, which is the day (on the map only), the three chips the screen's
+   width, and under them the hours' track (on the map only), as wide as the
+   dock and a thumb's height. No legend and no zoom buttons: two fingers zoom. */
 .workspace[data-chart="map"] {
   top: 64px;
 }
@@ -1891,8 +1894,13 @@
   bottom: calc(8px + env(safe-area-inset-bottom));
   width: auto;
   transform: none;
-  flex-direction: column-reverse;
   padding: 6px;
+}
+.narrow-foot .hour-bar {
+  order: 1;
+}
+.narrow-foot .md-what {
+  order: 2;
 }
 .narrow-foot .md-chips {
   display: flex;
@@ -1976,8 +1984,24 @@
 .narrow-foot .hb-marks {
   display: none;
 }
+.narrow-foot .hb-when {
+  flex: 1;
+  text-align: center;
+}
+/* Clear of the dock's edge by the thumb's half, less the dock's padding. */
 .narrow-foot .hb-track {
-  height: 28px;
+  order: 3;
+  flex: none;
+  height: 44px;
+  margin: 0 5px;
+}
+.narrow-foot .hb-rail {
+  top: 20px;
+}
+.narrow-foot .hb-thumb {
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
 }
 
 /* ---------- a spot's peek and card, and "Spots here" ---------- */

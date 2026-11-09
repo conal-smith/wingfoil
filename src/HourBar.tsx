@@ -62,13 +62,16 @@ export function hourWords(time: number, now: number): string {
  *
  * On a narrow screen, where the list's head is out of sight under the map,
  * the day steps on the bar itself: ‹ before the hour's words and › after
- * them (`onDay`), each off where there is no day past it.
+ * them (`onDay`), each off where there is no day past it. The track is then
+ * a row of its own (`trackBelow`), the dock's whole width, under the chips
+ * (src/map.css), where a thumb can work it.
  */
 export default function HourBar({
   time,
   now,
   onTime,
   onDay,
+  trackBelow = false,
 }: {
   /** The hour shown. */
   time: number;
@@ -77,6 +80,8 @@ export default function HourBar({
   onTime: (time: number) => void;
   /** A day back or on, and whether there is one either way; none, no steps. */
   onDay?: { step: (by: -1 | 1) => void; back: boolean; on: boolean };
+  /** The track after the bar rather than in it, for the dock to place. */
+  trackBelow?: boolean;
 }) {
   const date = irishDate(time);
   const hours = useMemo(() => dayHours(date), [date]);
@@ -141,93 +146,100 @@ export default function HourBar({
     choose(to);
   };
 
-  return (
-    <div className="hour-bar" data-hour-bar data-day={date}>
-      <Button
-        variant="quiet"
-        size="sm"
-        icon
-        className="hb-play"
-        aria-label={playing ? "Pause" : "Play the hours"}
-        onClick={play}
-        data-hour-play
-      >
-        {playing ? (
-          <Pause size={15} strokeWidth={1.75} aria-hidden="true" />
-        ) : (
-          <Play size={15} strokeWidth={1.75} aria-hidden="true" />
-        )}
-      </Button>
-      {onDay && (
-        <Button
-          variant="quiet"
-          size="sm"
-          icon
-          className="hb-day"
-          aria-label="The day before"
-          disabled={!onDay.back}
-          onClick={() => onDay.step(-1)}
-          data-hour-day="back"
-        >
-          <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
-        </Button>
-      )}
-      <span className="hb-when" data-hour-when aria-hidden="true">
-        {words}
-      </span>
-      {onDay && (
-        <Button
-          variant="quiet"
-          size="sm"
-          icon
-          className="hb-day"
-          aria-label="The day after"
-          disabled={!onDay.on}
-          onClick={() => onDay.step(1)}
-          data-hour-day="on"
-        >
-          <ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />
-        </Button>
-      )}
-      <div
-        ref={track}
-        className="hb-track"
-        role="slider"
-        tabIndex={0}
-        aria-label="Hour"
-        aria-valuemin={FIRST_HOUR}
-        aria-valuemax={LAST_HOUR}
-        aria-valuenow={irishHour(hours[shown] ?? time)}
-        aria-valuetext={words}
-        onKeyDown={keys}
-        onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture?.(event.pointerId);
-          setPlaying(false);
+  const slider = (
+    <div
+      ref={track}
+      className="hb-track"
+      role="slider"
+      tabIndex={0}
+      aria-label="Hour"
+      aria-valuemin={FIRST_HOUR}
+      aria-valuemax={LAST_HOUR}
+      aria-valuenow={irishHour(hours[shown] ?? time)}
+      aria-valuetext={words}
+      onKeyDown={keys}
+      onPointerDown={(event) => {
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        setPlaying(false);
+        fromPointer(event);
+      }}
+      onPointerMove={(event) => {
+        if (event.currentTarget.hasPointerCapture?.(event.pointerId))
           fromPointer(event);
-        }}
-        onPointerMove={(event) => {
-          if (event.currentTarget.hasPointerCapture?.(event.pointerId))
-            fromPointer(event);
-        }}
-        data-hour-track
-      >
-        <span className="hb-rail" aria-hidden="true">
-          <span className="hb-fill" style={{ width: `${share * 100}%` }} />
-          <span className="hb-thumb" style={{ left: `${share * 100}%` }} />
-        </span>
-        <span className="hb-marks" aria-hidden="true">
-          {MARKS.map((h) => (
-            <span
-              key={h}
-              style={{
-                left: `${((h - FIRST_HOUR) / (LAST_HOUR - FIRST_HOUR)) * 100}%`,
-              }}
-            >
-              {String(h).padStart(2, "0")}
-            </span>
-          ))}
-        </span>
-      </div>
+      }}
+      data-hour-track
+    >
+      <span className="hb-rail" aria-hidden="true">
+        <span className="hb-fill" style={{ width: `${share * 100}%` }} />
+        <span className="hb-thumb" style={{ left: `${share * 100}%` }} />
+      </span>
+      <span className="hb-marks" aria-hidden="true">
+        {MARKS.map((h) => (
+          <span
+            key={h}
+            style={{
+              left: `${((h - FIRST_HOUR) / (LAST_HOUR - FIRST_HOUR)) * 100}%`,
+            }}
+          >
+            {String(h).padStart(2, "0")}
+          </span>
+        ))}
+      </span>
     </div>
+  );
+
+  return (
+    <>
+      <div className="hour-bar" data-hour-bar data-day={date}>
+        <Button
+          variant="quiet"
+          size="sm"
+          icon
+          className="hb-play"
+          aria-label={playing ? "Pause" : "Play the hours"}
+          onClick={play}
+          data-hour-play
+        >
+          {playing ? (
+            <Pause size={15} strokeWidth={1.75} aria-hidden="true" />
+          ) : (
+            <Play size={15} strokeWidth={1.75} aria-hidden="true" />
+          )}
+        </Button>
+        {onDay && (
+          <Button
+            variant="quiet"
+            size="sm"
+            icon
+            className="hb-day"
+            aria-label="The day before"
+            disabled={!onDay.back}
+            onClick={() => onDay.step(-1)}
+            data-hour-day="back"
+          >
+            <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+          </Button>
+        )}
+        <span className="hb-when" data-hour-when aria-hidden="true">
+          {words}
+        </span>
+        {onDay && (
+          <Button
+            variant="quiet"
+            size="sm"
+            icon
+            className="hb-day"
+            aria-label="The day after"
+            disabled={!onDay.on}
+            onClick={() => onDay.step(1)}
+            data-hour-day="on"
+          >
+            <ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />
+          </Button>
+        )}
+        {!trackBelow && slider}
+      </div>
+      {trackBelow && slider}
+    </>
   );
 }

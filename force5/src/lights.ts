@@ -588,7 +588,10 @@ export function createLights(
   const capture = (budget: number) => {
     const w = boxW;
     const h = boxH;
-    const chart = `${map.getContainer().className}|${dpr()}`;
+    // Hidden under a page opened over it, a pill reads as hidden: pictures
+    // taken then are not the ones to draw when the map is back.
+    const box = map.getContainer();
+    const chart = `${box.className}|${getComputedStyle(box).visibility}|${dpr()}`;
     const out = new Map<Entry, Look>();
     const until = performance.now() + budget;
     behind = false;

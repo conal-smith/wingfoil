@@ -46,15 +46,16 @@ async function openMap(page: Page) {
     .toBeGreaterThan(0);
 }
 
-test("the map opens first, then the list, the switch and the chips standing still", async ({
+test("the map opens first, then the list, the chips at the foot of the screen", async ({
   page,
 }) => {
   await openMap(page);
   await expect(foot(page)).toHaveAttribute("data-narrow-foot", "map");
   await expect(switchTo(page, "Map")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
-  // The dock: the day and its hours, then the chips the screen's width; no
-  // legend, no zoom buttons, and the map's own locate button.
+  // The dock: the day, then the chips the screen's width, then the hours'
+  // track as wide as the dock; no legend, no zoom buttons, and the map's own
+  // locate button.
   const hours = foot(page).locator("[data-hour-bar]");
   await expect(hours).toBeVisible();
   await expect(
@@ -65,6 +66,12 @@ test("the map opens first, then the list, the switch and the chips standing stil
   const chipBox = (await chips.first().boundingBox())!;
   const hourBox = (await hours.boundingBox())!;
   expect(hourBox.y).toBeLessThan(chipBox.y);
+  const trackBox = (await foot(page)
+    .locator("[data-hour-track]")
+    .boundingBox())!;
+  expect(trackBox.y).toBeGreaterThanOrEqual(chipBox.y + chipBox.height);
+  expect(trackBox.width).toBeGreaterThanOrEqual(390 - 2 * 20);
+  expect(trackBox.height).toBeGreaterThanOrEqual(44);
   await expect(page.locator(".map-legend")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Zoom in" })).toHaveCount(0);
   await expect(
@@ -97,7 +104,9 @@ test("the map opens first, then the list, the switch and the chips standing stil
   await expect(page.locator("[data-finder-heart]")).toBeVisible();
   await expect(foot(page).locator("[data-hour-bar]")).toHaveCount(0);
   const chipAfter = (await chips.first().boundingBox())!;
-  expect(Math.abs(chipAfter.y - chipBox.y)).toBeLessThan(2);
+  // Down into the room the hours' track had under them.
+  expect(chipAfter.y).toBeGreaterThan(chipBox.y);
+  expect(chipAfter.y + chipAfter.height).toBeLessThanOrEqual(844);
   const switchAfter = (await switchTo(page, "List").boundingBox())!;
   const bar = (await page.locator("[data-top-bar]").boundingBox())!;
   expect(switchAfter.y + switchAfter.height).toBeLessThanOrEqual(
@@ -129,6 +138,42 @@ test("a phone has no full chart: its links land on the map or the spot", async (
   await expect(
     page.locator("[data-top-bar]").getByRole("link", { name: "Chart" }),
   ).toHaveCount(0);
+});
+
+test("after dark the map opens on the hour now, not on tomorrow", async ({
+  page,
+}) => {
+  // The suite's own clock: 22:00 Irish summer time, after last light.
+  await page.goto("/");
+  await expect(page.locator("[data-hour-when]")).toHaveText(/^Today \d\d:00$/, {
+    timeout: 30000,
+  });
+});
+
+test("a spot opened from the map's peek has no pills of the map over it", async ({
+  page,
+}) => {
+  await openMap(page);
+  const id = await pills(page).evaluateAll(
+    (els) =>
+      els
+        .map((el) => ({
+          id: el.getAttribute("data-spot-id")!,
+          top: el.getBoundingClientRect().top,
+        }))
+        .sort((a, b) => a.top - b.top)[0].id,
+  );
+  await page.locator(`.spot-marker[data-spot-id="${id}"] .lt-pill`).tap();
+  await peek(page).locator("a").first().tap();
+  await expect(page).toHaveURL(new RegExp(`/spot/${id}`), { timeout: 30000 });
+  await expect(page.locator(".map-under-page")).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.locator(".lt-pill:visible")).toHaveCount(0);
+  // And they are back with the map.
+  await page.goBack();
+  await expect
+    .poll(() => page.locator(".lt-pill:visible").count())
+    .toBeGreaterThan(0);
 });
 
 test("a pill on the map says its figure, listed or not", async ({ page }) => {

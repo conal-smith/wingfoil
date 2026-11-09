@@ -2772,6 +2772,7 @@ export default function App() {
           now={clockNow}
           onTime={setFinderPicked}
           onDay={split ? undefined : (dayStep ?? undefined)}
+          trackBelow={!split}
         />
       )}
     </MapDock>
