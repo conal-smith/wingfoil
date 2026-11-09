@@ -283,8 +283,8 @@ const styles = tv({
     // The small label beside the pointer or under a finger: the hour, then
     // what the row under it says that is not easily read from the screen.
     hourLabel: [
-      "pointer-events-none absolute z-6 grid max-w-52 -translate-y-1/2 gap-px rounded-control bg-ground px-2 py-1 shadow-float inset-ring-1 inset-ring-line",
-      "font-body text-label whitespace-nowrap text-ink tabular-nums",
+      "pointer-events-none absolute z-6 grid w-max max-w-52 -translate-y-1/2 gap-px rounded-control bg-ground px-2 py-1 shadow-float inset-ring-1 inset-ring-line",
+      "font-body text-label text-ink tabular-nums",
     ],
     hourLabelLine: "flex items-center gap-1.5",
     hourLabelQuiet: "font-normal text-ink-2",
