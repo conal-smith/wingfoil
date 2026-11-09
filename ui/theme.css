@@ -717,6 +717,18 @@
   stroke-linejoin: round;
 }
 
+/* A row of hours running past its window: faded at its two edges, so a figure
+   cut there reads as more to come and not as clipped. */
+@utility mask-fade-x {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent
+  );
+}
+
 /* Fraunces at its largest optical size: the high-contrast cut a spot's name
    is set in on its own page, whatever size it is drawn at. Elsewhere the
    browser picks the optical size from the font size, which is what is
@@ -931,8 +943,8 @@
   --grid-template-columns-graph: 72px minmax(0, 1fr);
   /* The same on a phone: room for "Direction" in the caption's size. */
   --grid-template-columns-graph-narrow: 68px minmax(0, 1fr);
-  /* What it is like now: three small cards, and the picture beside them. */
-  --grid-template-columns-nowblock: repeat(3, minmax(0, 1fr)) 156px;
+  /* What it is like now: three small cards, and the picture's card beside them. */
+  --grid-template-columns-nowblock: repeat(3, minmax(0, 1fr)) 296px;
   /* A notice on one thin line. */
   --grid-template-columns-notice-compact: 24px minmax(0, 1fr) auto auto;
   /* The night on a graph: over the day's card, so it is darker than the day
