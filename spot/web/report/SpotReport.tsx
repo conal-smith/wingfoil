@@ -1455,6 +1455,8 @@ type WaveBand = (typeof WAVE_BANDS)[number][0];
 const MIN_TRAIN_M = 0.15;
 const WAVE_NAME: Record<WaveBand, string> = {
   waves: "Waves",
+/** Past the lead model's split: its absence is not a calm sea. */
+const NO_SWELL_SPLIT = "Swell split not forecast this far ahead";
   wdir: "Direction",
   period: "Period",
   wblend: "Models",
@@ -2613,7 +2615,9 @@ function Graph({
       if (!part)
         return (
           <span className={s.hourLabelQuiet()} data-card-part={band}>
-            No {WAVE_NAME[band].toLowerCase()} this hour
+            {PART_ROWS.some(([key]) => partOf(w, key))
+              ? `No ${WAVE_NAME[band].toLowerCase()} this hour`
+              : NO_SWELL_SPLIT}
           </span>
         );
       return (
@@ -3284,7 +3288,7 @@ function Graph({
                     className="sticky left-3 inline-block font-body text-caption text-ink-muted"
                     data-parts-note
                   >
-                    No swell split this far ahead
+                    {NO_SWELL_SPLIT}
                   </span>
                 </div>
               )}
