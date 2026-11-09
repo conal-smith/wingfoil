@@ -160,13 +160,13 @@ const styles = tv({
       "mt-2 grid grid-cols-2 gap-2 wide:grid-cols-3 rail:grid-cols-nowblock rail:gap-3",
     nowCard: [
       "flex min-w-0 flex-col justify-center gap-0.5 rounded-surface bg-sunken on-card px-3.5 py-2",
-      "cards:flex-row cards:items-end cards:justify-between cards:gap-3",
+      "cards:flex-row cards:items-end cards:justify-between cards:gap-3 cards:pb-5",
     ],
     // On a phone the stars have a row to themselves, the word and what is
     // next side by side.
     nowCardStars:
       "col-span-2 flex-row items-end justify-between gap-3 wide:col-span-1 wide:flex-col wide:items-start wide:justify-center wide:gap-0.5 cards:flex-row cards:items-end cards:justify-between cards:gap-3",
-    nowHead: "grid min-w-0 gap-0.5",
+    nowHead: "grid min-w-0 gap-0.5 cards:min-h-14 cards:content-between",
     nowLabel:
       "block truncate font-body text-caption font-medium whitespace-nowrap text-ink-muted wide:text-label",
     nowFigure:
@@ -192,7 +192,7 @@ const styles = tv({
     ],
     // The spots around, nearest first, the one you are on first of all.
     nearRow:
-      "flex items-center gap-1 overflow-x-auto scrollbar-none py-1.5 font-body text-body",
+      "mask-fade-end flex items-center gap-1 overflow-x-auto scrollbar-none py-1.5 pr-6 font-body text-body",
     near: [
       "flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 whitespace-nowrap text-ink no-underline",
       "transition-colors duration-fast hover:bg-sunken",
@@ -204,7 +204,7 @@ const styles = tv({
     nearAll: "ml-1 shrink-0",
     // A card a day, as many as the forecast reaches: they share the width
     // while they fit, and scroll sideways past it.
-    week: "relative flex min-w-0 flex-1 gap-2 overflow-x-auto scrollbar-none",
+    week: "mask-fade-end relative flex min-w-0 flex-1 gap-2 overflow-x-auto scrollbar-none pr-6",
     weekRow: "flex items-center gap-1.5",
     // The outline round the days the graph has on screen, laid over the
     // strip and slid along it as the graph scrolls (`paintDayWindow`).
@@ -893,7 +893,7 @@ export function SpotReport({
               </div>
               <div className={s.guide()}>
                 <div className={s.gd()}>
-                  <h3 className={s.gdHead()}>Water</h3>
+                  {forecast.shore_note && <h3 className={s.gdHead()}>Water</h3>}
                   <p className={s.gdText()}>
                     {bed && Number.isFinite(bed.z)
                       ? `1 m deep at the launch above ${(bed.z + 1).toFixed(1)} m of tide.`
