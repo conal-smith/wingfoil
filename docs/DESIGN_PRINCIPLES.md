@@ -985,8 +985,9 @@ and last light where it has the room; the foot keeps the hours alone. A cursor
 with the hour on a tag runs through both graphs; the line for now is red, as
 the mark rule asks. A click holds the
 hour: moving the pointer no longer moves it, but up and down still reads the
-other rows at that hour, and the column is outlined. Esc, the cross by the
-inside the tag or a click on the held hour lets go. The arrow keys step the hour, up and
+other rows at that hour, and the column's tint deepens, so nothing is drawn
+beside a figure that could cut it. Esc, the cross inside the tag or a click on
+the held hour lets go. The arrow keys step the hour, up and
 down the rows, Home goes back to now. The strip of days marks the day under
 the cursor and outlines the days on screen, whole cards only (2026-11-09),
 following the graphs as they scroll. The scroll bar is gone: the arrows, a mouse drag past a few pixels, a
@@ -995,11 +996,14 @@ wheel or a trackpad move the hours.
 Night is darker than day in both themes: `night` over the card, ink at 4.5%
 in the light theme and black at 30% in the dark, where ink would lighten it;
 faint parallel lines rise through it at 45°, 8 px apart (6 on a phone), ink at
-9% and 7%; figures over them have a halo of the night's own colour. Hidden
+6% and 7%; figures over them have a halo of the night's own colour, a ring
+never a plate, so a line beside a figure still reads. Hidden
 nights draw neither. The gust is its own figure, raised and in the gust's
-colour beside the wind's, not yellow, which is Met Éireann's; the Gusts row
-and its factor go, the factor said in the label and the Table, the tint of a
-gust that costs a star moving behind the figures. The bands' rail labels stay
+colour beside the wind's, not yellow, which is Met Éireann's, raised clear of
+the speed and a figure's width away, so a windy hour reads as two numbers; the
+Gusts row and its factor go, the factor said in the label and the Table, a
+gust that costs a star marked by a short bar under the figures, never through
+them. The bands' rail labels stay
 inside the rail ("Models" for both the wind and wave blends).
 
 Wave heights take a setting of their own (`waveUnits`, Settings, "Wave
@@ -1034,12 +1038,19 @@ playhead; a second tap puts it away. The launch depth is in that label's tide
 reading alone.
 
 The strip's outline goes round whole day cards, a sliver under 48 px not
-counted. A day whose name does not fit whole in what is left of it has no
-name, nor a daylight range without one. The Sky row keeps every sixth hour
-where a group would touch the next. The plot fades at its two edges, so a
-figure cut there reads as more to come. The star row draws only hours with
-stars; an hour with none says why in its label. A swell row past the lead
-model's split says so once, in words. Below 1180 px the warning's credit is
+counted. A day whose name does not fit whole in what is left of it, to the
+window's right edge as to its left, has no name, nor a daylight range without
+one. The Sky and Direction rows keep every sixth hour where a group would
+touch the next. The plot fades at its two edges and a figure that would be cut
+there is not drawn; the lines and areas run on under it. The cursor's line
+breaks at the figures of its hour, so it never strikes through what it points
+to. The strips of nearby spots and days fade at their right edge, their last
+card resting clear of it. A swell row past the lead model's split says so once
+in words, and the label over it says the same: a split not forecast is not a
+calm sea. The Direction rows name their figures in the rail (kn, gust; ft). On
+a phone a warning's first line is its level and kind, its coast under the
+chevron with the rest. The star row draws only hours with
+stars; an hour with none says why in its label. Below 1180 px the warning's credit is
 the same short line as beside it on a wide window.
 
 The nearby spots are the riding places within 30 km, nine at most, and the
