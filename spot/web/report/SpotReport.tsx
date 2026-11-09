@@ -1,8 +1,9 @@
 /**
  * A riding place as a spot report: the spots around it in a thin strip, its
- * name, then the days, what it is like now on small cards beside the
- * chart's loupe on the satellite picture, and the graph, every row on one
- * clock under the days' headings (or the table), and the spot's own notes. Two faces, sentence-case labels, the stars as stars.
+ * name, then the days, what it is like now on small cards beside a small
+ * satellite picture with the chart's loupe, and the graphs, each with the days
+ * along its head (or the table), and the spot's own notes. Two faces,
+ * sentence-case labels, the stars as stars.
  */
 import {
   createContext,
@@ -17,7 +18,6 @@ import {
   currentFigure,
   currentText,
   currentUnits,
-  type CurrentReading,
 } from "../../../force5/src/currentReading";
 import { faintRose, loupeRose, roseScale } from "../../../force5/src/focus";
 import { modelName } from "../../../force5/src/lead";
@@ -156,17 +156,29 @@ const styles = tv({
     name: "m-0 font-display text-big-sm font-semibold text-ink wide:text-big",
     acts: "flex shrink-0 items-center gap-2",
     // What it is like now: three small cards and the picture, under the days.
-    nowBlock: "mt-2 grid grid-cols-2 gap-2 rail:grid-cols-nowblock rail:gap-3",
-    nowCard:
-      "flex min-w-0 flex-col justify-center rounded-surface bg-sunken on-card px-3.5 py-2.5",
+    nowBlock:
+      "mt-2 grid grid-cols-2 gap-2 wide:grid-cols-3 rail:grid-cols-nowblock rail:gap-3",
+    nowCard: [
+      "flex min-w-0 flex-col justify-center gap-0.5 rounded-surface bg-sunken on-card px-3.5 py-2",
+      "cards:flex-row cards:items-end cards:justify-between cards:gap-3",
+    ],
+    // On a phone the stars have a row to themselves, the word and what is
+    // next side by side.
+    nowCardStars:
+      "col-span-2 flex-row items-end justify-between gap-3 wide:col-span-1 wide:flex-col wide:items-start wide:justify-center wide:gap-0.5 cards:flex-row cards:items-end cards:justify-between cards:gap-3",
+    nowHead: "grid min-w-0 gap-0.5",
     nowLabel:
       "block truncate font-body text-caption font-medium whitespace-nowrap text-ink-muted wide:text-label",
     nowFigure:
-      "mt-1 flex min-w-0 items-baseline gap-1.5 font-body text-lead font-semibold whitespace-nowrap text-ink tabular-nums wide:text-big-sm",
+      "flex min-w-0 items-baseline gap-1.5 font-body text-lead font-semibold whitespace-nowrap text-ink tabular-nums rail:text-big-sm",
     nowUnit: "text-body font-medium text-ink-2",
     nowGust: "text-gust-ink",
     nowLine:
-      "mt-0.5 block truncate font-body text-body whitespace-nowrap text-ink-2 tabular-nums",
+      "block min-w-0 truncate font-body text-body whitespace-nowrap text-ink-2 tabular-nums cards:shrink-0 cards:text-right cards:text-label",
+    nowWord: "text-lead font-semibold",
+    // The next stars, the time alone a link.
+    nowNext:
+      "flex min-w-0 items-center gap-1.5 font-body text-body whitespace-nowrap text-ink-2 tabular-nums cards:shrink-0 cards:text-label",
     nowQuiet: "font-normal text-ink-2",
     line: "font-body text-prose text-ink-2",
     off: "text-pen",
@@ -211,76 +223,54 @@ const styles = tv({
     range: "font-body text-body font-semibold whitespace-nowrap",
     small: "font-body text-caption font-normal text-ink-muted",
     spark: "block h-5 w-full",
-    // The days' headings, held at the top of the screen over both sections,
-    // with a phone's reading of the hour under its playhead above them.
-    tools: ["sticky top-0 z-3 mt-2 grid w-full gap-y-1 bg-ground py-1"],
-    // The readings in a grid of cells that keep their places as the hours
-    // are scrubbed: even cells, the longer readings two wide, four to a row
-    // on a phone.
-    readout:
-      "grid w-full grid-flow-row-dense grid-cols-4 items-start gap-x-3 gap-y-1",
-    // A phone's hour, over its reading: plain and bold, as wide as the
-    // widest hour it says ("Wed 16:00"), so "Now" holds the same place.
-    chip: "inline-flex min-w-24 items-center gap-1 justify-self-start font-body text-prose font-semibold whitespace-nowrap text-ink tabular-nums",
-    ro: "grid min-w-0 gap-px",
-
-    roWide: "col-span-2",
-    roLabel:
-      "truncate font-body text-caption font-medium whitespace-nowrap text-ink-muted",
-    // Where the wind at Now was measured: quiet, on the label's own line, so
-    // the cell is the height it always is.
+    // Where the wind at Now was measured: quiet, on the card's label.
     roSource: "font-normal",
-    // One line of a fixed height, whatever it holds: a figure, a dash, the
-    // stars or a notice, so no row grows or shrinks with the hour.
-    roValue:
-      "block h-5 truncate font-body text-body leading-5 font-semibold whitespace-nowrap text-ink tabular-nums",
-    roMarks: "flex h-5 min-w-0 items-center gap-1.5 overflow-hidden",
     // The band names in a column of their own beside the hours, narrower on
     // a phone, so no name ever sits over an hour's figures.
-    gbox: "relative grid grid-cols-graph-narrow rounded-surface bg-sunken on-card py-1.5 wide:grid-cols-graph",
-    gl: "relative",
-    // The days' headings along the head, each at its own day's start and
-    // held at the strip's left edge while that day is on screen.
+    gbox: "relative grid grid-cols-graph-narrow rounded-surface bg-sunken on-card pb-1.5 wide:grid-cols-graph",
+    gl: "relative border-0 border-r border-line",
+    // The days along the top of each graph, on the graph's own hours: each
+    // name held at the strip's left edge while its day is on screen, and held
+    // at the top of the screen while its graph is.
     dayHeads:
-      "grid h-8 grid-cols-graph-narrow items-center wide:grid-cols-graph",
+      "sticky top-0 z-3 col-span-full grid h-8 grid-cols-graph-narrow items-center rounded-t-surface bg-sunken wide:grid-cols-graph",
     headStrip: "h-full overflow-hidden",
     headRow: "relative h-full",
     dayHead: "absolute top-0 h-full border-0 border-l border-line",
     dayHeadFirst: "border-l-0",
     dayHeadName:
-      "sticky left-0 inline-flex h-full items-baseline gap-1.5 bg-ground pt-1.5 pr-3 pl-2 font-body text-body font-semibold whitespace-nowrap text-ink",
+      "sticky left-0 inline-flex h-full items-center gap-1.5 bg-sunken pr-3 pl-2 font-body text-body font-semibold whitespace-nowrap text-ink",
     dayHeadLight: "font-normal text-ink-muted tabular-nums",
-    // The hour under the cursor (or held, or stepped to with the keys), and
-    // beside it the way to let a held hour go.
+    // The rail along the top of each graph's plot, its own lane for what
+    // says the hour, so nothing there covers a name or a figure: the hour
+    // under the cursor (or held, or stepped to with the keys).
     cursorSpot:
-      "absolute top-1/2 z-2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1",
+      "pointer-events-none absolute top-1 z-2 inline-flex -translate-x-1/2 items-center",
     cursorTag: [
-      "inline-flex items-center gap-1 rounded-full bg-inverse px-2.5 py-0.5",
-      "font-body text-body font-semibold whitespace-nowrap text-ink-inverse tabular-nums",
+      "inline-flex items-center gap-1 rounded-full bg-inverse px-2 py-0.5",
+      "font-body text-label font-semibold whitespace-nowrap text-ink-inverse tabular-nums",
     ],
     cursorTagFocus: "outline-2 outline-offset-2 outline-focus",
-    // Where now is, along the head.
+    // Let go of a held hour, inside the tag that says it.
+    letGo:
+      "pointer-events-auto -mr-1 size-4 text-ink-inverse hover:bg-transparent hover:opacity-70",
+    // Where now is, on the same rail.
     nowTag:
-      "absolute top-1/2 z-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ground px-2 py-0.5 font-body text-body font-semibold whitespace-nowrap text-now",
+      "pointer-events-none absolute top-1 z-1 -translate-x-1/2 rounded-full bg-sunken px-1.5 py-0.5 font-body text-label font-semibold whitespace-nowrap text-now",
     // The two arrows at the strip's end that move the hours a day at a time.
     arrows: "flex shrink-0 items-center gap-0.5 max-wide:hidden",
-    // A band's name, in a strip as tall as its band. On a phone, where the
-    // readout stays over the graph, the name keeps clear of the readout's
-    // foot (`top`, set to the readout's height) while any of its band is
-    // still in view, rather than going under it.
+    // A band's name, in a strip as tall as its band.
     glBand: "absolute inset-x-0",
     glName: [
-      "sticky block h-4 pl-1.5 font-body text-caption leading-4 font-medium whitespace-nowrap text-ink-muted wide:pl-4",
+      "block h-4 pl-1.5 font-body text-caption leading-4 font-medium whitespace-nowrap text-ink-muted wide:pl-4",
     ],
     // Sideways through the hours without a bar drawn over them: a wheel, a
     // drag, the arrows in the head or the strip of days moves them. The
     // focus ring stands on the cursor's tag, never round the whole graph.
     graph: [
-      "relative overflow-x-auto overscroll-x-contain scrollbar-none border-0 border-l border-line",
+      "mask-fade-x relative overflow-x-auto overscroll-x-contain scrollbar-none",
       NO_RING,
     ],
-    // Where the readout's foot meets the graph scrolling under it.
-    toolsEdge: "pointer-events-none absolute inset-x-0 top-full h-px bg-line",
     // The week's two sections, Wind and then Waves, each under a heading
     // with the models it reads beside it.
     weekHead:
@@ -288,16 +278,8 @@ const styles = tv({
     weekTitle: "flex items-center gap-3",
     h3: "m-0 font-body text-lead font-semibold text-ink",
     weekSub: "font-body text-body text-ink-muted",
-    // On a phone the one readout's two panes, Wind and Waves, in the same
-    // place: the one the page is at shows, the other waits unseen, so the
-    // readout is as tall for either and nothing under it moves.
-    pane: [
-      "col-start-1 row-start-1 transition-opacity duration-fast motion-reduce:transition-none",
-    ],
-    // The swells and the wind sea, three to a row.
-    parts: "col-span-4 grid grid-cols-3 gap-x-3 gap-y-1",
-    // The small label beside the pointer on a desktop: the hour, then what
-    // the row under it says that is not easily read from the screen.
+    // The small label beside the pointer or under a finger: the hour, then
+    // what the row under it says that is not easily read from the screen.
     hourLabel: [
       "pointer-events-none absolute z-6 grid max-w-52 -translate-y-1/2 gap-px rounded-control bg-ground px-2 py-1 shadow-float inset-ring-1 inset-ring-line",
       "font-body text-label whitespace-nowrap text-ink tabular-nums",
@@ -327,15 +309,16 @@ const styles = tv({
     td: "border-0 border-t border-line px-3 py-2.5 whitespace-nowrap",
     narrow: "hidden wide:table-cell",
     guide: "grid gap-3 wide:grid-cols-2 cards:grid-cols-4",
-    // The picture and the notes on the place, side by side once there is room.
-    // Square, as the pictures are, so the rose is whole.
-    photo: "aspect-square w-full",
-    seg: "absolute top-1.5 left-1/2 -translate-x-1/2",
-    foot: [
-      "absolute bottom-1.5 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-photo-pill px-2 py-0.5",
-      "font-body text-label font-semibold whitespace-nowrap text-photo-line",
-    ],
-    footGust: "text-caption text-photo-gust",
+    // The picture's card: what the rose reads and the tide switch, beside
+    // the square of satellite picture.
+    pictureCard: "col-span-2 wide:col-span-3 rail:col-span-1",
+    pictureSide:
+      "flex min-w-0 flex-1 flex-col justify-between gap-1.5 px-3 py-2",
+    pictureHour:
+      "block truncate font-body text-label font-medium text-ink-muted",
+    foot: "block min-w-0 truncate font-body text-body font-semibold whitespace-nowrap text-ink tabular-nums",
+    footGust: "text-caption text-gust-ink",
+    seg: "self-start",
     gd: "rounded-surface bg-sunken on-card p-4 wide:px-5",
     gdHead: "m-0 mb-1.5 font-body text-prose font-semibold text-ink",
     gdText: "m-0 font-body text-prose text-ink-2",
@@ -526,7 +509,7 @@ export function SpotReport({
     [obs, spot.lat, spot.lon],
   );
   // The wind now as that station measured it, while fresh: the Wind now
-  // card and the readout at Now both say it, so they never disagree.
+  // card and a phone's tag at Now both say it, so they never disagree.
   const nowMeasured = useMemo(() => measuredNow(paired, now), [paired, now]);
   const [firstNow] = useState(now);
   const nearby = useNearby(forecast.nearby, rider, firstNow);
@@ -679,7 +662,7 @@ export function SpotReport({
   };
   const scale = useMemo(() => roseScale(units), [units]);
   // At Now the picture's rose says the wind the station measured, as the
-  // Wind now card and the readout do; a reading with no direction has no
+  // Wind now card and a phone's tag do; a reading with no direction has no
   // rose to draw, so the forecast's stands then.
   const loupeMeasured =
     shown !== null && shown === nowRow && nowMeasured?.reading.from != null
@@ -741,9 +724,6 @@ export function SpotReport({
     <UnitsContext.Provider value={units}>
       <WaveUnitsContext.Provider value={waveUnits}>
         <main className={s.main()}>
-          {nearby.length > 0 && (
-            <NearbyStrip here={point ? null : spot} readings={nearby} />
-          )}
           <section className={s.title()}>
             <div className="grid min-w-0 gap-1">
               <h1 className={s.name()}>{spot.name}</h1>
@@ -751,6 +731,9 @@ export function SpotReport({
             </div>
             <div className={s.acts()}>{actions}</div>
           </section>
+          {nearby.length > 0 && (
+            <NearbyStrip here={point ? null : spot} readings={nearby} />
+          )}
           {notices && <div className={s.notices()}>{notices}</div>}
 
           <section className="pt-2" aria-labelledby="the-week">
@@ -806,58 +789,50 @@ export function SpotReport({
                   faint={loupeFaint}
                   facing={facing}
                   scale={scale}
-                  className={s.photo()}
+                  className={s.pictureCard()}
                 >
-                  <Segmented
-                    aria-label="Tide in the picture"
-                    size="sm"
-                    className={s.seg()}
-                    value={tide}
-                    onChange={(t) => setTide(t)}
-                    options={[
-                      { value: "high", label: "High tide" },
-                      { value: "low", label: "Low tide" },
-                    ]}
-                  />
-                  <span
-                    className={s.foot()}
-                    data-loupe-foot
-                    data-measured={loupeMeasured?.paired.station.id}
-                  >
-                    {loupe ? (
-                      <>
-                        {!heroAtNow && (
-                          <>
-                            <span>
-                              {dayNames(dublinDate(heroAt), heroAt).short}{" "}
-                              {clock(heroAt)}
+                  <div className={s.pictureSide()}>
+                    <div
+                      className={s.foot()}
+                      data-loupe-foot
+                      data-measured={loupeMeasured?.paired.station.id}
+                    >
+                      <span className={s.pictureHour()}>
+                        {heroAtNow
+                          ? "Now"
+                          : `${dayNames(dublinDate(heroAt), heroAt).short} ${clock(heroAt)}`}
+                      </span>{" "}
+                      {loupe ? (
+                        <>
+                          {loupe.reading.replace(/ g(\d+)$/, "")}{" "}
+                          {/ g\d+$/.test(loupe.reading) && (
+                            <span className={s.footGust()}>
+                              g{loupe.reading.match(/ g(\d+)$/)![1]}
                             </span>
-                            <span>·</span>
-                          </>
-                        )}
-                        {loupe.reading.replace(/ g(\d+)$/, "")}
-                        {/ g\d+$/.test(loupe.reading) && (
-                          <span className={s.footGust()}>
-                            g{loupe.reading.match(/ g(\d+)$/)![1]}
-                          </span>
-                        )}
-                        {heroAtNow && shoreWord(loupeShore) && (
-                          <>
-                            <span>·</span>
-                            <span
-                              className={
-                                loupe.warn ? "text-photo-red" : undefined
-                              }
-                            >
+                          )}
+                          {heroAtNow && shoreWord(loupeShore) && (
+                            <span className="font-normal text-ink-2">
+                              {" · "}
                               {shoreWord(loupeShore)}
                             </span>
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      "No wind reading"
-                    )}
-                  </span>
+                          )}
+                        </>
+                      ) : (
+                        "No wind reading"
+                      )}
+                    </div>
+                    <Segmented
+                      aria-label="Tide in the picture"
+                      size="sm"
+                      className={s.seg()}
+                      value={tide}
+                      onChange={(t) => setTide(t)}
+                      options={[
+                        { value: "high", label: "High tide" },
+                        { value: "low", label: "Low tide" },
+                      ]}
+                    />
+                  </div>
                 </PhotoLoupe>
               )}
             </div>
@@ -1177,93 +1152,123 @@ function NowCards({
   const wing = row?.rating
     ? `${row.rating.wing.own ?? row.rating.wing.recommended} m² wing`
     : null;
+  // No stars this hour: why, and when the next ones are (the time alone a
+  // link), or that none are coming.
+  const nextLine =
+    !stars && !taken ? (
+      next ? (
+        <span className={s.nowNext()}>
+          <span className={s.nowQuiet()}>Next</span>
+          <Stars n={next.stars} size={13} />
+          <Button
+            variant="link"
+            size="sm"
+            className="max-w-full"
+            onClick={() => onShowNext(next.from)}
+            data-next-stars
+          >
+            {dayNames(dublinDate(next.from), now).short} {clock(next.from)}
+          </Button>
+        </span>
+      ) : (
+        <span className={s.nowLine()} data-next-stars>
+          None ahead
+        </span>
+      )
+    ) : stars > 0 && wing ? (
+      <span className={s.nowLine()}>{wing}</span>
+    ) : null;
   return (
     <>
       {rated && (
-        <div className={s.nowCard()} data-your-stars>
-          <span className={s.nowLabel()}>Stars now</span>
-          <div className={s.nowFigure()}>
-            {stars > 0 ? (
-              <Stars n={stars} size={18} />
-            ) : taken ? (
-              <NoticeMark level={taken.level} className="min-w-0">
-                <span className="truncate">
-                  {taken.level === "water" && watered
-                    ? restrictionShort(watered)
-                    : taken.word}
+        <div
+          className={s.nowCard({ className: s.nowCardStars() })}
+          data-your-stars
+        >
+          <div className={s.nowHead()}>
+            <span className={s.nowLabel()}>Stars now</span>
+            <div className={s.nowFigure()}>
+              {stars > 0 ? (
+                <Stars n={stars} size={20} />
+              ) : taken ? (
+                <NoticeMark
+                  level={taken.level}
+                  className={s.nowWord({ className: "min-w-0" })}
+                >
+                  <span className="truncate">
+                    {taken.level === "water" && watered
+                      ? restrictionShort(watered)
+                      : taken.word}
+                  </span>
+                </NoticeMark>
+              ) : (
+                <span className={s.nowWord()}>
+                  {row && !row.hour.daylight ? "Dark" : "No stars"}
                 </span>
-              </NoticeMark>
-            ) : next ? (
-              <Button
-                variant="link"
-                size="sm"
-                className="max-wide:h-auto max-wide:max-w-full max-wide:flex-wrap max-wide:justify-start"
-                onClick={() => onShowNext(next.from)}
-                data-next-stars
-              >
-                <span className={s.nowQuiet()}>Next</span>
-                <Stars n={next.stars} size={15} />
-                {dayNames(dublinDate(next.from), now).short} {clock(next.from)}
-              </Button>
-            ) : (
-              <span className={s.nowQuiet()} data-next-stars>
-                None ahead
-              </span>
-            )}
+              )}
+            </div>
           </div>
-          {stars > 0 && wing && <span className={s.nowLine()}>{wing}</span>}
+          {nextLine}
         </div>
       )}
       <div className={s.nowCard()} data-now>
-        <span className={s.nowLabel()} data-now-wind-label>
-          Wind now
-          {measured && (
-            <span className={s.roSource()} data-now-source>
-              {" "}
-              · {pairedName(measured.paired)},{" "}
-              {measuredAt(measured.reading.time)}
-            </span>
-          )}
-        </span>
-        {wind ? (
-          <>
-            <div
-              className={s.nowFigure()}
-              data-now-wind
-              data-measured={measured ? measured.paired.station.id : undefined}
-            >
-              {speed.say(wind.kn)}
-              {gust !== null && (
-                <span className={s.nowGust()}>g{speed.say(gust)}</span>
-              )}
-              {speed.unit && <span className={s.nowUnit()}>{speed.unit}</span>}
-            </div>
-            <span
-              className={s.nowLine({
-                className: isOff(shore) ? s.off() : undefined,
-              })}
-              data-now-direction
-            >
-              {wind.from !== null && compass(wind.from)}
-              {wind.from !== null && shoreWord(shore) && " · "}
-              {shoreWord(shore)}
-            </span>
-          </>
-        ) : (
-          <div className={s.nowFigure()}>–</div>
+        <div className={s.nowHead()}>
+          <span className={s.nowLabel()} data-now-wind-label>
+            Wind now
+            {measured && (
+              <span className={s.roSource()} data-now-source>
+                {" "}
+                · {pairedName(measured.paired)},{" "}
+                {measuredAt(measured.reading.time)}
+              </span>
+            )}
+          </span>
+          <div
+            className={s.nowFigure()}
+            data-now-wind
+            data-measured={measured ? measured.paired.station.id : undefined}
+          >
+            {wind ? (
+              <>
+                {speed.say(wind.kn)}
+                {gust !== null && (
+                  <span className={s.nowGust()}>g{speed.say(gust)}</span>
+                )}
+                {speed.unit && (
+                  <span className={s.nowUnit()}>{speed.unit}</span>
+                )}
+              </>
+            ) : (
+              "–"
+            )}
+          </div>
+        </div>
+        {wind && (
+          <span
+            className={s.nowLine({
+              className: isOff(shore) ? s.off() : undefined,
+            })}
+            data-now-direction
+          >
+            {wind.from !== null && compass(wind.from)}
+            {wind.from !== null && shoreWord(shore) && " · "}
+            {shoreWord(shore)}
+          </span>
         )}
       </div>
       {(hasWaves || sea) && (
         <div className={s.nowCard()} data-now-waves>
-          <span className={s.nowLabel()}>
-            {hasWaves ? "Waves now" : "Water now"}
-          </span>
-          <div className={s.nowFigure()}>
-            {hasWaves
-              ? waves?.heightM == null
-                ? "–"
-                : heights.text(waves.heightM)
-              : sea && `${sea.celsius.toFixed(1)} °C`}
+          <div className={s.nowHead()}>
+            <span className={s.nowLabel()}>
+              {hasWaves ? "Waves now" : "Water now"}
+            </span>
+            <div className={s.nowFigure()}>
+              {hasWaves
+                ? waves?.heightM == null
+                  ? "–"
+                  : heights.text(waves.heightM)
+                : sea && `${sea.celsius.toFixed(1)} °C`}
+            </div>
           </div>
           {hasWaves && (
             <span className={s.nowLine()}>
@@ -1490,7 +1495,7 @@ const ARROW = "M0 6V-6M-3.5 -2.5L0 -6.5l3.5 4";
  * Several lines in one band all cross, and two hues side by side (ECMWF's
  * purple, ICON-EU's blue) are too close for a colour-blind rider, so the
  * coarse global models are dashed and the fine regional ones solid; every
- * value is named in the readout and the card besides.
+ * value is named in the label and the key besides.
  */
 const DASHED = new Set([
   "ecmwf",
@@ -1622,10 +1627,10 @@ function Graph({
   /**
    * The weather station or buoy paired with the place (force5/src/windObs.ts
    * `pairStation`), or null: its readings up to now are drawn on the wind,
-   * and its latest is the readout's at Now.
+   * and its latest is what the label and a phone's tag say at Now.
    */
   measured?: Paired | null;
-  /** Its latest reading, while fresh (`measuredNow`): the readout's at Now. */
+  /** Its latest reading, while fresh (`measuredNow`): said at Now. */
   nowMeasured?: MeasuredReading | null;
   /** The strip of days, whose days in view the graph marks. */
   strip: React.RefObject<HTMLDivElement | null>;
@@ -1642,8 +1647,9 @@ function Graph({
   const s = styles();
   const [ref, width] = useWidth<HTMLDivElement>(900);
   const waveRef = useRef<HTMLDivElement>(null);
-  // The days' headings along the head, on the same hours as the graphs.
+  // The days along the head of each graph, on the same hours as the graphs.
   const heads = useRef<HTMLDivElement>(null);
+  const waveHeads = useRef<HTMLDivElement>(null);
   const windSvg = useRef<SVGSVGElement>(null);
   const waveSvg = useRef<SVGSVGElement>(null);
   const wide = useWide();
@@ -1663,86 +1669,12 @@ function Graph({
     () => onFocus(hover === null ? null : (rows[hover]?.time ?? null)),
     [hover, rows, onFocus],
   );
-  // On a phone one readout is held over the top of the graphs as the page
-  // scrolls (`tools`). The band names are held clear of its foot, `held`
-  // being its height, and once the graph runs under it a line marks where.
-  const tools = useRef<HTMLDivElement>(null);
   const gbox = useRef<HTMLDivElement>(null);
   const waveBox = useRef<HTMLDivElement>(null);
-  const windSection = useRef<HTMLElement>(null);
-  const waveSection = useRef<HTMLElement>(null);
-  const [held, setHeld] = useState(0);
-  const [stuck, setStuck] = useState(false);
-  useEffect(() => {
-    const el = tools.current;
-    const box = gbox.current;
-    if (!el || !box) return;
-    let sticky = false;
-    const scrolled = () =>
-      setStuck(
-        sticky &&
-          box.getBoundingClientRect().top <
-            el.getBoundingClientRect().bottom - 0.5,
-      );
-    const measured = () => {
-      sticky = getComputedStyle(el).position === "sticky";
-      setHeld(sticky ? el.offsetHeight : 0);
-      scrolled();
-    };
-    measured();
-    const watch =
-      typeof ResizeObserver === "undefined"
-        ? null
-        : new ResizeObserver(measured);
-    watch?.observe(el);
-    window.addEventListener("scroll", scrolled, { passive: true });
-    window.addEventListener("resize", measured);
-    return () => {
-      watch?.disconnect();
-      window.removeEventListener("scroll", scrolled);
-      window.removeEventListener("resize", measured);
-    };
-  }, [wide]);
-  // On a phone the one readout says the wind while the Wind section is on
-  // screen, and turns to the waves once the Waves section comes up past the
-  // middle of what the readout leaves of the screen.
-  const [section, setSection] = useState<Section>("wind");
-  useEffect(() => {
-    if (wide || !waves) {
-      setSection("wind");
-      return;
-    }
-    const check = () => {
-      const top = tools.current?.getBoundingClientRect().bottom ?? 0;
-      const head = waveSection.current?.getBoundingClientRect().top;
-      if (head === undefined) return;
-      setSection(head < top + (innerHeight - top) * 0.45 ? "waves" : "wind");
-    };
-    check();
-    window.addEventListener("scroll", check, { passive: true });
-    window.addEventListener("resize", check);
-    return () => {
-      window.removeEventListener("scroll", check);
-      window.removeEventListener("resize", check);
-    };
-  }, [wide, !!waves]);
-  /** The phone's Wind | Waves: to that section, under the readout. */
-  const jump = (to: Section) => {
-    const target = (to === "waves" ? waveSection : windSection).current;
-    if (!target) return;
-    setSection(to);
-    window.scrollTo({
-      top:
-        target.getBoundingClientRect().top +
-        scrollY -
-        (tools.current?.offsetHeight ?? 0) -
-        4,
-      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "auto"
-        : "smooth",
-    });
-  };
-  const lower = stack(WIND_BANDS, 14, (band) =>
+  // Which graph says the hour on a desktop, where one tag does: the one the
+  // pointer is over, or the keys are in; a phone says it on both.
+  const [tagAt, setTagAt] = useState<Section>("wind");
+  const lower = stack(WIND_BANDS, RAIL, (band) =>
     band === "blend" ? models.length > 0 : true,
   );
   const GH = lower.height;
@@ -1789,7 +1721,7 @@ function Graph({
   /** Hours between the figures along the foot. */
   const tick = dark ? 3 : 6;
   const daysShown =
-    width < 600 ? 0 : Math.max(3, Math.min(7, Math.floor(width / 330)));
+    width < 600 ? 0 : Math.max(3, Math.min(7, Math.floor(width / 340)));
   // A day's width on a desktop is a day's hours, the lit ones alone where
   // the night is hidden.
   const dayHours = dark ? hours / Math.max(1, line.spans.length) : 24;
@@ -1809,7 +1741,7 @@ function Graph({
   const driver = useRef<HTMLDivElement | null>(null);
   const drove = useRef(-Infinity);
   const scrollers = () =>
-    [ref.current, waveRef.current, heads.current].filter(
+    [ref.current, waveRef.current, heads.current, waveHeads.current].filter(
       (el): el is HTMLDivElement => el !== null,
     );
   const drive = (e: { currentTarget: HTMLDivElement }) => {
@@ -1975,7 +1907,11 @@ function Graph({
     setScrolled(el.scrollLeft);
     paintDayWindow(el.scrollLeft);
     if (phone) {
-      setHover(rowAtX(headAt(el.scrollLeft)));
+      const row = rowAtX(headAt(el.scrollLeft));
+      setHover(row);
+      setCard((was) =>
+        was ? (placeBand(was.section as Section, row, was.band) ?? was) : was,
+      );
     } else if (pointer.current) {
       const row =
         pinned ??
@@ -1989,31 +1925,27 @@ function Graph({
       if (wide) setCard(place(pointer.current.section, row, pointer.current.y));
     }
   };
-  /** Where the days in view stand on the strip: the outline round them. */
+  /**
+   * Where the days in view stand on the strip: the outline round them, always
+   * whole cards, a sliver of a day at the graph's edge not counted.
+   */
   const paintDayWindow = (left: number) => {
     const frame = dayWindow.current;
     const row = strip.current;
     if (!frame || !row) return;
     const tiles = [...row.querySelectorAll<HTMLElement>("[data-day-card]")];
-    /** A time in the hours as a place on the strip's tiles. */
-    const place = (x: number, end: boolean) => {
-      const i = Math.max(
-        0,
-        days.findIndex(
-          ({ midnight }) => X(midnight + 24 * HOUR) > (end ? x - 1 : x),
-        ),
-      );
-      const tile = tiles[i];
-      if (!tile) return null;
-      const from = X(days[i].midnight);
-      const to = X(days[i].midnight + 24 * HOUR);
-      const share =
-        to > from ? Math.min(1, Math.max(0, (x - from) / (to - from))) : 0;
-      return tile.offsetLeft + share * tile.offsetWidth;
-    };
-    const a = place(left, false);
-    const b = place(left + width, true);
-    if (a === null || b === null) return;
+    const showing = days.map(({ midnight }) => {
+      const from = X(midnight);
+      const to = X(midnight + 24 * HOUR);
+      const kept = Math.min(to, left + width) - Math.max(from, left);
+      return kept >= Math.min(WHOLE_DAY_PX, to - from - 1);
+    });
+    const first = showing.indexOf(true);
+    const last = showing.lastIndexOf(true);
+    const a = tiles[first]?.offsetLeft;
+    const end = tiles[last];
+    if (a === undefined || !end) return;
+    const b = end.offsetLeft + end.offsetWidth;
     frame.style.left = `${a}px`;
     frame.style.width = `${Math.max(0, b - a)}px`;
     // The hours moved past what the strip shows: the strip follows.
@@ -2155,10 +2087,6 @@ function Graph({
   const deepAt =
     bed && Number.isFinite(bed.z) && !bed.area.level ? bed.z + 1 : null;
   const handovers = leadChanges(rows);
-  const hasDepth = useMemo(
-    () => rows.some((r) => depthAt(r.time) !== null),
-    [rows, depthAt],
-  );
   const ay = lower.axis;
   const hoverRow = hover === null ? null : rows[hover];
   useEffect(() => {
@@ -2179,6 +2107,7 @@ function Graph({
   const onMove = (at: Section) => (e: React.PointerEvent<SVGSVGElement>) => {
     if (e.pointerType === "touch") return;
     pointer.current = { section: at, x: e.clientX, y: e.clientY };
+    setTagAt(at);
     const box = e.currentTarget.getBoundingClientRect();
     const row = pinned ?? rowAtX(e.clientX - box.left);
     if (pinned === null) setHover(row);
@@ -2275,62 +2204,43 @@ function Graph({
   const heldHere = pinned !== null && hover === pinned;
   const letGo = (
     <Button
-      variant="outline"
+      variant="quiet"
       size="xs"
       icon
+      className={s.letGo()}
       aria-label="Let go of this hour"
       onClick={release}
       data-let-go
     >
-      <Cross size={12} strokeWidth={2.5} aria-hidden="true" />
+      <Cross size={11} strokeWidth={2.5} aria-hidden="true" />
     </Button>
   );
-  const chip = (
-    <span className={s.chip()} data-readout-hour>
-      {hourWords}
-    </span>
-  );
   // The tag on the cursor: the hour under it, or with the keys in the graph
-  // the hour read out, so the focus always has somewhere to stand.
-  const tagRow = hoverRow ?? (keyFocus ? shownRow : null);
+  // the hour read out, so the focus always has somewhere to stand. A phone
+  // has no pointer, so its tag always stands at the playhead.
+  const tagRow = phone
+    ? (hoverRow ?? shownRow)
+    : (hoverRow ?? (keyFocus ? shownRow : null));
   const tagWords = tagRow
     ? tagRow === rowAt(rows, now)
       ? "Now"
       : `${dayNames(dublinDate(tagRow.time), tagRow.time).short} ${clock(tagRow.time)}`
     : "";
   const waveAt = waves && shownAt >= 0 ? waves.rows[shownAt] : null;
-  // At now, the moment the head says, not its hour's start.
-  const readAt = shownRow ? (isNow ? now : shownRow.time) : null;
-  const tideNow = readAt === null ? null : tideHeightAt(turns, readAt);
-  // A phone has no pointer, so the hour under its playhead is read here.
-  const windReadout = (
-    <Readout
-      row={shownRow}
-      rated={rated}
-      current={current.columns[shownAt] ?? null}
-      rain={shownRow ? rowRain(rain, shownRow) : null}
-      hasCurrent={current.columns.length > 0}
-      tide={
-        turns.length || hasDepth
-          ? {
-              height: tideNow,
-              depth: readAt === null ? null : depthAt(readAt),
-            }
-          : null
-      }
-      unlit={dark ? "Twilight" : "Dark"}
-      measured={isNow ? nowMeasured : null}
-    />
-  );
-  const waveReadout = waves && (
-    <WaveReadout
-      row={shownRow}
-      waves={waveAt}
-      partitions={PART_ROWS.filter(([key]) =>
-        waves.rows.some((r) => partOf(r, key)),
-      ).map(([key]) => key)}
-    />
-  );
+  /** A phone's tag says the row's reading after its hour: the wind or the waves. */
+  const tagReading = (at: Section, r: SpotRow): string => {
+    if (at === "waves") {
+      const w = waves?.rows[rows.indexOf(r)];
+      if (!w || w.heightM === null) return "";
+      return `${heights.text(w.heightM)}${w.periodS !== null ? ` ${Math.round(w.periodS)} s` : ""}`;
+    }
+    const atNow = r === rowAt(rows, now) ? nowMeasured : null;
+    const kn = atNow ? atNow.reading.windKn : r.hour.wind?.wind_kn;
+    if (kn === undefined) return "";
+    const raw = atNow ? atNow.reading.gustKn : (r.hour.wind?.gust_kn ?? null);
+    const gusting = speed.gust(kn, raw);
+    return `${speed.say(kn)}${gusting !== null ? ` g${speed.say(gusting)}` : ""} ${speed.unit}`.trim();
+  };
   /** The night shaded and hatched, the day lines and the hours along a section's foot. */
   const hatch = phone ? 6 : 8;
   const frame = (height: number, axis: number, data: boolean) => (
@@ -2432,15 +2342,17 @@ function Graph({
       />
       {hoverRow && (
         <>
-          <rect
-            x={X(hoverRow.time)}
-            y={4}
-            width={hoverRow.step * px}
-            height={axis - 4}
-            rx={Math.min(6, px / 2)}
-            className="fill-ink"
-            fillOpacity={0.07}
-          />
+          {!phone && (
+            <rect
+              x={X(hoverRow.time)}
+              y={4}
+              width={hoverRow.step * px}
+              height={axis - 4}
+              rx={Math.min(6, px / 2)}
+              className="fill-ink"
+              fillOpacity={0.07}
+            />
+          )}
           <line
             x1={mid(hoverRow)}
             x2={mid(hoverRow)}
@@ -2469,7 +2381,7 @@ function Graph({
     </>
   );
   const waveStack = waves
-    ? stack(WAVE_BANDS, 10, (band) =>
+    ? stack(WAVE_BANDS, RAIL - 4, (band) =>
         // A train that stays under this all week has no row of its own.
         band in WAVE_PART
           ? waves.rows.some(
@@ -2478,6 +2390,19 @@ function Graph({
           : true,
       )
     : null;
+  // Where the rows of the swells have run out of forecast, scrolled past their
+  // last hour: said once, at the first such row.
+  const partsEnded = (() => {
+    const first = PART_ROWS.map(([key]) => waveStack?.at[key]).find(Boolean);
+    if (!waves || !first) return null;
+    const last = rows.reduce(
+      (latest, r, i) =>
+        PART_ROWS.some(([key]) => partOf(waves.rows[i], key)) ? r.time : latest,
+      -Infinity,
+    );
+    if (last === -Infinity || scrolled + width * 0.25 <= X(last)) return null;
+    return first[0] + 2;
+  })();
   /** Whether a time is in a night that is drawn: its figures get a halo. */
   const halo = (t: number) =>
     !dark &&
@@ -2685,6 +2610,12 @@ function Graph({
     }
     if (band in WAVE_PART) {
       const part = partOf(w, band as PartRow);
+      if (!part)
+        return (
+          <span className={s.hourLabelQuiet()} data-card-part={band}>
+            No {WAVE_NAME[band].toLowerCase()} this hour
+          </span>
+        );
       return (
         <span className={s.hourLabelLine()} data-card-part={band}>
           <span className={s.hourLabelQuiet()}>{WAVE_NAME[band]}</span>
@@ -2737,6 +2668,7 @@ function Graph({
     onKeyDown: onKey,
     onFocus: (e: React.FocusEvent<HTMLDivElement>) => {
       drive(e);
+      setTagAt(at);
       if (e.target.matches(":focus-visible")) setKeyFocus(true);
     },
     onBlur: () => setKeyFocus(false),
@@ -2753,138 +2685,133 @@ function Graph({
   const svgProps = (at: Section) => ({
     onPointerMove: phone ? undefined : onMove(at),
     onPointerLeave: phone ? undefined : onLeave,
-    onClick: phone ? undefined : onClick,
+    onClick: phone ? tapRow(at) : onClick,
     className: "block",
   });
+  /** A label's x kept in the window of the hours, `margin` from its edges. */
+  const clampX = (x: number, margin: number) =>
+    Math.min(Math.max(x, scrolled + margin), scrolled + width - margin);
+  /** A note drawn from `x` that would not run into the now line. */
+  const clearOfNow = (x: number) => X(now) < x - 4 || X(now) > x + 128;
+  // Below a sky group's own width, every other one.
+  const skyEvery = 3 * px >= 46 ? 3 : 6;
+  /** What says the hour on a section's rail: Now, and the cursor's tag. */
+  const railMarks = (at: Section) => {
+    const half = phone ? 84 : heldHere ? 54 : 44;
+    return (
+      <>
+        {seen({ time: now }) &&
+          X(now) >= scrolled &&
+          X(now) <= scrolled + width &&
+          !(tagRow && Math.abs(mid(tagRow) - X(now)) < TAG_CLEAR) && (
+            <span
+              className={s.nowTag()}
+              style={{ left: Math.max(X(now), scrolled + 18) }}
+              data-now-tag={at}
+            >
+              Now
+            </span>
+          )}
+        {tagRow && (phone || tagAt === at) && (
+          <span
+            className={s.cursorSpot()}
+            style={{ left: clampX(mid(tagRow), half) }}
+          >
+            <span
+              className={s.cursorTag({
+                className: keyFocus ? s.cursorTagFocus() : undefined,
+              })}
+              data-cursor-tag={at}
+              data-held={heldHere || undefined}
+              data-measured={
+                phone && at === "wind" && isNow && nowMeasured
+                  ? nowMeasured.paired.station.id
+                  : undefined
+              }
+            >
+              <span data-cursor-hour>{tagWords}</span>
+              {phone && tagReading(at, tagRow) && (
+                <span>{` · ${tagReading(at, tagRow)}`}</span>
+              )}
+              {heldHere && letGo}
+            </span>
+          </span>
+        )}
+      </>
+    );
+  };
+  /** The days along the head of a section's graph, on its hours. */
+  const dayHeads = (at: Section) => (
+    <div className={s.dayHeads()}>
+      <div />
+      <div
+        className={s.headStrip()}
+        ref={at === "wind" ? heads : waveHeads}
+        data-day-heads={at}
+      >
+        <div className={s.headRow()} style={{ width: W }}>
+          {days.map(({ day, sun, midnight }, i) => {
+            if (!drawn(midnight)) return null;
+            const names = dayNames(day.date, now);
+            const dayLeft = Math.max(0, X(midnight));
+            const dayWidth = X(midnight + 24 * HOUR) - dayLeft;
+            // How much of the day has room for its name, on the graph and
+            // on the screen: a name that cannot fit whole is not drawn, nor a
+            // daylight range without the name before it.
+            const room = Math.min(
+              dayWidth,
+              X(midnight + 24 * HOUR) - Math.max(dayLeft, scrolled),
+            );
+            if (room < 140) return null;
+            const roomy = wide && room >= 270;
+            const title =
+              names.relative === "Today" || names.relative === "Tomorrow"
+                ? `${names.relative}, ${names.short} ${Number(day.date.slice(8, 10))}`
+                : `${names.long} ${Number(day.date.slice(8, 10))}`;
+            return (
+              <div
+                key={day.date}
+                className={s.dayHead({
+                  className: i === 0 ? s.dayHeadFirst() : undefined,
+                })}
+                style={{ left: dayLeft, width: dayWidth }}
+              >
+                <span className={s.dayHeadName()} data-day-head={day.date}>
+                  {title}
+                  {sun.firstLight && sun.lastLight && roomy && (
+                    <span className={s.dayHeadLight()}>
+                      {clock(sun.firstLight)}–{clock(sun.lastLight)}
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+  /** On a phone, a tap on a row asks it for its label; a second puts it away. */
+  const tapRow = (at: Section) => (e: React.MouseEvent<SVGSVGElement>) => {
+    if (shownAt < 0) return;
+    const next = place(at, shownAt, e.clientY);
+    setCard((was) => (was && next && was.band === next.band ? null : next));
+  };
+  useEffect(() => {
+    if (!phone || !card) return;
+    const away = (e: PointerEvent) => {
+      if (
+        !(e.target as Element).closest("[data-spot-graph], [data-wave-graph]")
+      )
+        setCard(null);
+    };
+    window.addEventListener("pointerdown", away);
+    return () => window.removeEventListener("pointerdown", away);
+  }, [phone, card]);
   const windModels = models.map((m) => modelName(m.id)).join(", ");
   const waveModels = waves?.lines.map((l) => waveModelName(l.id)).join(", ");
   return (
     <>
-      <div className={s.tools()} ref={tools} data-week-head>
-        {stuck && <div className={s.toolsEdge()} aria-hidden="true" />}
-        {!wide && (
-          <div className="grid w-full gap-2" data-readout>
-            <div className="flex items-center justify-between gap-2.5">
-              {chip}
-              {waves && (
-                <Segmented
-                  aria-label="What the readout shows"
-                  size="sm"
-                  value={section}
-                  onChange={jump}
-                  options={[
-                    { value: "wind", label: "Wind" },
-                    { value: "waves", label: "Waves" },
-                  ]}
-                />
-              )}
-            </div>
-            <div className="grid" aria-live="polite">
-              <div
-                className={s.pane({
-                  className:
-                    section === "wind"
-                      ? "visible opacity-100"
-                      : "invisible opacity-0",
-                })}
-                aria-hidden={section !== "wind"}
-                data-pane="wind"
-              >
-                {windReadout}
-              </div>
-              {waves && (
-                <div
-                  className={s.pane({
-                    className:
-                      section === "waves"
-                        ? "visible opacity-100"
-                        : "invisible opacity-0",
-                  })}
-                  aria-hidden={section !== "waves"}
-                  data-pane="waves"
-                >
-                  {waveReadout}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        <div className={s.dayHeads()}>
-          <div />
-          <div className={s.headStrip()} ref={heads} data-day-heads>
-            <div className={s.headRow()} style={{ width: W }}>
-              {days.map(({ day, sun, midnight }, i) => {
-                if (!drawn(midnight)) return null;
-                const names = dayNames(day.date, now);
-                // A sliver of a day (today's last hour, or a day whose
-                // light is nearly gone with the night hidden) has no room.
-                const dayLeft = Math.max(0, X(midnight));
-                const dayWidth = X(midnight + 24 * HOUR) - dayLeft;
-                if (dayWidth < 100) return null;
-                // How much of the day is on screen: a name that would only
-                // show its last letters as the day goes off the left waits.
-                const onScreen =
-                  X(midnight + 24 * HOUR) - Math.max(dayLeft, scrolled);
-                if (onScreen < 110) return null;
-                const roomy = wide && onScreen >= 260;
-                const title =
-                  names.relative === "Today" || names.relative === "Tomorrow"
-                    ? `${names.relative}, ${names.short} ${Number(day.date.slice(8, 10))}`
-                    : `${names.long} ${Number(day.date.slice(8, 10))}`;
-                return (
-                  <div
-                    key={day.date}
-                    className={s.dayHead({
-                      className: i === 0 ? s.dayHeadFirst() : undefined,
-                    })}
-                    style={{ left: dayLeft, width: dayWidth }}
-                  >
-                    <span className={s.dayHeadName()} data-day-head={day.date}>
-                      {title}
-                      {sun.firstLight && sun.lastLight && roomy && (
-                        <span className={s.dayHeadLight()}>
-                          {clock(sun.firstLight)}–{clock(sun.lastLight)}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                );
-              })}
-              {seen({ time: now }) && !(tagRow && tagWords === "Now") && (
-                <span
-                  className={s.nowTag()}
-                  style={{ left: X(now) }}
-                  data-now-tag
-                >
-                  Now
-                </span>
-              )}
-              {tagRow && (
-                <span
-                  className={s.cursorSpot()}
-                  style={{
-                    left: Math.min(
-                      Math.max(mid(tagRow), scrolled + TAG_HALF),
-                      scrolled + width - TAG_HALF,
-                    ),
-                  }}
-                >
-                  <span
-                    className={s.cursorTag({
-                      className: keyFocus ? s.cursorTagFocus() : undefined,
-                    })}
-                    data-cursor-tag
-                    data-held={heldHere || undefined}
-                  >
-                    {tagWords}
-                  </span>
-                  {heldHere && letGo}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
       {arrowsAt &&
         createPortal(
           <>
@@ -2913,11 +2840,7 @@ function Graph({
           </>,
           arrowsAt,
         )}
-      <section
-        ref={windSection}
-        aria-labelledby="week-wind"
-        data-week-section="wind"
-      >
+      <section aria-labelledby="week-wind" data-week-section="wind">
         <div className={s.weekHead()}>
           <div className={s.weekTitle()}>
             <h3 className={s.h3()} id="week-wind">
@@ -2932,9 +2855,9 @@ function Graph({
           )}
         </div>
         <div className={s.gbox()} ref={gbox}>
+          {dayHeads("wind")}
           <BandNames
             height={GH}
-            held={held}
             bands={(Object.keys(ROW) as WindBand[])
               .filter((band) => rated || band !== "stars")
               .map((band) => [
@@ -2987,7 +2910,9 @@ function Graph({
               </defs>
               {frame(GH, ay, true)}
               {rows.map((r, i) =>
-                r.rating && seen(r) ? (
+                // Only where there are stars: an hour rated none says so in its
+                // label, not with a grey dash the length of the night.
+                r.rating?.stars && seen(r) ? (
                   <rect
                     key={i}
                     x={X(r.time) + 1}
@@ -3179,11 +3104,18 @@ function Graph({
                 </>
               )}
               {turns
-                .filter((t) => t.time >= start && t.time <= end && seen(t))
+                .filter(
+                  (t) =>
+                    t.time >= start &&
+                    t.time <= end &&
+                    seen(t) &&
+                    X(t.time) >= scrolled - 34 &&
+                    X(t.time) <= scrolled + width + 34,
+                )
                 .map((t, i) => (
                   <text
                     key={i}
-                    x={X(t.time)}
+                    x={clampX(X(t.time), 18)}
                     y={t.tide === "high" ? TY(t.height) - 6 : TY(t.height) + 15}
                     textAnchor="middle"
                     className={`fill-ink-2 font-body text-caption ${halo(t.time)}`}
@@ -3217,7 +3149,7 @@ function Graph({
                     className="stroke-ink-muted"
                     strokeDasharray="3 4"
                   />
-                  {X(h.time) >= scrolled && (
+                  {X(h.time) >= scrolled && clearOfNow(X(h.time) + 6) && (
                     <text
                       x={X(h.time) + 6}
                       y={ROW.wind[0] + 6}
@@ -3254,10 +3186,13 @@ function Graph({
                 </span>
               </div>
             )}
+            {railMarks("wind")}
             {rows
               .filter(
                 (r) =>
-                  r.hour.weather && dublinHour(r.time) % 3 === 0 && seen(r),
+                  r.hour.weather &&
+                  dublinHour(r.time) % skyEvery === 0 &&
+                  seen(r),
               )
               .map((r, i) => (
                 <span
@@ -3281,11 +3216,7 @@ function Graph({
         </div>
       </section>
       {waves && waveStack && (
-        <section
-          ref={waveSection}
-          aria-labelledby="week-waves"
-          data-week-section="waves"
-        >
+        <section aria-labelledby="week-waves" data-week-section="waves">
           <div className={s.weekHead({ className: "mt-6" })}>
             <h3 className={s.h3()} id="week-waves">
               Waves
@@ -3297,9 +3228,9 @@ function Graph({
             )}
           </div>
           <div className={s.gbox()} ref={waveBox}>
+            {dayHeads("waves")}
             <BandNames
               height={waveStack.height}
-              held={held}
               bands={(Object.keys(waveStack.at) as WaveBand[]).map((band) => {
                 const [y, h] = waveStack.at[band]!;
                 return [
@@ -3341,6 +3272,21 @@ function Graph({
                 />
                 {marks(waveStack.axis)}
               </svg>
+              {railMarks("waves")}
+              {partsEnded !== null && (
+                // Said once, and kept in view as the hours scroll under it.
+                <div
+                  className="pointer-events-none absolute left-0"
+                  style={{ top: partsEnded, width: W }}
+                >
+                  <span
+                    className="sticky left-3 inline-block font-body text-caption text-ink-muted"
+                    data-parts-note
+                  >
+                    No swell split this far ahead
+                  </span>
+                </div>
+              )}
             </div>
             {card?.section === "waves" && labelFor("waves", card)}
           </div>
@@ -3491,32 +3437,31 @@ const WAVE_PART: Record<string, true> = Object.fromEntries(
   PART_ROWS.map(([key]) => [key, true]),
 );
 
-/** Half the cursor's tag, to keep it whole at the strip's two ends. */
-const TAG_HALF = 46;
+/** The height left clear along the top of each plot for the hour's tag. */
+const RAIL = 24;
+/** A day has to show this many pixels to count as in view, on the strip. */
+const WHOLE_DAY_PX = 48;
+/** How near the cursor's tag can stand to the Now tag before Now gives way. */
+const TAG_CLEAR = 64;
 /** The hour label's widest, and its gap from the hour's column, for placing it. */
 const LABEL_WIDTH = 208;
 const LABEL_GAP = 10;
 
 /**
  * A section's band names, in a column of their own beside the hours, each in
- * a strip as tall as its band, held below a phone's readout while any of the
- * band is still in view.
+ * a strip as tall as its band.
  */
 function BandNames({
   height,
-  held,
   bands,
 }: {
   height: number;
-  held: number;
   bands: (readonly [string, number, readonly [number, number]])[];
 }) {
   const s = styles();
   return (
     <div className={s.gl()} style={{ height }}>
       {bands.map(([name, middle, [y, h]]) => (
-        // The strip runs from where the name sits, beside the middle of
-        // its band, to the band's foot: as far as the name can be held.
         <div
           key={`${name}${y}`}
           className={s.glBand()}
@@ -3525,11 +3470,7 @@ function BandNames({
             height: Math.max(16, y + h - (middle - 8)),
           }}
         >
-          <span
-            className={s.glName()}
-            style={{ top: held }}
-            data-band-name={name}
-          >
+          <span className={s.glName()} data-band-name={name}>
             {name}
           </span>
         </div>
@@ -4629,182 +4570,6 @@ function WaveBands({
   );
 }
 
-/**
- * A phone's reading of the hour under its playhead: it has no pointer for
- * the label beside the graph. Compact cells that hold their places.
- */
-function Readout({
-  row,
-  rated,
-  current,
-  rain,
-  hasCurrent,
-  tide,
-  unlit,
-  measured = null,
-}: {
-  row: SpotRow | null;
-  rated: boolean;
-  current: CurrentReading | null;
-  /** The row's rain, mm/h, or null where no total covers it. */
-  rain: number | null;
-  /** The place has a current at any hour. */
-  hasCurrent: boolean;
-  /** The tide at the hour with the depth at the launch; null with no tide. */
-  tide: { height: number | null; depth: number | null } | null;
-  /**
-   * What an hour the sun is not up in is called: dark, or with the night
-   * left out the twilight, the one such hour still shown.
-   */
-  unlit: "Dark" | "Twilight";
-  /**
-   * At Now, the paired station's latest reading, fresh: the wind cell says
-   * it, and where it is from, in place of the forecast's.
-   */
-  measured?: MeasuredReading | null;
-}) {
-  const speed = useSpeed();
-  const units = useContext(UnitsContext);
-  const s = styles();
-  const wind = row?.hour.wind;
-  const gustKn = wind ? speed.gust(wind.wind_kn, wind.gust_kn) : null;
-  const beside = row?.rating ? besideMark(row) : null;
-  const taken = row && !row.rating ? standIn(row) : null;
-  // Every reading the place has, in a cell of its own that holds its place
-  // whatever the hour: an hour without one reads "–", so nothing moves as
-  // the hours are scrubbed through. Before the hours are read the cells
-  // stand empty, at the height they will have.
-  return (
-    <div className={s.readout()} data-wind-readout>
-      {rated && (
-        // Two wide on a phone, where one cell has no room for the five
-        // stars and a warning's mark beside them.
-        <div className={s.ro({ className: "col-span-2" })}>
-          <span className={s.roLabel()}>Stars</span>
-          {row?.rating ? (
-            <span className={s.roMarks()}>
-              <Stars n={row.rating.stars} />
-              {beside && <NoticeMark level={beside} />}
-            </span>
-          ) : taken ? (
-            <span className={s.roMarks()} title={taken.word}>
-              <NoticeMark level={taken.level} className="min-w-0">
-                <span className="truncate">{taken.word}</span>
-              </NoticeMark>
-            </span>
-          ) : (
-            <b className={s.roValue()}>
-              {!row || row.hour.daylight ? "–" : unlit}
-            </b>
-          )}
-        </div>
-      )}
-      <div className={s.ro({ className: "col-span-2" })} data-readout-wind>
-        <span className={s.roLabel()}>
-          Wind
-          {measured && (
-            <span className={s.roSource()} data-readout-source>
-              {" "}
-              · {pairedName(measured.paired)},{" "}
-              {measuredAt(measured.reading.time)}
-            </span>
-          )}
-        </span>
-        <b
-          className={s.roValue()}
-          data-measured={measured ? measured.paired.station.id : undefined}
-        >
-          {measured ? (
-            <>
-              {speed.say(measured.reading.windKn)}
-              {speed.gust(measured.reading.windKn, measured.reading.gustKn) !==
-                null && (
-                <span className="text-gust-ink">
-                  {" "}
-                  g
-                  {speed.say(
-                    speed.gust(
-                      measured.reading.windKn,
-                      measured.reading.gustKn,
-                    )!,
-                  )}
-                </span>
-              )}{" "}
-              {speed.unit}
-              {measured.reading.from !== null &&
-                ` ${compass(measured.reading.from)}`}
-            </>
-          ) : wind ? (
-            <>
-              {speed.say(wind.wind_kn)}
-              {gustKn !== null && (
-                <span className="text-gust-ink"> g{speed.say(gustKn)}</span>
-              )}{" "}
-              {speed.unit} {compass(wind.direction_deg)}
-            </>
-          ) : (
-            "–"
-          )}
-        </b>
-      </div>
-      {rated && (
-        <div className={s.ro()}>
-          <span className={s.roLabel()}>Wing</span>
-          <b className={s.roValue()}>
-            {row?.rating
-              ? `${row.rating.wing.own ?? row.rating.wing.recommended} m²`
-              : "–"}
-          </b>
-        </div>
-      )}
-      {tide && (
-        <div className={s.ro({ className: "col-span-2" })} data-readout-tide>
-          <span className={s.roLabel()}>Tide</span>
-          <b className={s.roValue()}>
-            {tide.height === null ? "–" : `${tide.height.toFixed(1)} m`}
-            {tide.depth !== null && (
-              <span className="font-normal text-ink-2">
-                {" "}
-                · launch {tide.depth.toFixed(1)} m
-              </span>
-            )}
-          </b>
-        </div>
-      )}
-      <div className={s.ro()} data-readout-rain>
-        <span className={s.roLabel()}>Rain</span>
-        <b className={s.roValue()}>
-          {rain === null
-            ? "–"
-            : rain < DRY_MM_PER_HOUR
-              ? "Dry"
-              : `${rain < 0.1 ? "<0.1" : rain.toFixed(1)} mm/h`}
-        </b>
-      </div>
-      {hasCurrent && (
-        <div className={s.ro({ className: "col-span-4" })} data-readout-current>
-          <span className={s.roLabel()}>Current</span>
-          <b className={s.roValue()}>
-            {current ? (
-              <>
-                {currentText(current.speed, units)}
-                {current.speed >= MIN_ARROW_MS && (
-                  <span className="font-normal text-ink-2">
-                    {" "}
-                    to {compass(current.towards)}
-                  </span>
-                )}
-              </>
-            ) : (
-              "–"
-            )}
-          </b>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** The waves on one line: "4 ft 13 s from W". */
 function SeaLine({ at }: { at: WaveRow | null }) {
   const heights = useHeights();
@@ -4836,61 +4601,6 @@ function PartLine({ part }: { part: WavePartHour | null }) {
         </span>
       )}
     </>
-  );
-}
-
-/**
- * A phone's Waves pane: the waves at the hour, the models' range, and the
- * swells and the wind sea. Never the wind: that is the Wind pane's.
- */
-function WaveReadout({
-  row,
-  waves,
-  partitions,
-}: {
-  row: SpotRow | null;
-  waves: WaveRow | null;
-  /** The partitions the week has, in the bands' order. */
-  partitions: readonly PartRow[];
-}) {
-  const s = styles();
-  const heights = useHeights();
-  const range =
-    waves &&
-    waves.lowM !== null &&
-    waves.highM !== null &&
-    waves.highM > waves.lowM
-      ? heights.range(waves.lowM, waves.highM)
-      : null;
-  return (
-    <div className={s.readout()} data-wave-readout>
-      <div className={s.ro({ className: s.roWide() })} data-readout-waves>
-        <span className={s.roLabel()}>Waves</span>
-        <b className={s.roValue()}>
-          <SeaLine at={row ? waves : null} />
-        </b>
-      </div>
-      <div
-        className={s.ro({ className: "col-span-2" })}
-        data-readout-wave-models
-      >
-        <span className={s.roLabel()}>Wave models</span>
-        <b className={s.roValue()}>{range ?? "–"}</b>
-      </div>
-      {partitions.length > 0 && (
-        // Three to a row.
-        <div className={s.parts()}>
-          {partitions.map((key) => (
-            <div key={key} className={s.ro()} data-readout-part={key}>
-              <span className={s.roLabel()}>{WAVE_NAME[key]}</span>
-              <b className={s.roValue()}>
-                <PartLine part={partOf(waves, key)} />
-              </b>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 

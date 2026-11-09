@@ -1,6 +1,7 @@
 /**
  * The loupe (shared/web/Loupe.tsx) over a spot's satellite picture, at high or
- * low tide. Its words show on hover, or a tap.
+ * low tide, a small square with what it reads beside it (`children`). Its
+ * words show on hover, or a tap.
  */
 import { useState } from "react";
 import type { LoupeRose, RoseScale } from "../../../force5/src/focus";
@@ -11,7 +12,9 @@ import { lift, type PictureTide, type SpotPicture } from "../satellite";
 
 const styles = tv({
   slots: {
-    root: "relative m-0 overflow-hidden rounded-surface bg-photo-shade",
+    root: "m-0 flex min-w-0 items-stretch overflow-hidden rounded-surface bg-sunken on-card",
+    // Square, as the pictures are, so the rose is whole.
+    photo: "relative size-24 shrink-0 overflow-hidden bg-photo-shade",
     img: "absolute inset-0 size-full object-cover transition-opacity duration-base",
   },
 });
@@ -50,37 +53,39 @@ export function PhotoLoupe({
       data-photo-loupe
       data-tide={tide}
     >
-      {(["high", "low"] as const).map((t) => (
-        <img
-          key={t}
-          className={s.img({
-            className: [
-              t === tide ? "opacity-100" : "opacity-0",
-              lift(picture),
-            ],
-          })}
-          src={picture.urls[t]}
-          alt={
-            t === tide
-              ? `From above at ${t} tide, north up, with the wind drawn over it.`
-              : ""
-          }
-          loading="lazy"
-          decoding="async"
+      <div className={s.photo()}>
+        {(["high", "low"] as const).map((t) => (
+          <img
+            key={t}
+            className={s.img({
+              className: [
+                t === tide ? "opacity-100" : "opacity-0",
+                lift(picture),
+              ],
+            })}
+            src={picture.urls[t]}
+            alt={
+              t === tide
+                ? `From above at ${t} tide, north up, with the wind drawn over it.`
+                : ""
+            }
+            loading="lazy"
+            decoding="async"
+          />
+        ))}
+        <Loupe
+          width={picture.width}
+          height={picture.height}
+          cx={picture.at.x * picture.width}
+          cy={picture.at.y * picture.height}
+          r={scale.metres / picture.metresPerPixel}
+          loupe={loupe}
+          faint={faint}
+          facing={facing}
+          scale={scale}
+          words={pinned || hovered}
         />
-      ))}
-      <Loupe
-        width={picture.width}
-        height={picture.height}
-        cx={picture.at.x * picture.width}
-        cy={picture.at.y * picture.height}
-        r={scale.metres / picture.metresPerPixel}
-        loupe={loupe}
-        faint={faint}
-        facing={facing}
-        scale={scale}
-        words={pinned || hovered}
-      />
+      </div>
       {children}
     </figure>
   );
