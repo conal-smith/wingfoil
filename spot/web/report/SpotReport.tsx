@@ -290,7 +290,7 @@ const styles = tv({
     hourLabelQuiet: "font-normal text-ink-2",
     hourLabelModel: "flex items-center gap-1.5",
     sky: "pointer-events-none absolute left-0 flex items-center gap-1 rounded-control font-body text-caption text-ink-2",
-    skyNight: "bg-night-ground",
+    skyNight: "halo-text",
     // The key under the graph: its groups in a row, each a small heading
     // over its marks, every mark drawn at one size; two to a row on a phone.
     legend: [
@@ -1455,10 +1455,10 @@ const WAVE_BANDS = [
 type WaveBand = (typeof WAVE_BANDS)[number][0];
 /** A swell or wind sea lower than this, in metres, reads as none. */
 const MIN_TRAIN_M = 0.15;
-const WAVE_NAME: Record<WaveBand, string> = {
-  waves: "Waves",
 /** Past the lead model's split: its absence is not a calm sea. */
 const NO_SWELL_SPLIT = "Swell split not forecast this far ahead";
+const WAVE_NAME: Record<WaveBand, string> = {
+  waves: "Waves",
   wdir: "Direction",
   period: "Period",
   wblend: "Models",
@@ -2332,8 +2332,61 @@ function Graph({
         ))}
     </>
   );
+  /**
+   * Where the hour read out prints a figure, on a section's rows: its cursor
+   * line breaks there, so it never strikes through the figure it points to.
+   */
+  const figureRows = (
+    at: Section,
+    r: SpotRow,
+  ): (readonly [number, number])[] => {
+    const hour = dublinHour(r.time);
+    const x = mid(r);
+    if (at === "waves") {
+      const w = waves?.rows[rows.indexOf(r)];
+      if (!w || !waveStack || !seen(r)) return [];
+      const { wdir, period } = waveStack.at;
+      return [
+        wdir && hour % 3 === 0 && !w.held && whole(x, 14) ? wdir : null,
+        period &&
+        hour % 3 === 0 &&
+        !w.held &&
+        w.periodS !== null &&
+        whole(x, 14)
+          ? period
+          : null,
+        ...PART_ROWS.map(([key]) => {
+          const row = waveStack.at[key];
+          return row &&
+            hour % 6 === 3 &&
+            !w.held &&
+            partOf(w, key) &&
+            whole(x + 10, 28)
+            ? ([row[0], 16] as const)
+            : null;
+        }),
+      ].filter((y): y is readonly [number, number] => y !== null);
+    }
+    const rate = rowRain(rain, r);
+    return [
+      r.hour.wind && hour % figureEvery === 0 && whole(x, 20) ? ROW.dir : null,
+      lower.at.rain &&
+      hour % 3 === 0 &&
+      rate !== null &&
+      rate >= DRY_MM_PER_HOUR &&
+      whole(x, 14)
+        ? ([lower.at.rain[0], 12] as const)
+        : null,
+      lower.at.current &&
+      hour % 3 === 0 &&
+      current.columns[rows.indexOf(r)] &&
+      whole(x, 14)
+        ? lower.at.current
+        : null,
+    ].filter((y): y is readonly [number, number] => y !== null);
+  };
   /** Now's line, and the hour read out's column, cursor and hold. */
-  const marks = (axis: number) => (
+  const marks = (at: Section, axis: number) => (
     <>
       <line
         x1={X(now)}
@@ -2354,32 +2407,32 @@ function Graph({
               height={axis - 4}
               rx={Math.min(6, px / 2)}
               className="fill-ink"
-              fillOpacity={0.07}
+              fillOpacity={heldHere ? 0.14 : 0.07}
+              data-held-hour={heldHere || undefined}
             />
           )}
-          <line
-            x1={mid(hoverRow)}
-            x2={mid(hoverRow)}
-            y1={4}
-            y2={axis}
+          <path
+            d={
+              [...figureRows(at, hoverRow), [axis, 0] as const]
+                .sort((a, b) => a[0] - b[0])
+                .reduce(
+                  (out, [y, h]) =>
+                    y > out.from
+                      ? {
+                          d: `${out.d}M${mid(hoverRow)} ${out.from}V${y}`,
+                          from: y + h,
+                        }
+                      : { d: out.d, from: y + h },
+                  { d: "", from: 4 },
+                ).d
+            }
+            fill="none"
             className="stroke-ink"
             strokeOpacity={phone ? 0.5 : 0.75}
             strokeWidth={phone ? 1.5 : 1}
             data-playhead-line={phone || undefined}
             data-cursor-line={!phone || undefined}
           />
-          {heldHere && (
-            <rect
-              x={X(hoverRow.time) + 0.75}
-              y={4.75}
-              width={Math.max(1, hoverRow.step * px - 1.5)}
-              height={axis - 5.5}
-              rx={Math.min(6, px / 2)}
-              className="fill-none stroke-ink"
-              strokeWidth={1.5}
-              data-held-hour
-            />
-          )}
         </>
       )}
     </>
@@ -2699,8 +2752,19 @@ function Graph({
     Math.min(Math.max(x, scrolled + margin), scrolled + width - margin);
   /** A note drawn from `x` that would not run into the now line. */
   const clearOfNow = (x: number) => X(now) < x - 4 || X(now) > x + 128;
-  // Below a sky group's own width, every other one.
-  const skyEvery = 3 * px >= 46 ? 3 : 6;
+  // Below a figure group's own width, every other one.
+  const figureEvery = 3 * px >= 46 ? 3 : 6;
+  /**
+   * Whether a group of figures, `half` either side of `x`, escapes being cut
+   * by the window of hours: wholly past it, or whole inside it and clear of
+   * the fade at its edges. One that would be cut is not drawn; the line and
+   * the area carry on under it.
+   */
+  const whole = (x: number, half: number) =>
+    x + half <= scrolled ||
+    x - half >= scrolled + width ||
+    (x - half >= scrolled + EDGE_FADE &&
+      x + half <= scrolled + width - EDGE_FADE);
   /** What says the hour on a section's rail: Now, and the cursor's tag. */
   const railMarks = (at: Section) => {
     const half = phone ? 84 : heldHere ? 54 : 44;
@@ -2766,7 +2830,8 @@ function Graph({
             // daylight range without the name before it.
             const room = Math.min(
               dayWidth,
-              X(midnight + 24 * HOUR) - Math.max(dayLeft, scrolled),
+              Math.min(X(midnight + 24 * HOUR), scrolled + width) -
+                Math.max(dayLeft, scrolled),
             );
             if (room < 140) return null;
             const roomy = wide && room >= 270;
@@ -2880,6 +2945,7 @@ function Graph({
                           ? ROW.sky[0] + 20
                           : ROW[band][0] + Math.min(ROW[band][1], 40) / 2,
                 ROW[band],
+                band === "dir" && speed.unit ? `${speed.unit}, gust` : null,
               ])}
           />
           <div {...graphProps("wind")} ref={ref} data-spot-graph>
@@ -2945,7 +3011,6 @@ function Graph({
                     fill="none"
                     stroke="url(#spot-wind)"
                     strokeWidth={2.2}
-                band === "dir" && speed.unit ? `${speed.unit}, gust` : null,
                   />
                 </>
               )}
@@ -3041,7 +3106,10 @@ function Graph({
                   ) : null;
                 })}
               {windRows
-                .filter((r) => dublinHour(r.time) % 3 === 0)
+                .filter(
+                  (r) =>
+                    dublinHour(r.time) % figureEvery === 0 && whole(mid(r), 20),
+                )
                 .map((r, i) => (
                   <g key={i}>
                     <g
@@ -3146,6 +3214,7 @@ function Graph({
                 current={current}
                 rain={rain}
                 units={units}
+                whole={whole}
               />
               {handovers.filter(seen).map((h, i) => (
                 <g key={i}>
@@ -3168,7 +3237,7 @@ function Graph({
                   )}
                 </g>
               ))}
-              {marks(ay)}
+              {marks("wind", ay)}
               {hoverRow?.hour.wind && (
                 <circle
                   cx={mid(hoverRow)}
@@ -3199,8 +3268,9 @@ function Graph({
               .filter(
                 (r) =>
                   r.hour.weather &&
-                  dublinHour(r.time) % skyEvery === 0 &&
-                  seen(r),
+                  dublinHour(r.time) % figureEvery === 0 &&
+                  seen(r) &&
+                  whole(mid(r) + 11, 22),
               )
               .map((r, i) => (
                 <span
@@ -3249,6 +3319,7 @@ function Graph({
                       ? y + 18
                       : y + Math.min(h, 40) / 2,
                   [y, h],
+                  band === "wdir" ? heights.unit : null,
                 ];
               })}
             />
@@ -3275,10 +3346,11 @@ function Graph({
                   end={end}
                   handovers={waveHandovers(rows, waves).filter(seen)}
                   scrolled={scrolled}
+                  whole={whole}
                   halo={halo}
                   pointed={card?.section === "waves" ? card.band : null}
                 />
-                {marks(waveStack.axis)}
+                {marks("waves", waveStack.axis)}
               </svg>
               {railMarks("waves")}
               {partsEnded !== null && (
@@ -3319,7 +3391,6 @@ function Graph({
               </KeyItem>
             )}
             {/* A point reads one model an hour: nothing to disagree. */}
-                  band === "wdir" ? heights.unit : null,
             {rated && <KeyItem mark="spread">Where models disagree</KeyItem>}
           </KeyGroup>
           {models.length > 0 && (
@@ -3448,6 +3519,8 @@ const WAVE_PART: Record<string, true> = Object.fromEntries(
 
 /** The height left clear along the top of each plot for the hour's tag. */
 const RAIL = 24;
+/** How far in from a window's edge a figure stands clear of its fade, `mask-fade-x`. */
+const EDGE_FADE = 12;
 /** A day has to show this many pixels to count as in view, on the strip. */
 const WHOLE_DAY_PX = 48;
 /** How near the cursor's tag can stand to the Now tag before Now gives way. */
@@ -3488,6 +3561,7 @@ function BandNames({
           <span className={s.glName()} data-band-name={name}>
             {name}
           </span>
+          {unit && <span className={s.glUnit()}>{unit}</span>}
         </div>
       ))}
     </div>
@@ -3561,7 +3635,6 @@ function KeyGroup({
   return (
     <div
       className={s.kGroup({ className: wide ? "max-wide:col-span-2" : "" })}
-          {unit && <span className={s.glUnit()}>{unit}</span>}
       {...data}
     >
       <span className={s.kHead()}>{name}</span>
@@ -3690,10 +3763,10 @@ function KeyMark({ mark }: { mark: KeyMarkKind }) {
       return (
         <rect
           x={0}
-          y={1}
+          y={4.5}
           width={20}
-          height={10}
-          rx={2}
+          height={3}
+          rx={1.5}
           className="fill-gust"
           fillOpacity={mark === "over" ? 0.9 : 0.45}
         />
@@ -3752,10 +3825,10 @@ function KeyMark({ mark }: { mark: KeyMarkKind }) {
       return (
         <rect
           x={0}
-          y={4.5}
+          y={1}
           width={20}
-          height={3}
-          rx={1.5}
+          height={10}
+          rx={2}
           className="fill-sea-1"
           fillOpacity={0.9}
         />
@@ -3817,6 +3890,7 @@ function LowerBands({
   current,
   rain,
   units,
+  whole,
 }: {
   rows: readonly SpotRow[];
   /** Whether a row is drawn: not with the night left out and it after dark. */
@@ -3835,6 +3909,8 @@ function LowerBands({
   current: SpotCurrents;
   rain: ReadonlyMap<number, number>;
   units: Units;
+  /** Whether figures `half` either side of `x` escape being cut by the window. */
+  whole: (x: number, half: number) => boolean;
 }) {
   const speed = useSpeed();
   const mid = (r: Pick<SpotRow, "time" | "step">) =>
@@ -3899,7 +3975,9 @@ function LowerBands({
               })}
               {rows.filter(third).map((r, i) => {
                 const rate = rowRain(rain, r);
-                return rate === null || rate < DRY_MM_PER_HOUR ? null : (
+                return rate === null ||
+                  rate < DRY_MM_PER_HOUR ||
+                  !whole(mid(r), 14) ? null : (
                   <text
                     key={i}
                     x={mid(r)}
@@ -4059,7 +4137,7 @@ function LowerBands({
         <g data-band="current">
           {rows.map((r, i) => {
             const reading = current.columns[i];
-            if (!reading || !third(r)) return null;
+            if (!reading || !third(r) || !whole(mid(r), 14)) return null;
             const [y] = lower.current!;
             return (
               <g key={i}>
@@ -4125,6 +4203,7 @@ function WaveBands({
   end,
   handovers,
   scrolled,
+  whole,
   halo,
   pointed,
 }: {
@@ -4143,6 +4222,8 @@ function WaveBands({
   handovers: readonly { time: number; to: string }[];
   /** How far the hours are scrolled: a note past the left edge goes. */
   scrolled: number;
+  /** Whether figures `half` either side of `x` escape being cut by the window. */
+  whole: (x: number, half: number) => boolean;
   /** The class that keeps a figure clear of the night's hatch at its time. */
   halo: (t: number) => string;
   /** The row under the pointer: over a swell, the other swells fade. */
@@ -4324,7 +4405,7 @@ function WaveBands({
           return (
             <g data-band="wave-direction">
               {at
-                .filter((p) => third(p.row) && !p.held)
+                .filter((p) => third(p.row) && !p.held && whole(mid(p.row), 14))
                 .map(({ row, w }, i) => (
                   <g key={i}>
                     {w.from !== null && (
@@ -4360,7 +4441,13 @@ function WaveBands({
           return (
             <g data-band="period">
               {at
-                .filter((p) => third(p.row) && !p.held && p.w.periodS !== null)
+                .filter(
+                  (p) =>
+                    third(p.row) &&
+                    !p.held &&
+                    p.w.periodS !== null &&
+                    whole(mid(p.row), 14),
+                )
                 .map(({ row, w }, i) => (
                   <text
                     key={i}
@@ -4550,7 +4637,9 @@ function WaveBands({
               strokeWidth={1.2}
             />
             {parts
-              .filter((p) => sixth(p.row) && !p.held)
+              .filter(
+                (p) => sixth(p.row) && !p.held && whole(mid(p.row) + 10, 28),
+              )
               .map(({ row, part }, i) => (
                 <g key={i}>
                   {part.from !== null && (
