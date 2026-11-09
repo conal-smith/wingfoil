@@ -105,8 +105,8 @@ export function SpotNotices({
       <p className={s.foot()} data-notices-source>
         {warned && (
           <>
-            Weather warnings issued by Met Éireann (CC BY 4.0),{" "}
-            <Link href={MET_WARNINGS_PAGE}>the latest at met.ie</Link>.
+            Met Éireann, CC BY 4.0, <Link href={MET_WARNINGS_PAGE}>met.ie</Link>
+            .
           </>
         )}
         {warned && watered && " "}
