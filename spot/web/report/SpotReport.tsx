@@ -261,6 +261,8 @@ const styles = tv({
     arrows: "flex shrink-0 items-center gap-0.5 max-wide:hidden",
     // A band's name, in a strip as tall as its band.
     glBand: "absolute inset-x-0",
+    glUnit:
+      "block h-4 pl-1.5 font-body text-caption leading-4 font-normal whitespace-nowrap text-ink-muted wide:pl-4",
     glName: [
       "block h-4 pl-1.5 font-body text-caption leading-4 font-medium whitespace-nowrap text-ink-muted wide:pl-4",
     ],
@@ -2943,6 +2945,7 @@ function Graph({
                     fill="none"
                     stroke="url(#spot-wind)"
                     strokeWidth={2.2}
+                band === "dir" && speed.unit ? `${speed.unit}, gust` : null,
                   />
                 </>
               )}
@@ -3316,6 +3319,7 @@ function Graph({
               </KeyItem>
             )}
             {/* A point reads one model an hour: nothing to disagree. */}
+                  band === "wdir" ? heights.unit : null,
             {rated && <KeyItem mark="spread">Where models disagree</KeyItem>}
           </KeyGroup>
           {models.length > 0 && (
@@ -3461,12 +3465,18 @@ function BandNames({
   bands,
 }: {
   height: number;
-  bands: (readonly [string, number, readonly [number, number]])[];
+  /** Each band's name, its middle, its span, and what its figures are in. */
+  bands: (readonly [
+    string,
+    number,
+    readonly [number, number],
+    (string | null)?,
+  ])[];
 }) {
   const s = styles();
   return (
     <div className={s.gl()} style={{ height }}>
-      {bands.map(([name, middle, [y, h]]) => (
+      {bands.map(([name, middle, [y, h], unit]) => (
         <div
           key={`${name}${y}`}
           className={s.glBand()}
@@ -3551,6 +3561,7 @@ function KeyGroup({
   return (
     <div
       className={s.kGroup({ className: wide ? "max-wide:col-span-2" : "" })}
+          {unit && <span className={s.glUnit()}>{unit}</span>}
       {...data}
     >
       <span className={s.kHead()}>{name}</span>
