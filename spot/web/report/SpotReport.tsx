@@ -3010,8 +3010,8 @@ function Graph({
                   {speed.say(k)}
                 </text>
               ))}
-              {/* What the gusts do to the stars, behind the figures, hour by
-                  hour. */}
+              {/* What the gusts do to the stars, hour by hour: a bar under the
+                  figures, never through them. */}
               {rated &&
                 windRows.map((r, i) => {
                   const g = gustReading(
@@ -3022,12 +3022,13 @@ function Graph({
                   return g?.kind === "costs" || g?.kind === "over" ? (
                     <rect
                       key={i}
-                      x={X(r.time)}
-                      y={ROW.dir[0] + 22}
-                      width={r.step * px}
-                      height={17}
+                      x={X(r.time) + 1}
+                      y={ROW.dir[0] + 38}
+                      width={Math.max(1, r.step * px - 2)}
+                      height={3}
+                      rx={1.5}
                       className="fill-gust"
-                      fillOpacity={g.kind === "over" ? 0.24 : 0.12}
+                      fillOpacity={g.kind === "over" ? 0.9 : 0.45}
                       data-gust-tint={g.kind}
                     />
                   ) : null;
@@ -3064,8 +3065,8 @@ function Graph({
                         r.hour.wind!.gust_kn,
                       ) !== null && (
                         <tspan
-                          dx={1.5}
-                          dy={-4.5}
+                          dx={3}
+                          dy={-6}
                           className="fill-gust-ink text-caption"
                           data-gust={speed.say(
                             speed.gust(
@@ -3679,7 +3680,7 @@ function KeyMark({ mark }: { mark: KeyMarkKind }) {
           height={10}
           rx={2}
           className="fill-gust"
-          fillOpacity={mark === "over" ? 0.45 : 0.22}
+          fillOpacity={mark === "over" ? 0.9 : 0.45}
         />
       );
     case "waves":
@@ -3736,10 +3737,10 @@ function KeyMark({ mark }: { mark: KeyMarkKind }) {
       return (
         <rect
           x={0}
-          y={1}
+          y={4.5}
           width={20}
-          height={10}
-          rx={2}
+          height={3}
+          rx={1.5}
           className="fill-sea-1"
           fillOpacity={0.9}
         />
