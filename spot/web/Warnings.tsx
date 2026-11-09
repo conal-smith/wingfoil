@@ -131,10 +131,24 @@ export function WarningNotices({
                   <Link href={MET_WARNINGS_PAGE}>met.ie</Link>
                 </>
               }
-              title={<span data-warning-headline>{warningTitle(item)}</span>}
+              title={
+                <>
+                  {/* On a phone the kind and its level, the coast it names
+                      under the chevron, so the days stay on the first screen. */}
+                  <span className="wide:hidden">
+                    {warningName({ ...item, marine: false })}
+                  </span>
+                  <span className="hidden wide:inline" data-warning-headline>
+                    {warningTitle(item)}
+                  </span>
+                </>
+              }
               detailsLabel={`Details of the ${warningTitle(item).charAt(0).toLowerCase()}${warningTitle(item).slice(1)}`}
               details={
                 <div className={s.more()}>
+                  <p className={s.line({ className: "wide:hidden" })}>
+                    {warningTitle(item)}
+                  </p>
                   <p className={s.line()}>
                     {warningKind(item)} warning
                     {item.marine ? " (marine)" : ""}
