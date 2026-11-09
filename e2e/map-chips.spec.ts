@@ -143,7 +143,7 @@ test("with no wave frames listed there is no Waves chip", async ({ page }) => {
   await expect(fieldChip(page, "Waves")).toHaveCount(0);
 });
 
-test("Waves draws the wave height on the sea, its legend in metres", async ({
+test("Waves draws the wave height on the sea, its legend in feet", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -157,13 +157,13 @@ test("Waves draws the wave height on the sea, its legend in metres", async ({
   // note in its place.
   await page.waitForTimeout(1500);
   if ((await legend(page).getAttribute("data-map-legend-note")) === null) {
-    await expect(legend(page)).toContainText("Metres");
+    await expect(legend(page)).toContainText("Feet");
     await expect(legend(page).locator(".ml-marks span")).toHaveText([
       "0",
-      "1",
-      "2",
       "3",
-      "5+",
+      "7",
+      "10",
+      "16+",
     ]);
   } else await expect(legend(page)).toHaveText(/^Wave map to [A-Z][a-z]{2}$/);
   // The source is named in About the map, never in the dock.
