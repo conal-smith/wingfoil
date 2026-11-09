@@ -27,9 +27,10 @@ const ICONS: Record<FieldId, ReactNode> = {
  * The map's dock, centred on its foot: what the map is coloured with, and
  * when. Its top row is the fields' lit chips (ui/Chip.tsx `lit`), at most one
  * on, and the legend at its right (src/MapScales.tsx); under them, where the
- * page has one, the day's hour bar (src/HourBar.tsx). With no field on, the
- * map is plain and the shallows glow round the coast; pressing the chip that
- * is on turns it off, back to that.
+ * page has one, the day's hour bar (src/HourBar.tsx); on a narrow screen the
+ * day's words over the chips and the hours' track under them. With no field
+ * on, the map is plain and the shallows glow round the coast; pressing the
+ * chip that is on turns it off, back to that.
  *
  * The chips are one group with one stop on Tab: the arrows walk them, Home
  * and End go to the ends, Space or Enter presses, and Escape turns the field

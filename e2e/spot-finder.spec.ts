@@ -116,10 +116,10 @@ const useMyLocation = async (page: Page) => {
     return;
   }
   // Under that width the map has it too, over the dock; the list follows.
-  await page
-    .getByRole("group", { name: "Map or list" })
-    .getByRole("button", { name: "Map" })
-    .click();
+  const map = page.locator("[data-view-switch]").getByRole("button", {
+    name: "Map",
+  });
+  if (await map.count()) await map.click();
   await page
     .locator("[data-narrow-foot]")
     .getByRole("button", { name: "Use my location" })
@@ -128,11 +128,10 @@ const useMyLocation = async (page: Page) => {
 };
 /** Under the width for the list beside the map: the list, from the map. */
 const toList = async (page: Page) => {
-  const list = page
-    .getByRole("group", { name: "Map or list" })
-    .getByRole("button", { name: "List" });
-  if ((await list.getAttribute("aria-pressed")) !== "true") await list.click();
-  await expect(list).toHaveAttribute("aria-pressed", "true");
+  const views = page.locator("[data-view-switch]");
+  const list = views.getByRole("button", { name: "List" });
+  if (await list.count()) await list.click();
+  await expect(views.getByRole("button", { name: "Map" })).toBeVisible();
 };
 const cards = (page: Page) => page.locator("[data-spot-card]");
 /** The heart at the list's head: on, the favourites; off, the spots in view. */
@@ -1263,7 +1262,7 @@ test.describe("on a phone", () => {
     const [name, find, views, menu] = [
       (await mark.boundingBox())!,
       (await bar.getByRole("button", { name: "Search spots" }).boundingBox())!,
-      (await bar.getByRole("group", { name: "Map or list" }).boundingBox())!,
+      (await bar.locator(".nf-switch").boundingBox())!,
       (await bar.getByRole("button", { name: "Site menu" }).boundingBox())!,
     ];
     // In one row, in that order, all on the screen; light or dark is in the

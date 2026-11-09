@@ -795,6 +795,17 @@ hour now is the nearest hour, as a clock is read (19:59 is 20:00), on the
 cards and the pill alike; an hour off either end of the day's row is ticked
 nowhere, never on the last hour in its stead.
 
+**2026-11-09 — With the map first, the finder opens on the hour now.** The
+owner, on a phone at 18:45: the map opened on Tomorrow 13:00. Under the width
+for the list beside the map, the map is what opens, so it opens on today and
+the hour now, at any hour; › steps to tomorrow. The ruling above stands where
+the list is beside the map. On that dock the hours' track is its own row under
+the chips, the dock's width and a thumb's height. The top bar's Map | List is
+one button naming the view not shown. A pill's peek is a small card at the
+left, the place's name the link to its page, with no words about tapping.
+On a phone the list has no dock, and its head says the day's name alone
+between two small arrows.
+
 **2026-11-03 — The depths are a layer, off by default.** The owner: a first
 visit read the figures in the water before anything else, and could not say
 what they were. The depth tints, contours, their figures, the soundings and

@@ -19,9 +19,7 @@ const AFTERNOON = new Date(SAMPLE_CLOCK.getTime() - 7.5 * 3600000);
 
 const foot = (page: Page) => page.locator("[data-narrow-foot]");
 const switchTo = (page: Page, name: "Map" | "List") =>
-  page
-    .getByRole("group", { name: "Map or list" })
-    .getByRole("button", { name });
+  page.locator("[data-view-switch]").getByRole("button", { name });
 const pills = (page: Page) => page.locator(".spot-marker.lt-pilled");
 const peek = (page: Page) => page.locator("[data-spot-peek]");
 
@@ -46,15 +44,17 @@ async function openMap(page: Page) {
     .toBeGreaterThan(0);
 }
 
-test("the map opens first, then the list, the switch and the chips standing still", async ({
+test("the map opens first, then the list, which has no dock", async ({
   page,
 }) => {
   await openMap(page);
   await expect(foot(page)).toHaveAttribute("data-narrow-foot", "map");
-  await expect(switchTo(page, "Map")).toHaveAttribute("aria-pressed", "true");
+  await expect(switchTo(page, "List")).toBeVisible();
+  await expect(switchTo(page, "Map")).toHaveCount(0);
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
-  // The dock: the day and its hours, then the chips the screen's width; no
-  // legend, no zoom buttons, and the map's own locate button.
+  // The dock: the day, then the chips the screen's width, then the hours'
+  // track as wide as the dock; no legend, no zoom buttons, and the map's own
+  // locate button.
   const hours = foot(page).locator("[data-hour-bar]");
   await expect(hours).toBeVisible();
   await expect(
@@ -65,6 +65,12 @@ test("the map opens first, then the list, the switch and the chips standing stil
   const chipBox = (await chips.first().boundingBox())!;
   const hourBox = (await hours.boundingBox())!;
   expect(hourBox.y).toBeLessThan(chipBox.y);
+  const trackBox = (await foot(page)
+    .locator("[data-hour-track]")
+    .boundingBox())!;
+  expect(trackBox.y).toBeGreaterThanOrEqual(chipBox.y + chipBox.height);
+  expect(trackBox.width).toBeGreaterThanOrEqual(390 - 2 * 20);
+  expect(trackBox.height).toBeGreaterThanOrEqual(44);
   await expect(page.locator(".map-legend")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Zoom in" })).toHaveCount(0);
   await expect(
@@ -96,9 +102,17 @@ test("the map opens first, then the list, the switch and the chips standing stil
   });
   await expect(page.locator("[data-finder-heart]")).toBeVisible();
   await expect(foot(page).locator("[data-hour-bar]")).toHaveCount(0);
-  const chipAfter = (await chips.first().boundingBox())!;
-  expect(Math.abs(chipAfter.y - chipBox.y)).toBeLessThan(2);
-  const switchAfter = (await switchTo(page, "List").boundingBox())!;
+  await expect(foot(page).locator("[data-map-field]")).toHaveCount(0);
+  // The day by its name alone, whole.
+  await page.getByRole("button", { name: "Next day" }).tap();
+  const day = page.locator("[data-finder-day]");
+  await expect
+    .poll(() => day.evaluate((el: HTMLElement) => el.innerText.trim()))
+    .toBe("Tomorrow");
+  expect(await day.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  const switchAfter = (await switchTo(page, "Map").boundingBox())!;
   const bar = (await page.locator("[data-top-bar]").boundingBox())!;
   expect(switchAfter.y + switchAfter.height).toBeLessThanOrEqual(
     bar.y + bar.height,
@@ -118,7 +132,8 @@ test("a phone has no full chart: its links land on the map or the spot", async (
 }) => {
   await page.goto("/?map");
   await expect(page).toHaveURL(/\/$/);
-  await expect(switchTo(page, "Map")).toHaveAttribute("aria-pressed", "true");
+  await expect(switchTo(page, "List")).toBeVisible();
+  await expect(switchTo(page, "Map")).toHaveCount(0);
   const bar = page.locator("[data-top-bar]");
   await expect(bar.getByRole("link", { name: "Chart" })).toHaveCount(0);
   await bar.getByRole("button", { name: "Site menu" }).tap();
@@ -129,6 +144,42 @@ test("a phone has no full chart: its links land on the map or the spot", async (
   await expect(
     page.locator("[data-top-bar]").getByRole("link", { name: "Chart" }),
   ).toHaveCount(0);
+});
+
+test("after dark the map opens on the hour now, not on tomorrow", async ({
+  page,
+}) => {
+  // The suite's own clock: 22:00 Irish summer time, after last light.
+  await page.goto("/");
+  await expect(page.locator("[data-hour-when]")).toHaveText(/^Today \d\d:00$/, {
+    timeout: 30000,
+  });
+});
+
+test("a spot opened from the map's peek has no pills of the map over it", async ({
+  page,
+}) => {
+  await openMap(page);
+  const id = await pills(page).evaluateAll(
+    (els) =>
+      els
+        .map((el) => ({
+          id: el.getAttribute("data-spot-id")!,
+          top: el.getBoundingClientRect().top,
+        }))
+        .sort((a, b) => a.top - b.top)[0].id,
+  );
+  await page.locator(`.spot-marker[data-spot-id="${id}"] .lt-pill`).tap();
+  await peek(page).locator("a").first().tap();
+  await expect(page).toHaveURL(new RegExp(`/spot/${id}`), { timeout: 30000 });
+  await expect(page.locator(".map-under-page")).toHaveCount(1);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.locator(".lt-pill:visible")).toHaveCount(0);
+  // And they are back with the map.
+  await page.goBack();
+  await expect
+    .poll(() => page.locator(".lt-pill:visible").count())
+    .toBeGreaterThan(0);
 });
 
 test("a pill on the map says its figure, listed or not", async ({ page }) => {
@@ -158,6 +209,14 @@ test("a pill tapped turns light and peeks; tapped again it opens its spot", asyn
   ).toHaveCount(1);
   for (const row of ["Wind", "Waves", "Weather", "Tide"])
     await expect(peek(page).getByText(row, { exact: true })).toBeVisible();
+  // A small card, its name the link, and no words about tapping.
+  await expect(peek(page).locator("a")).toHaveCount(1);
+  await expect(peek(page).locator("[data-peek-open]")).toHaveAttribute(
+    "href",
+    new RegExp(`/spot/${id}`),
+  );
+  await expect(peek(page)).not.toContainText("Tap again");
+  expect((await peek(page).boundingBox())!.width).toBeLessThanOrEqual(256);
   // Above the dock, and on the screen.
   const box = (await peek(page).boundingBox())!;
   const dockBox = (await foot(page).locator("[data-hour-bar]").boundingBox())!;

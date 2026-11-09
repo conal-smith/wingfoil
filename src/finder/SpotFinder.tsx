@@ -7,7 +7,8 @@
  * Over the cards, one row: ‹ Today ›, a heart and a filter button. The day
  * steps through today and the five days after it (src/finder/DaySteps.tsx). It
  * opens on today, and once today's rows are over (the hour after last light,
- * finder.ts `todayOver`) on tomorrow, at the hour it opens on. The filter
+ * finder.ts `todayOver`) on tomorrow, at the hour it opens on; with the map
+ * first on a narrow screen, on today and the hour now at any hour. The filter
  * opens a sheet with the fewest stars a place is to have, the list's order
  * (the best first, the nearest, A to Z) and the model the stars are rated
  * from (the rider's own, as the spot page and Settings set it); a dot on the
@@ -428,10 +429,12 @@ export default function SpotFinder(props: FinderProps) {
   const allListed = useMemo(() => listed.map((l) => l.spot), [listed]);
   // The day the finder opens on: today, or tomorrow once today's rows are
   // over at every place listed; every place there is while the list follows
-  // the map, so that a pan west at dusk does not step the day back.
+  // the map, so that a pan west at dusk does not step the day back. With the
+  // map first (`mapped`), always today: the map opens on the hour now.
   const opensOn = useMemo(
-    () => openingDay(dates, following ? spots : allListed, now),
-    [dates, following, spots, allListed, halfHour],
+    () =>
+      mapped ? dates[0] : openingDay(dates, following ? spots : allListed, now),
+    [mapped, dates, following, spots, allListed, halfHour],
   );
   // A day stepped to yesterday that is gone now is the opening day again.
   const day = chosen !== null && dates.includes(chosen) ? chosen : opensOn;

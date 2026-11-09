@@ -764,7 +764,9 @@
 .map-canvas .lt.lt-pilled .lt-pill,
 .map-canvas .lt:is(.lit, .sel) .lt-pill,
 .map-canvas .lt:focus-visible .lt-pill {
-  visibility: visible;
+  /* Not `visible`, which would show through the map hidden under a page
+     opened over it (src/PagesOverMap.tsx). */
+  visibility: inherit;
 }
 /* Placed, the pill is its button's box. */
 .map-canvas .lt.lt-pilled .lt-pill {
@@ -1862,9 +1864,9 @@
 /* ---------- the finder under the width for the list beside the map ---------- */
 /* The map or the list (src/App.tsx `narrow`), the map first: under the top
    bar a map the height of the screen, or the list scrolling the page. Either
-   way the foot stays: the Map | List switch, a small dark pill, over the
-   dock, which is the day and its hours (on the map only) and the three
-   chips the screen's width. No legend and no zoom buttons: two fingers zoom. */
+   map has the dock at its foot: the day, the three chips the screen's width,
+   and under them the hours' track, as wide as the dock and a thumb's height.
+   No legend and no zoom buttons: two fingers zoom. The list has no dock. */
 .workspace[data-chart="map"] {
   top: 64px;
 }
@@ -1891,8 +1893,13 @@
   bottom: calc(8px + env(safe-area-inset-bottom));
   width: auto;
   transform: none;
-  flex-direction: column-reverse;
   padding: 6px;
+}
+.narrow-foot .hour-bar {
+  order: 1;
+}
+.narrow-foot .md-what {
+  order: 2;
 }
 .narrow-foot .md-chips {
   display: flex;
@@ -1902,18 +1909,18 @@
   flex: 1 1 0;
   justify-content: center;
 }
-/* The list: the switch and the chips stand where they stood over the map,
-   on a solid strip the cards scroll under. */
+/* The list: where the switch stands at the foot, a solid strip under it that
+   the cards scroll under. */
 .narrow-foot[data-narrow-foot="list"]::before {
   content: "";
   position: absolute;
   inset: auto 0 0;
-  height: calc(var(--nf-room, 62px) + 70px);
+  height: 70px;
   background: var(--color-ground);
   box-shadow: 0 -1px 0 var(--color-line);
 }
 .app-shell[data-narrow="list"] [data-finder-list] {
-  padding-bottom: 150px;
+  padding-bottom: 90px;
 }
 .nf-switch {
   position: absolute;
@@ -1936,7 +1943,9 @@
   box-shadow: inset 0 0 0 1px var(--color-line);
   background: none;
 }
+/* As wide for Map as for List, so it does not shift as it changes. */
 .nf-switch.in-bar > * {
+  min-width: 52px;
   padding: 0 9px;
 }
 @media (max-width: 340px) {
@@ -1946,10 +1955,10 @@
 }
 @media (max-width: 720px) {
   .narrow-foot[data-narrow-foot="list"]::before {
-    height: var(--nf-room, 62px);
+    display: none;
   }
   .app-shell[data-narrow="list"] [data-finder-list] {
-    padding-bottom: 90px;
+    padding-bottom: 24px;
   }
 }
 .nf-switch > * {
@@ -1959,10 +1968,6 @@
   border-radius: var(--radius-pill);
   color: var(--map-pill-ink-2);
   font-weight: 600;
-}
-.nf-switch > [aria-pressed="true"] {
-  background: var(--map-pill-lit);
-  color: var(--map-pill-lit-ink);
 }
 .nf-locate {
   position: absolute;
@@ -1976,15 +1981,31 @@
 .narrow-foot .hb-marks {
   display: none;
 }
+.narrow-foot .hb-when {
+  flex: 1;
+  text-align: center;
+}
+/* Clear of the dock's edge by the thumb's half, less the dock's padding. */
 .narrow-foot .hb-track {
-  height: 28px;
+  order: 3;
+  flex: none;
+  height: 44px;
+  margin: 0 5px;
+}
+.narrow-foot .hb-rail {
+  top: 20px;
+}
+.narrow-foot .hb-thumb {
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
 }
 
 /* ---------- a spot's peek and card, and "Spots here" ---------- */
 /* Its name, its wind, waves, weather and tide, and its stars at the hour
-   (src/SpotPeek.tsx): over the phone's map a peek above the switch, the
-   screen's width; on the full chart a card beside the pill tapped, a small
-   pointer on its edge at the pill. */
+   (src/SpotPeek.tsx): over the phone's map a small peek at the left above
+   the dock, clear of the locate button; on the full chart a card beside the
+   pill tapped, a small pointer on its edge at the pill. */
 .spot-peek,
 .spots-here {
   position: absolute;
@@ -1998,7 +2019,26 @@
     var(--shadow-float),
     inset 0 0 0 1px var(--color-line);
 }
-.spot-peek.is-peek,
+.spot-peek.is-peek {
+  left: 8px;
+  width: min(224px, calc(100% - 84px));
+  bottom: calc(var(--nf-room, 62px) + 10px);
+  padding: 6px 10px 8px;
+}
+.spot-peek.is-peek .sp-head {
+  align-items: center;
+  margin-bottom: 2px;
+}
+.spot-peek.is-peek .sp-rows {
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 0 6px;
+}
+.spot-peek.is-peek .sp-rows dd {
+  min-height: 20px;
+}
+.spot-peek.is-peek .sp-foot {
+  margin-top: 4px;
+}
 .narrow-foot .spots-here {
   left: 8px;
   right: 8px;
@@ -2052,8 +2092,9 @@
   flex: 1;
   min-width: 0;
 }
-.sp-name b {
+.sp-name a {
   display: block;
+  color: var(--color-ink);
   font-weight: 600;
   font-size: var(--text-prose);
   overflow-wrap: break-word;
@@ -2117,10 +2158,6 @@
 .sp-foot em {
   font-style: normal;
   color: var(--color-ink-muted);
-  font-size: var(--text-caption);
-}
-.sp-open {
-  margin-left: auto;
   font-size: var(--text-caption);
 }
 .spots-here {
