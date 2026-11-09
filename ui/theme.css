@@ -717,8 +717,16 @@
   stroke-linejoin: round;
 }
 
-/* A row of hours running past its window: faded at its two edges, so a figure
-   cut there reads as more to come and not as clipped. */
+/* The same halo for text set in HTML over a graph. A soft ring, not a plate,
+   so a line beside the figure still reads through it. */
+@utility halo-text {
+  text-shadow:
+    0 0 2px var(--color-night-ground),
+    0 0 2px var(--color-night-ground);
+}
+
+/* A row of hours running past its window: faded at its two edges, so what
+   runs past them reads as more to come. */
 @utility mask-fade-x {
   mask-image: linear-gradient(
     to right,
@@ -727,6 +735,13 @@
     #000 calc(100% - 12px),
     transparent
   );
+}
+
+/* A strip running past its right edge: faded there, so a card it cuts reads
+   as more to come. Give the strip the fade's width as padding at its end, and
+   its last card comes to rest clear of it. */
+@utility mask-fade-end {
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
 }
 
 /* Fraunces at its largest optical size: the high-contrast cut a spot's name
@@ -951,7 +966,7 @@
      in either theme, its faint hatch, and the two laid together, for the halo
      that keeps a figure clear of the hatch. */
   --color-night: color-mix(in srgb, var(--color-ink) 4.5%, transparent);
-  --color-night-hatch: color-mix(in srgb, var(--color-ink) 9%, transparent);
+  --color-night-hatch: color-mix(in srgb, var(--color-ink) 6%, transparent);
   --color-night-ground: color-mix(in srgb, var(--color-ink) 4.5%, var(--color-sunken));
   /* The Spot finder's card: its picture, then its name and its two bars. */
   --grid-template-columns-card: 104px minmax(0, 1fr);

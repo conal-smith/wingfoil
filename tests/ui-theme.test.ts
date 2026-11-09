@@ -115,7 +115,7 @@ const COLOURS: Record<string, string> = {
   gust: "#e0803a",
   "gust-ink": "#a34d12",
   night: "color-mix(in srgb, #111114 4.5%, transparent)",
-  "night-hatch": "color-mix(in srgb, #111114 9%, transparent)",
+  "night-hatch": "color-mix(in srgb, #111114 6%, transparent)",
   "night-ground": "color-mix(in srgb, #111114 4.5%, #f5f5f7)",
   // The weather's state, and nothing else: the sun is the buoy's yellow.
   "weather-sun": "#e9b200",
