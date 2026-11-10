@@ -6,7 +6,6 @@ import type {
   VectorTileSource,
 } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import { beaufortPath } from "../../ui/beaufortPath";
 import { Button } from "../../ui/Button";
 import { Notice } from "../../ui/Notice";
 import {
@@ -36,11 +35,8 @@ import { createReadingPills, type ReadingPills } from "./readingPills";
 import type { WindStation } from "./windObs";
 import {
   LOUPE_BAND,
-  bezelTicks,
-  dialDrawing,
   footBox,
   metresPerPixel,
-  roseDrawing,
   roseFitRadius,
   roseRadius,
   roseScale,
@@ -48,9 +44,7 @@ import {
   WASH_BANDS,
   zoomFor,
   type FocusStyle,
-  type Line,
   type LoupeRose,
-  type RoseScale,
 } from "./focus";
 import {
   COAST_GLOW_CORNERS,
@@ -61,6 +55,7 @@ import {
   FOIL_MIN_ZOOM,
 } from "./foilDepth";
 import { isLakeWater } from "./pointSource";
+import { SVG, drawFoot, drawLoupe, redraw, svgEl } from "./loupeDraw";
 import { setMapView } from "./tiledField";
 import {
   createWindLayer,
@@ -304,8 +299,6 @@ const WORLD = [
   [-40, 35],
 ];
 
-const SVG = "http://www.w3.org/2000/svg";
-
 /** The wash's layers, a band of it apiece (focus.ts `washHoles`): the loupe's. */
 const WASH_LAYERS = Array.from({ length: WASH_BANDS }, (_, i) =>
   i ? `focus-${i}` : "focus",
@@ -318,321 +311,9 @@ const WASH_LAYERS = Array.from({ length: WASH_BANDS }, (_, i) =>
  */
 const STRETCH = [0.67, 1.5] as const;
 
-/**
- * While `redraw` draws over a drawing: for each parent, how many of its
- * elements have been drawn again so far.
- */
-let drawn: Map<Element, number> | null = null;
-
-/**
- * An SVG element, its attributes set, added to a parent. In a redraw, the
- * element already in its place is kept when it is of the same kind and
- * class, and only what differs is set.
- */
-function svgEl(
-  parent: Element,
-  tag: string,
-  attrs: Record<string, string | number> = {},
-) {
-  let el: Element | null = null;
-  if (drawn) {
-    const i = drawn.get(parent) ?? 0;
-    drawn.set(parent, i + 1);
-    const old = parent.children[i];
-    if (
-      old?.localName === tag &&
-      old.getAttribute("class") === (attrs.class ?? null)
-    ) {
-      el = old;
-      drawn.set(el, 0);
-      for (const name of el.getAttributeNames())
-        if (!(name in attrs)) el.removeAttribute(name);
-    } else {
-      el = document.createElementNS(SVG, tag);
-      parent.insertBefore(el, old ?? null);
-    }
-  } else {
-    el = document.createElementNS(SVG, tag);
-    parent.appendChild(el);
-  }
-  for (const [key, value] of Object.entries(attrs)) {
-    const v = typeof value === "number" ? value.toFixed(1) : value;
-    if (el.getAttribute(key) !== v) el.setAttribute(key, v);
-  }
-  return el;
-}
-
-/** An element's words, set only when they are not already. */
-function write(el: Element, text: string) {
-  if (el.textContent !== text) el.textContent = text;
-}
-
 /** An attribute, set only when it is not already. */
 function setAttr(el: Element, name: string, value: string) {
   if (el.getAttribute(name) !== value) el.setAttribute(name, value);
-}
-
-/**
- * Draws into `g` over what is drawn there: a frame of a zoom moves the
- * elements already drawn rather than building them again. What the new
- * drawing does not use goes.
- */
-function redraw(g: Element, draw: () => void) {
-  drawn = new Map([[g, 0]]);
-  try {
-    draw();
-    for (const [parent, n] of drawn)
-      while (parent.children.length > n) parent.lastElementChild!.remove();
-  } finally {
-    drawn = null;
-  }
-}
-
-/** A line from focus.ts's geometry, as an SVG line. */
-const lineAttrs = (l: Line) => ({ x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 });
-
-/** The hatches the rose fills with: ink for the no-go, the pen's for offshore. */
-function hatches(g: SVGGElement) {
-  const defs = svgEl(g, "defs");
-  for (const [id, size, angle] of [
-    ["loupe-hatch", 6, 45],
-    ["loupe-redhatch", 3.6, -45],
-    ["loupe-redlight", 6, -45],
-  ] as const) {
-    const p = svgEl(defs, "pattern", {
-      id,
-      width: size,
-      height: size,
-      patternUnits: "userSpaceOnUse",
-      patternTransform: `rotate(${angle})`,
-    });
-    svgEl(p, "line", { class: id, x1: 0, y1: 0, x2: 0, y2: size });
-  }
-}
-
-/**
- * The loupe at the origin, `r` pixels to the inside of its rim: drawn as the
- * chart draws a box, ink, a band of paper and ink, with a compass bezel's
- * ticks in the paper and N at the top. No handle and no magnifying: the chart
- * runs straight on through the glass.
- *
- * Inside it, the ride rose for the dock's hour (focus.ts `roseDrawing`): the
- * no-go hatched, the tack out washed in paper, the tack home dashed, the slow
- * water downwind of them faint along the rim, the drift downwind, and the
- * half-way ring with its distance when it is to scale. On the bezel, the
- * offshore winds in the pen's red and the needle in the wind's colour. The
- * reading in a box at its foot is `drawFoot`'s.
- */
-function drawLoupe(
-  g: SVGGElement,
-  r: number,
-  /** The rose's distances while it is to scale, else null. */
-  scale: RoseScale | null,
-  loupe: LoupeRose | null,
-) {
-  hatches(g);
-  // Held at its smallest, no longer to scale: a compass, with nothing inside.
-  const rose = roseDrawing(scale ? (loupe?.rose ?? null) : null, r, scale);
-  const glass = svgEl(g, "g", { class: "map-rose" });
-  if (rose.nogo) {
-    const nogo = svgEl(glass, "g", { class: "map-rose-nogo" });
-    svgEl(nogo, "path", { class: "map-rose-nogo-fill", d: rose.nogo.fill });
-    svgEl(nogo, "path", { class: "map-rose-nogo-hatch", d: rose.nogo.fill });
-    for (const e of rose.nogo.edges)
-      svgEl(nogo, "line", { class: "map-rose-nogo-edge", ...lineAttrs(e) });
-  }
-  for (const fan of rose.fans) {
-    const fg = svgEl(glass, "g", { class: `map-rose-fan is-${fan.kind}` });
-    if (fan.fill)
-      svgEl(fg, "path", { class: "map-rose-fan-fill", d: fan.fill });
-    for (const e of fan.edges)
-      svgEl(fg, "line", { class: "map-rose-fan-edge", ...lineAttrs(e) });
-    svgEl(fg, "path", { class: "map-rose-fan-arc", d: fan.arc });
-    if (fan.head) svgEl(fg, "path", { class: "map-rose-head", d: fan.head });
-  }
-  if (rose.slow) svgEl(glass, "path", { class: "map-rose-slow", d: rose.slow });
-  for (const ring of rose.rings)
-    svgEl(glass, "circle", { class: "map-rose-ring", r: ring.r });
-  if (rose.drift) {
-    const dg = svgEl(glass, "g", {
-      class: `map-rose-drift${rose.drift.out ? " is-out" : ""}`,
-    });
-    svgEl(dg, "line", {
-      class: "map-rose-drift-halo",
-      ...lineAttrs(rose.drift.line),
-    });
-    svgEl(dg, "line", {
-      class: "map-rose-drift-line",
-      ...lineAttrs(rose.drift.line),
-    });
-    svgEl(dg, "path", { class: "map-rose-drift-head", d: rose.drift.head });
-  }
-  for (const l of [...rose.rings.map((ring) => ring.label), ...rose.labels])
-    write(
-      svgEl(glass, "text", {
-        class: `map-rose-label is-${l.kind}`,
-        x: l.x,
-        y: l.y,
-        "text-anchor": "middle",
-      }),
-      l.text,
-    );
-
-  const rim = svgEl(g, "g", { class: "map-loupe-rim" });
-  svgEl(rim, "circle", { class: "map-loupe-band", r: r + LOUPE_BAND / 2 });
-  svgEl(rim, "circle", { class: "map-loupe-edge is-inner", r });
-  svgEl(rim, "circle", { class: "map-loupe-edge", r: r + LOUPE_BAND });
-  const dial = loupe ? dialDrawing(loupe.rose.windFrom, loupe.facing, r) : null;
-  for (const d of dial?.crossOff ?? [])
-    svgEl(g, "path", { class: "map-dial-crossoff", d });
-  if (dial?.offshore)
-    svgEl(g, "path", { class: "map-dial-offshore", d: dial.offshore.band });
-  for (const t of bezelTicks(r))
-    svgEl(g, "line", {
-      class: t.long ? "map-loupe-tick is-long" : "map-loupe-tick",
-      x1: t.x1,
-      y1: t.y1,
-      x2: t.x2,
-      y2: t.y2,
-    });
-  write(
-    svgEl(g, "text", {
-      class: "map-loupe-north",
-      y: -r - 2.5,
-      "text-anchor": "middle",
-    }),
-    "N",
-  );
-  // A glint on the glass, top left.
-  const g0 = r - 16;
-  svgEl(g, "path", {
-    class: "map-loupe-glint",
-    d: `M${(Math.cos(3.55) * g0).toFixed(1)} ${(Math.sin(3.55) * g0).toFixed(1)} A${g0} ${g0} 0 0 1 ${(Math.cos(4.25) * g0).toFixed(1)} ${(Math.sin(4.25) * g0).toFixed(1)}`,
-  });
-  if (!loupe || !dial) return;
-  if (dial.offshore) {
-    svgEl(g, "path", { class: "map-dial-offshore-arc", d: dial.offshore.arc });
-    svgEl(g, "path", {
-      id: "loupe-offshore-words",
-      class: "map-dial-words-path",
-      d: dial.offshore.text,
-    });
-    const words = svgEl(g, "text", { class: "map-dial-words" });
-    write(
-      svgEl(words, "textPath", {
-        href: "#loupe-offshore-words",
-        startOffset: "50%",
-        "text-anchor": "middle",
-      }),
-      "OFFSHORE",
-    );
-  }
-  const needle = svgEl(g, "g", { class: "map-dial-needle" });
-  svgEl(needle, "path", {
-    d: dial.needle,
-    fill: loupe.colour,
-  });
-  svgEl(needle, "circle", { cx: dial.pin[0], cy: dial.pin[1], r: 1.6 });
-}
-
-/**
- * The box at the bezel's foot: the reading, and the wind's relation to the
- * shore. It is drawn round the origin of a sheet of its own and moved there
- * (`place` in the focus effect), so a box held in view as the chart moves
- * under it costs no drawing at all.
- */
-function drawFoot(foot: SVGGElement, loupe: LoupeRose | null) {
-  redraw(foot, () => {
-    if (!loupe) return;
-    const box = footBox(loupe.reading, loupe.relation, 0);
-    svgEl(foot, "rect", {
-      class: "map-loupe-foot-box",
-      x: -box.w / 2,
-      y: -box.h / 2,
-      width: box.w,
-      height: box.h,
-    });
-    svgEl(foot, "rect", {
-      class: "map-loupe-foot-rule",
-      x: -box.w / 2 + 2.5,
-      y: -box.h / 2 + 2.5,
-      width: box.w - 5,
-      height: box.h - 5,
-    });
-    if (loupe.forces)
-      drawForces(foot, -box.w / 2 + 9, loupe.from, loupe.forces);
-    else
-      write(
-        svgEl(foot, "text", {
-          class: "map-loupe-reading",
-          x: -box.w / 2 + 9,
-          y: 4.5,
-        }),
-        loupe.reading,
-      );
-    write(
-      svgEl(foot, "text", {
-        class: `map-loupe-relation${loupe.warn ? " is-warn" : ""}`,
-        x: box.w / 2 - 8,
-        y: 4,
-        "text-anchor": "end",
-      }),
-      loupe.relation,
-    );
-  });
-}
-
-/** The reading's mono advance: IBM Plex Mono at 13px is 0.6em a character. */
-const READING_ADVANCE = 7.8;
-
-/**
- * The reading in Force: "SW", the wind's glyph and force, and the gust's
- * small after a "g". The words are one line of text with room left in it
- * (`dx`) where each glyph stands, the glyphs placed by the mono advance.
- */
-function drawForces(
-  foot: SVGGElement,
-  x: number,
-  from: string,
-  { wind, gust }: { wind: number; gust: number | null },
-) {
-  const big = beaufortPath(wind, 13);
-  const small = gust === null ? null : beaufortPath(gust, 10);
-  // A class of its own, so a redraw never reuses the plain reading's text,
-  // whose words would stay beside the parts.
-  const text = svgEl(foot, "text", {
-    class: "map-loupe-reading is-force",
-    x,
-    y: 4.5,
-  });
-  write(svgEl(text, "tspan"), `${from} `);
-  const bigX = x + (from.length + 1) * READING_ADVANCE;
-  write(svgEl(text, "tspan", { dx: big.width + 1 }), String(wind));
-  const glyph = (
-    d: ReturnType<typeof beaufortPath>,
-    at: number,
-    top: number,
-  ) => {
-    const g = svgEl(foot, "g", {
-      class: "map-loupe-glyph",
-      transform: `translate(${at.toFixed(1)} ${top})`,
-    });
-    svgEl(g, "path", { d: d.stroke, "stroke-width": d.strokeWidth });
-    if (d.fill)
-      svgEl(g, "path", {
-        class: "is-pennant",
-        d: d.fill,
-        "stroke-width": d.strokeWidth * 0.6,
-      });
-  };
-  glyph(big, bigX, -8);
-  if (small && gust !== null) {
-    write(svgEl(text, "tspan"), " g");
-    write(svgEl(text, "tspan", { dx: small.width + 1 }), String(gust));
-    const smallX =
-      bigX + big.width + 1 + (String(wind).length + 2) * READING_ADVANCE;
-    glyph(small, smallX, -5);
-  }
 }
 
 function ring(lon: number, lat: number, metres: number, n = 56) {
@@ -1548,7 +1229,9 @@ export default function WindMap(props: Props) {
     const drawRose = () => {
       if (g)
         redraw(g, () =>
-          drawLoupe(g!, r, toScale ? scale : null, latest.current.rose),
+          drawLoupe(g!, r, toScale ? scale : null, latest.current.rose, {
+            id: "loupe",
+          }),
         );
     };
     /**

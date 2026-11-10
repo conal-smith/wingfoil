@@ -247,7 +247,8 @@ export interface RoseDrawing {
   /** Downwind of the course, possible but slow: a faint dotted arc along the rim. */
   slow: string | null;
   drift: { line: Line; head: string; out: boolean } | null;
-  rings: { r: number; label: RoseLabel }[];
+  /** The half-way ring, its distance written where there is room. */
+  rings: { r: number; label: RoseLabel | null }[];
   labels: RoseLabel[];
 }
 
@@ -348,9 +349,16 @@ export function roseDrawing(
     const half = scale.label.length * 3.6;
     const sin = Math.abs(Math.sin((at * Math.PI) / 180));
     const [ox, oy] = polar(at, r - 12 - sin * half);
+    // The ring's own distance only where it clears the rim's: on a small
+    // rose the two would be written over each other.
+    const gap = r - 12 - sin * half - r * ratio;
+    const room = sin * (half + scale.innerLabel.length * 3.6) + (1 - sin) * 14;
     out.rings.push({
       r: r * ratio,
-      label: { x: ix, y: iy + 4, text: scale.innerLabel, kind: "figure" },
+      label:
+        gap >= room + 4
+          ? { x: ix, y: iy + 4, text: scale.innerLabel, kind: "figure" }
+          : null,
     });
     out.labels.push({ x: ox, y: oy + 4, text: scale.label, kind: "figure" });
   }
@@ -371,13 +379,19 @@ export interface DialDrawing {
 /** How far in from the rim the needle's tail starts. */
 const NEEDLE = 30;
 
+/** Whether a bearing is inside a clockwise span. */
+const holds = (span: Span, bearing: number) =>
+  (((bearing - span.from) % 360) + 360) % 360 <= span.to - span.from;
+
 /**
- * On the bezel at radius `r`: where an offshore wind would carry a rider, in
- * red (none without a facing), and the needle out across the rim on the same
- * side, the way the wind blows: an offshore wind's stands in the red.
- * OFFSHORE is written along an arc outside the band, the right way up: on
- * the lower half of the dial the arc runs back, and a little further out, so
- * the letters stand on it.
+ * On the bezel at radius `r`: the needle out across the rim, the way the wind
+ * blows, and red only where it is blowing a rider: an offshore wind's span in
+ * red with OFFSHORE written along it, a cross-offshore wind's span lighter.
+ * A wind that carries no one out to sea draws no red at all, so the red never
+ * points somewhere the wind is not going (the owner's ruling of 2026-11-10).
+ * None without a facing. OFFSHORE is written along an arc outside the band,
+ * the right way up: on the lower half of the dial the arc runs back, and a
+ * little further out, so the letters stand on it.
  */
 export function dialDrawing(
   windFrom: number,
@@ -388,21 +402,25 @@ export function dialDrawing(
   const outer = r + LOUPE_BAND - 0.6;
   let offshore: DialDrawing["offshore"] = null;
   let crossOff: string[] = [];
+  const to = windFrom + 180;
   if (facing !== null) {
     const spans = offshoreSpans(facing);
     const o = spans.offshore;
-    const lower = Math.cos((mid(o) * Math.PI) / 180) < 0;
-    const words = { from: o.from - 10, to: o.to + 10 };
-    offshore = {
-      band: sectorPath(o, inner, outer),
-      arc: arcPath(o, r + LOUPE_BAND + 2.2),
-      text: lower
-        ? arcPath(words, r + LOUPE_BAND + 14, true)
-        : arcPath(words, r + LOUPE_BAND + 6),
-    };
-    crossOff = spans.crossOff.map((s) => sectorPath(s, inner, outer));
+    if (holds(o, to)) {
+      const lower = Math.cos((mid(o) * Math.PI) / 180) < 0;
+      const words = { from: o.from - 10, to: o.to + 10 };
+      offshore = {
+        band: sectorPath(o, inner, outer),
+        arc: arcPath(o, r + LOUPE_BAND + 2.2),
+        text: lower
+          ? arcPath(words, r + LOUPE_BAND + 14, true)
+          : arcPath(words, r + LOUPE_BAND + 6),
+      };
+    }
+    crossOff = spans.crossOff
+      .filter((s) => holds(s, to))
+      .map((s) => sectorPath(s, inner, outer));
   }
-  const to = windFrom + 180;
   const tip = r + LOUPE_BAND + 5;
   const tail = r - NEEDLE;
   const wing = (2.6 * tip) / tail;

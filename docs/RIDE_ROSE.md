@@ -31,17 +31,17 @@ foot ("NE 22 g27 · CROSS"). It is the mockup's recommended design
 | Reach | As home, labelled REACH | Both tacks where out and home mean nothing: a tapped point, a place with no facing, or an offshore wind |
 | Slow | A faint dotted arc along the rim, labelled SLOW in muted ink from 120 px | Downwind of both courses, past 120° off the wind each side: possible, but slow, so not drawn as course |
 | Drift | Dotted arrow straight downwind, labelled DRIFT. In red, with "OUT TO SEA", when the wind is cross-offshore or offshore | The wind's bearing + 180° |
-| Offshore | On the bezel, on the sea side: a dense red hatch where an offshore wind would carry a rider, a light one for cross-offshore, a red arc outside, and the word OFFSHORE | `shoreAngle`'s bands (see below) and the spot's facing |
+| Offshore | On the bezel, on the sea side, and only when the hour's wind is carrying a rider out: an offshore wind's span as a red arc with the word OFFSHORE along it, a cross-offshore wind's span in a lighter red. Any other wind draws no red, so the red never points where the wind is not going | `shoreAngle`'s bands (see below), the spot's facing and the hour's wind |
 | Needle | From inside the glass out across the bezel, on the side the wind blows to, filled with the wind's colour (`PALETTE`) | The dock's hour |
 | Foot box | "SW 16 g22" in the rider's units (in Force, the wind's glyph and force and the gust's smaller, `BeaufortGlyph`'s drawing), then the shore relation: ON, CROSS-ON, CROSS, CROSS-OFF (red) or OFF (red). With no beach, the units | The dock's hour |
 
 The wind's colour appears only on the needle. The red accent is used only for
-danger: the offshore winds on the bezel, and the drift when it heads out to
-sea. Labels are Inter, semibold at 11 px, haloed in the ground's colour so
+danger: the offshore or cross-offshore wind on the bezel when that is the
+wind blowing, and the drift when it heads out to sea. Labels are Inter, semibold at 11 px, haloed in the ground's colour so
 they read over the satellite picture and the chart in either theme.
 
 **Fallbacks.** In the dark, or below the rider's floor, the glass is empty.
-The needle, the foot box and the red bezel stay; on the spot page's satellite
+The needle, the foot box and any red on the bezel stay; on the spot page's satellite
 picture, in daylight, the rose under the floor is drawn faintly, so a calm hour
 still says where a rider could sail. When nothing the rider can hold heads out
 to sea (a learner in an onshore wind), the light's wedge is absent, and the
@@ -70,8 +70,8 @@ tack. A dashed ring marks half of it.
   not move the camera, so its rose is drawn at whatever size the zoom gives.
 - **Zooming.** The rose scales with the chart. Under 70 px
   (`ROSE_MIN_PX`) it would be too small to read. It is then held at 70 px, no
-  longer to scale, and drawn as a compass with the needle, the red bezel and
-  the box, with nothing inside and no distances written. Names appear from
+  longer to scale, and drawn as a compass with the needle, the bezel's red
+  if the wind has any, and the box, with nothing inside and no distances written. Names appear from
   90 px and bearings from 120 px.
 - **Zoomed in past the screen.** The bezel runs off the screen, and the foot
   box stays pinned inside the clear map above the dock.

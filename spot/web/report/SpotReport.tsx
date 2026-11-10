@@ -156,8 +156,10 @@ const styles = tv({
     name: "m-0 font-display text-big-sm font-semibold text-ink wide:text-big",
     acts: "flex shrink-0 items-center gap-2",
     // What it is like now: three small cards and the picture, under the days.
-    nowBlock:
-      "mt-2 grid grid-cols-2 gap-2 wide:grid-cols-3 rail:grid-cols-nowblock rail:gap-3",
+    // On a phone the picture is under the cards, the width of the page; wider,
+    // the cards stand one over another beside it.
+    nowBlock: "mt-2 grid gap-2 rail:gap-3",
+    nowCards: "grid min-w-0 grid-cols-2 gap-2 rail:gap-3",
     nowCard: [
       "flex min-w-0 flex-col justify-center gap-0.5 rounded-surface bg-sunken on-card px-3.5 py-2",
       "cards:flex-row cards:items-end cards:justify-between cards:gap-3 cards:pb-5",
@@ -311,20 +313,29 @@ const styles = tv({
     td: "border-0 border-t border-line px-3 py-2.5 whitespace-nowrap",
     narrow: "hidden wide:table-cell",
     guide: "grid gap-3 wide:grid-cols-2 cards:grid-cols-4",
-    // The picture's card: what the rose reads and the tide switch, beside
-    // the square of satellite picture.
-    pictureCard: "col-span-2 wide:col-span-3 rail:col-span-1",
+    // The picture's card: the satellite picture under the loupe, and under
+    // it the hour, what the rose reads and the tide switch.
     pictureSide:
-      "flex min-w-0 flex-1 flex-col justify-between gap-1.5 px-3 py-2",
+      "flex min-w-0 items-center justify-between gap-3 px-3.5 py-2.5",
     pictureHour:
       "block truncate font-body text-label font-medium text-ink-muted",
     foot: "block min-w-0 truncate font-body text-body font-semibold whitespace-nowrap text-ink tabular-nums",
     footGust: "text-caption text-gust-ink",
-    seg: "self-start",
+    seg: "shrink-0",
     gd: "rounded-surface bg-sunken on-card p-4 wide:px-5",
     gdHead: "m-0 mb-1.5 font-body text-prose font-semibold text-ink",
     gdText: "m-0 font-body text-prose text-ink-2",
     smallPrint: "grid gap-1 pt-8 font-body text-caption text-ink-muted",
+  },
+  variants: {
+    // With a picture: the cards one over another beside it.
+    pictured: {
+      true: {
+        nowBlock: "wide:grid-cols-2 rail:grid-cols-nowblock",
+        nowCards: "wide:auto-rows-fr wide:grid-cols-1",
+      },
+      false: { nowCards: "wide:grid-cols-3" },
+    },
   },
 });
 
@@ -769,29 +780,29 @@ export function SpotReport({
               </div>
               <div ref={setArrowsAt} className={s.arrows()} />
             </div>
-            <div className={s.nowBlock()} data-now-block>
-              <NowCards
-                row={nowRow}
-                waves={seaShown && nowWaveRow}
-                hasWaves={seaShown !== null}
-                sea={forecast.sea_temperature}
-                now={now}
-                rated={!point}
-                facing={facing}
-                measured={nowMeasured}
-                next={nextStars}
-                onShowNext={showNextStars}
-                forecast={forecast}
-              />
+            <div className={s.nowBlock({ pictured: !!picture })} data-now-block>
+              <div className={s.nowCards({ pictured: !!picture })}>
+                <NowCards
+                  row={nowRow}
+                  waves={seaShown && nowWaveRow}
+                  hasWaves={seaShown !== null}
+                  sea={forecast.sea_temperature}
+                  now={now}
+                  rated={!point}
+                  facing={facing}
+                  measured={nowMeasured}
+                  next={nextStars}
+                  onShowNext={showNextStars}
+                  forecast={forecast}
+                />
+              </div>
               {picture && (
                 <PhotoLoupe
                   picture={picture}
                   tide={tide}
                   loupe={loupe}
                   faint={loupeFaint}
-                  facing={facing}
                   scale={scale}
-                  className={s.pictureCard()}
                 >
                   <div className={s.pictureSide()}>
                     <div

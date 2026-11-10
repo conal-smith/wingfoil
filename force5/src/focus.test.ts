@@ -146,7 +146,31 @@ describe("the ride rose's geometry", () => {
     // The half-way ring, half the radius out, with its distance.
     expect(d.rings).toHaveLength(1);
     expect(d.rings[0].r).toBeCloseTo(75);
-    expect(d.rings[0].label.text).toBe("0.25 NM");
+    expect(d.rings[0].label!.text).toBe("0.25 NM");
+    // At any size, and whichever way the wind blows, the ring keeps its
+    // place and its distance is never written over the rim's.
+    const box = (l: { x: number; y: number; text: string }) => ({
+      l: l.x - l.text.length * 3.6,
+      r: l.x + l.text.length * 3.6,
+      t: l.y - 11,
+      b: l.y + 2,
+    });
+    for (const from of [0, 45, 90, 135, 180, 225, 270, 315])
+      for (let size = 80; size <= 300; size += 10) {
+        const turned = rideRose(
+          DEFAULT_RIDER,
+          { windKn: 16, gustKn: null, from, daylight: true },
+          null,
+        )!;
+        const drawn = roseDrawing(turned, size, roseScale("kn"));
+        expect(drawn.rings).toHaveLength(1);
+        const inner = drawn.rings[0].label;
+        const outer = drawn.labels.find((l) => l.text === "0.5 NM")!;
+        expect(outer).toBeDefined();
+        if (!inner) continue;
+        const [a, b] = [box(inner), box(outer)];
+        expect(a.r < b.l || b.r < a.l || a.b < b.t || b.b < a.t).toBe(true);
+      }
   });
 
   it("writes the drift out to sea in the pen's words when it is", () => {
@@ -173,13 +197,25 @@ describe("the ride rose's geometry", () => {
     expect(roseDrawing(rose, ROSE_MIN_PX - 1, null).slow).toBeNull();
   });
 
-  it("hatches where an offshore wind carries a rider on the bezel, and none without a beach", () => {
-    const dial = dialDrawing(225, DOLLYMOUNT, 150);
+  it("draws red only where the wind is carrying a rider out, and none without a beach", () => {
+    // Dollymount's sea is to the south-east: a north-westerly blows a rider
+    // straight out, the red arc and its words with the needle in them.
+    const dial = dialDrawing(305, DOLLYMOUNT, 150);
     expect(dial.offshore).not.toBeNull();
-    expect(dial.crossOff).toHaveLength(2);
+    expect(dial.crossOff).toHaveLength(0);
     // The offshore words on the upper half run clockwise; on the lower, back.
     expect(dial.offshore!.text).toContain(" 0 0 0 ");
-    expect(dialDrawing(225, 0, 150).offshore!.text).toContain(" 0 0 1 ");
+    expect(dialDrawing(180, 0, 150).offshore!.text).toContain(" 0 0 1 ");
+    // Cross-offshore: the one lighter span the needle stands in, no arc.
+    const cross = dialDrawing(255, DOLLYMOUNT, 150);
+    expect(cross.offshore).toBeNull();
+    expect(cross.crossOff).toHaveLength(1);
+    // Onshore, cross or cross-on: no red anywhere on the dial.
+    for (const from of [125, 45, 215, 170]) {
+      const calm = dialDrawing(from, DOLLYMOUNT, 150);
+      expect(calm.offshore).toBeNull();
+      expect(calm.crossOff).toHaveLength(0);
+    }
     const bare = dialDrawing(225, null, 150);
     expect(bare.offshore).toBeNull();
     expect(bare.crossOff).toHaveLength(0);
