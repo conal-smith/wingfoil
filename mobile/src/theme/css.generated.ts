@@ -251,7 +251,7 @@ export const css = {
   "text-name--letter-spacing": "-0.025em",
   "grid-template-columns-graph": "72px minmax(0, 1fr)",
   "grid-template-columns-graph-narrow": "68px minmax(0, 1fr)",
-  "grid-template-columns-nowblock": "repeat(3, minmax(0, 1fr)) 296px",
+  "grid-template-columns-nowblock": "minmax(0, 1fr) 32rem",
   "grid-template-columns-notice-compact": "24px minmax(0, 1fr) auto auto",
   "grid-template-columns-card": "104px minmax(0, 1fr)",
   "grid-template-columns-bars": "36px minmax(0, 1fr)",
