@@ -226,13 +226,9 @@ export function SiteNav({
     const preview = id === "market" || id === "community";
     const s = siteMenuStyles({ current: here });
     return (
-      // The chart and its tour are not on a phone: the finder is its map.
-      <li
-        key={id}
-        className={
-          id === "chart" || id === "tour" ? "max-wide:hidden" : undefined
-        }
-      >
+      // On a phone the chart is here alone, for whoever wants it: the
+      // finder's Map and List are the top bar's. Its tour is not.
+      <li key={id} className={id === "tour" ? "max-wide:hidden" : undefined}>
         <a
           ref={index === 0 ? first : undefined}
           className={s.row()}

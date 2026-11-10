@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   inFrame,
+  loupeFrame,
   loadSpotPictures,
   metresPerPixel,
   parseSpotPictures,
@@ -140,5 +141,29 @@ describe("the picture's geometry", () => {
     expect(pictureCredit(pictures.attribution)).toBe(
       "Contains modified Copernicus Sentinel data 2017–2026, composited for wingfoil.ie",
     );
+  });
+});
+
+describe("the picture under the loupe", () => {
+  const picture = spotPicture(pictures, portrane)!;
+  // A small distance, so the rim and not the frame decides how large.
+  const rim = 400 / picture.metresPerPixel;
+
+  it("is drawn large enough for the rim to fill the frame's shorter side, to scale", () => {
+    const frame = loupeFrame(picture, 358, 280, 400);
+    expect(frame.r).toBeCloseTo(280 / 2 - 34);
+    // The picture is scaled as the rim is, so the rose's distances are true.
+    expect(frame.image.width / picture.width).toBeCloseTo(frame.r / rim);
+    expect(frame.cx).toBeCloseTo(179);
+    expect(frame.cy).toBeCloseTo(140);
+  });
+
+  it("never leaves the frame uncovered, and keeps the place inside the picture", () => {
+    const frame = loupeFrame(picture, 1000, 280, 926);
+    expect(frame.image.width).toBeGreaterThanOrEqual(1000);
+    expect(frame.image.height).toBeGreaterThanOrEqual(280);
+    expect(frame.image.left).toBeLessThanOrEqual(0);
+    expect(frame.image.left + frame.image.width).toBeGreaterThanOrEqual(1000);
+    expect(frame.image.top + frame.image.height).toBeGreaterThanOrEqual(280);
   });
 });

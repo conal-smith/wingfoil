@@ -1360,3 +1360,31 @@ beside the search, in place of Chart, and the layers are the dock's Wind, Waves
 and Weather. The chart's address opens the map, a spot's chart address opens
 the spot's page, and the menu leaves out Chart and the tour. Wider screens keep
 the chart.
+
+**2026-11-10 — The chart's loupe on the picture, and red only for the wind
+blowing.** The owner: the loupe on the satellite picture was "different from
+the one we use in our chart", and "the red offshore is too confusing because
+the wind isn't blowing that way"; the loupe is on the picture "because it shows
+where you can go and drift". The chart, a spot's satellite picture and the
+finder's cards now draw one loupe from one drawing (force5/src/loupeDraw.ts,
+its look force5/src/loupe.css): the fine rim with the compass ticked outside
+it, N, the ride rose with its words and distances, and the needle in the
+wind's colour. On a photo it is drawn in the photo's own white, shade and red,
+as the chart is in the dark. The bezel is red only where the hour's wind is
+carrying a rider out: OFFSHORE along a red arc for an offshore wind, a lighter
+span for a cross-offshore one, and nothing for any other wind. The spot page's
+picture grows from the 96 px square of 2026-11-09 to a frame the rose fills,
+drawn at the picture's own scale so its distances are true: on a phone the
+width of the page under the cards, wider than that beside the cards, which
+stand one over another. The half-way ring's distance is written only where it
+clears the rim's.
+
+**2026-11-10 — The chart again on a phone, from the menu.** The owner: "we
+need to introduce the chart again, like it was, except Map and List should stay
+the exact same... chart should only be accessible through the hamburger menu."
+This replaces the entry of 2026-11-08. Up to 720 px the finder's Map | List
+stays in the top bar, and the menu's Chart opens the full chart (`/?map`) as
+it was. On the chart the top bar's switch says List and goes back to the
+finder's list; there is no Chart or Spots button in the bar. A link to a spot
+on the chart from elsewhere (`/?spot=keel`) still opens the spot's own page on
+a phone, and the tour stays off the phone's menu.

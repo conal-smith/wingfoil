@@ -184,6 +184,10 @@ const SpotFinder = lazy(() =>
 // on the home page is drawn before the map is downloaded and read. An
 // address that opens on the full chart asks for it at once.
 const loadWindMap = () => import("../force5/src/WindMap");
+
+/** A spot's address on the full chart, `/?spot=keel`. */
+const spotOnChart = (url: { pathname: string; search: string }) =>
+  url.pathname === "/" && new URLSearchParams(url.search).has("spot");
 const WindMap = lazy(loadWindMap);
 if (isChartAddress(window.location)) void loadWindMap();
 // Settings and the tour, each only when asked for; the tour's offer only on
@@ -403,24 +407,25 @@ export default function App() {
    * and one map, which is never taken down once it is made: the panel
    * beside the list and the full chart are the same map in a bigger box.
    */
-  const [askedPage, setPage] = useState<Page>(() =>
-    isChartAddress(window.location) ? "chart" : "finder",
-  );
-  // A phone has no full chart: its map and its list are the finder's.
+  // On a phone the finder's own Map and List are the way in, and the full
+  // chart is the menu's Chart alone: a link to a spot on the chart opens the
+  // spot's own page there instead (the owner's ruling of 2026-11-10).
   const phone = useMedia(PHONE);
-  const page: Page = phone ? "finder" : askedPage;
+  const [page, setPage] = useState<Page>(() =>
+    isChartAddress(window.location) && !(phone && spotOnChart(window.location))
+      ? "chart"
+      : "finder",
+  );
   const pageRef = useRef(page);
   pageRef.current = page;
-  // The full chart's address on a phone: a spot's opens the spot's own page,
-  // and the chart's the map.
   useEffect(() => {
-    if (!phone || !isChartAddress(window.location)) return;
+    if (!phone || !spotOnChart(window.location)) return;
     const query = new URLSearchParams(window.location.search);
-    const spot = query.get("spot");
-    if (spot)
-      window.location.replace(spotHref(spot, query.get("at") ?? undefined));
-    else window.history.replaceState({}, "", FINDER_HREF);
-  }, [phone]);
+    window.location.replace(
+      spotHref(query.get("spot")!, query.get("at") ?? undefined),
+    );
+    // Only as the page opens: a spot chosen on the chart itself stays there.
+  }, []);
   /** Room for the chart beside the list. */
   const split = useMedia(SPLIT);
   const splitRef = useRef(split);
@@ -2484,7 +2489,7 @@ export default function App() {
    * cards showed, as the lights beside them did.
    */
   const openChart = () => {
-    if (phone || pageRef.current === "chart") return;
+    if (pageRef.current === "chart") return;
     if (panelAt !== selected) selectColumn(panelAt);
     window.history.pushState(
       { fromList: 1 } satisfies ListEntry,
@@ -2656,7 +2661,12 @@ export default function App() {
       </>
     );
   };
-  /** The phone's and the tablet's two views: a button to the one not shown. */
+  /**
+   * The phone's and the tablet's two views: a button to the one not shown,
+   * Map on the list and List on either map (the finder's, or the full chart
+   * a phone opens from the menu).
+   */
+  const toMap = narrowList && !onChart;
   const viewSwitch = (inBar: boolean) => (
     <div
       className={inBar ? "nf-switch in-bar" : "nf-switch"}
@@ -2667,24 +2677,27 @@ export default function App() {
         variant="quiet"
         size="sm"
         onClick={() => {
-          if (narrowList) {
+          if (narrowList && !onChart) {
             setNarrowList(false);
             window.scrollTo(0, 0);
           } else {
+            // From the phone's full chart, opened from the menu: back to the
+            // finder's list.
+            openList();
             setNarrowList(true);
             setPeekId(null);
             setCrowd(null);
           }
         }}
-        data-view={narrowList ? "map" : "list"}
+        data-view={toMap ? "map" : "list"}
       >
         {!inBar &&
-          (narrowList ? (
+          (toMap ? (
             <MapIcon size={14} strokeWidth={1.75} aria-hidden="true" />
           ) : (
             <List size={14} strokeWidth={1.75} aria-hidden="true" />
           ))}
-        {narrowList ? "Map" : "List"}
+        {toMap ? "Map" : "List"}
       </Button>
     </div>
   );
@@ -2703,9 +2716,12 @@ export default function App() {
         }
         actions={phone ? viewSwitch(true) : undefined}
         view={
-          onChart
-            ? { to: "spots", href: FINDER_HREF, onClick: openList }
-            : { to: "chart", href: CHART_HREF, onClick: openChart }
+          // A phone's way to the chart is the menu's, and back the switch.
+          phone
+            ? undefined
+            : onChart
+              ? { to: "spots", href: FINDER_HREF, onClick: openList }
+              : { to: "chart", href: CHART_HREF, onClick: openChart }
         }
         menu={<SiteMenu current={onChart ? "chart" : "finder"} go={menuGo} />}
       />

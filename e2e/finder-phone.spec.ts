@@ -127,18 +127,34 @@ test("the map opens first, then the list, which has no dock", async ({
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
 });
 
-test("a phone has no full chart: its links land on the map or the spot", async ({
+test("a phone's full chart is the menu's alone, and List leads back to the finder", async ({
   page,
 }) => {
-  await page.goto("/?map");
-  await expect(page).toHaveURL(/\/$/);
+  await page.goto("/");
   await expect(switchTo(page, "List")).toBeVisible();
-  await expect(switchTo(page, "Map")).toHaveCount(0);
   const bar = page.locator("[data-top-bar]");
+  // The top bar keeps Map | List: no Chart and no Spots in it.
   await expect(bar.getByRole("link", { name: "Chart" })).toHaveCount(0);
+  await expect(bar.locator('a[data-view-switch="spots"]')).toHaveCount(0);
   await bar.getByRole("button", { name: "Site menu" }).tap();
-  for (const name of ["Chart", "Take the tour"])
-    await expect(page.getByRole("link", { name, exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Take the tour", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("link", { name: "Chart", exact: true }).tap();
+  await expect(page).toHaveURL(/\/\?map$/);
+  await expect(page.locator('.workspace[data-chart="full"]')).toBeVisible({
+    timeout: 30000,
+  });
+  const controls = page.getByRole("group", { name: "Map controls" });
+  for (const name of ["Zoom in", "Zoom out", "Layers"])
+    await expect(controls.getByRole("button", { name })).toBeVisible();
+  // On the chart the switch says List, and takes the rider to the finder's.
+  await expect(bar.locator('a[data-view-switch="spots"]')).toHaveCount(0);
+  await switchTo(page, "List").tap();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('.workspace[data-chart="full"]')).toHaveCount(0);
+  await expect(switchTo(page, "Map")).toBeVisible();
+  // A link to a spot on the chart, from elsewhere, opens the spot's own page.
   await page.goto("/?spot=keel");
   await expect(page).toHaveURL(/\/spot\/keel/);
   await expect(

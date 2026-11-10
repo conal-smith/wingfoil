@@ -14,16 +14,11 @@
  * the rose is the loupe's (force5/src/focus.ts), at the loupe's distance,
  * for the hour picked on the day's row, or the hour the day stands at.
  */
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Heart } from "lucide-react";
 import { faintRose, loupeRose, roseScale } from "../../force5/src/focus";
 import { Loupe } from "../../shared/web/Loupe";
+import { useSize } from "../../shared/web/useSize";
 import { speedShort, unitLabel, waveFigure } from "../../force5/src/units";
 import {
   measuredAt,
@@ -132,31 +127,6 @@ function useSpotPictures(): SpotPictures | null {
   return pictures;
 }
 
-/** An element's size, kept current; null until it is measured. */
-export function useSize<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
-  const [size, setSize] = useState<{ width: number; height: number } | null>(
-    null,
-  );
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    const measure = () => {
-      const { clientWidth: width, clientHeight: height } = element;
-      if (width && height)
-        setSize((s) =>
-          s && s.width === width && s.height === height ? s : { width, height },
-        );
-    };
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const watch = new ResizeObserver(measure);
-    watch.observe(element);
-    return () => watch.disconnect();
-  }, []);
-  return [ref, size] as const;
-}
-
 /**
  * The place from above, north up, with the ride rose on it for the hour. No
  * picture published (or one that will not load): the rose on the sea's tint.
@@ -218,18 +188,16 @@ export function SpotPicture({
         />
       )}
       {size && r > 0 && (
-        // In units of a hundredth of the rim, as the loupe's small one is drawn.
         <Loupe
-          width={(size.width * 100) / r}
-          height={(size.height * 100) / r}
-          cx={((place ? place.x : size.width / 2) * 100) / r}
-          cy={((place ? place.y : size.height / 2) * 100) / r}
-          r={100}
+          width={size.width}
+          height={size.height}
+          cx={place ? place.x : size.width / 2}
+          cy={place ? place.y : size.height / 2}
+          r={r}
           loupe={loupe}
           faint={faint}
-          facing={spot.facing ?? null}
           scale={null}
-          card
+          small
           className="pointer-events-none"
         />
       )}

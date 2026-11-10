@@ -645,7 +645,7 @@ test("round the chosen spot: a range ring, or a loupe at a true distance, kept a
   // zooming out once halves it.
   const rim = () =>
     page
-      .locator(".map-loupe-edge.is-inner")
+      .locator(".map-focus .map-loupe-edge")
       .evaluate((el) => Math.round(el.getBoundingClientRect().width));
   /** The rim's width once the camera has stopped. */
   const steady = async () => {
@@ -730,7 +730,7 @@ test("the mark round a chosen spot moves with the chart, in the same frame", asy
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  for (const [style, mark] of [["loupe", ".map-loupe-edge.is-inner"]]) {
+  for (const [style, mark] of [["loupe", ".map-focus .map-loupe-edge"]]) {
     await page.addInitScript(
       (style) => localStorage.setItem("wingfoil.map.focus.v1", style),
       style,

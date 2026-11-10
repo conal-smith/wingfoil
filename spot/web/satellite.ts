@@ -174,6 +174,45 @@ export function inFrame(picture: SpotPicture, width: number, height: number) {
   };
 }
 
+/** Room outside the rim for the compass's ticks, the needle's tip and OFFSHORE. */
+const LOUPE_ROOM = 34;
+
+/**
+ * The picture as a frame of `width` x `height` screen pixels shows it under
+ * the loupe: drawn as large as the frame needs for the loupe's rim, `metres`
+ * from the place, to fill the frame's shorter side with its ticks and words
+ * round it, and never smaller than covers the frame. The place is as near the
+ * frame's middle as the picture's edges allow. The picture's box in the
+ * frame, and the rim's centre and radius in screen pixels, to the picture's
+ * own scale, so the distances the rose writes are true.
+ */
+export function loupeFrame(
+  picture: SpotPicture,
+  width: number,
+  height: number,
+  metres: number,
+) {
+  const rim = metres / picture.metresPerPixel;
+  const room = Math.max(1, Math.min(width, height) / 2 - LOUPE_ROOM);
+  const k = Math.max(
+    room / rim,
+    width / picture.width,
+    height / picture.height,
+  );
+  const w = picture.width * k;
+  const h = picture.height * k;
+  const sx = picture.at.x * w;
+  const sy = picture.at.y * h;
+  const left = Math.min(0, Math.max(width - w, width / 2 - sx));
+  const top = Math.min(0, Math.max(height - h, height / 2 - sy));
+  return {
+    image: { left, top, width: w, height: h },
+    cx: left + sx,
+    cy: top + sy,
+    r: rim * k,
+  };
+}
+
 /**
  * The credit under the picture: the imagery's own clause of the list's
  * attribution ("Contains modified Copernicus Sentinel data 2017–2026,

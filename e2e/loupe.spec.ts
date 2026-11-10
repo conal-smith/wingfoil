@@ -79,7 +79,7 @@ const labels = (page: Page) =>
 /** The glass's radius on the screen. */
 const radius = (page: Page) =>
   page
-    .locator(".map-loupe-edge.is-inner")
+    .locator(".map-focus .map-loupe-edge")
     .evaluate((el) => el.getBoundingClientRect().width / 2);
 
 test("Dollymount's cross-shore hour: the no-go, out and home, and the wind at the foot", async ({
@@ -118,10 +118,12 @@ test("Dollymount's cross-shore hour: the no-go, out and home, and the wind at th
   }
   // A north-easterly drifts a rider along the beach, not out: in ink.
   await expect(r.locator(".map-rose-drift")).not.toHaveClass(/is-out/);
-  // The offshore winds for this beach are red on the bezel; the needle is the
+  // A cross-shore wind carries no one out to sea: no red on the bezel, so
+  // the red never points where the wind is not going. The needle is the
   // wind's colour, the only one in the glass.
-  await expect(r.locator(".map-dial-offshore")).toHaveCount(1);
-  await expect(r.locator(".map-dial-words")).toHaveText("OFFSHORE");
+  await expect(r.locator(".map-dial-offshore-arc")).toHaveCount(0);
+  await expect(r.locator(".map-dial-crossoff")).toHaveCount(0);
+  await expect(r.locator(".map-dial-words")).toHaveCount(0);
   await expect(r.locator(".map-dial-needle path")).toHaveAttribute(
     "fill",
     /^rgb\(/,
@@ -166,11 +168,13 @@ test("an offshore hour: the drift out to sea in red, and no way out or home", as
   await expect(r.locator(".map-rose-fan.is-out")).toHaveCount(0);
   await expect(r.locator(".map-rose-fan.is-home")).toHaveCount(0);
   await expect(r.locator(".map-rose-fan.is-reach")).toHaveCount(2);
-  // The needle stands in the red, pointing out to sea.
+  // The needle stands in the red, pointing out to sea, OFFSHORE along it.
   await expect(r.locator(".map-dial-needle")).toHaveCount(1);
+  await expect(r.locator(".map-dial-offshore-arc")).toHaveCount(1);
+  await expect(r.locator(".map-dial-words")).toHaveText("OFFSHORE");
 });
 
-test("in the dark, only the wind: the needle, the reading and the red", async ({
+test("in the dark, only the wind: the needle, the reading and its red", async ({
   page,
 }) => {
   await open(page, "dollymount");
@@ -181,7 +185,10 @@ test("in the dark, only the wind: the needle, the reading and the red", async ({
   await expect(r.locator(".map-rose-fan")).toHaveCount(0);
   await expect(r.locator(".map-rose-drift")).toHaveCount(0);
   await expect(r.locator(".map-dial-needle")).toHaveCount(1);
-  await expect(r.locator(".map-dial-offshore")).toHaveCount(1);
+  // A west-south-westerly is cross-offshore at Dollymount: the lighter red
+  // the needle stands in, and no OFFSHORE.
+  await expect(r.locator(".map-dial-crossoff")).toHaveCount(1);
+  await expect(r.locator(".map-dial-offshore-arc")).toHaveCount(0);
 });
 
 test("a spot with no shore facing: no red, no out or home, the needle and the reading", async ({
@@ -195,7 +202,7 @@ test("a spot with no shore facing: no red, no out or home, the needle and the re
   await expect(r.locator(".map-loupe-reading")).toHaveText(/^\w+ \d+( g\d+)?$/);
   // With no beach, the units where the shore would be.
   await expect(r.locator(".map-loupe-relation")).toHaveText("kn");
-  await expect(r.locator(".map-dial-offshore")).toHaveCount(0);
+  await expect(r.locator(".map-dial-offshore-arc")).toHaveCount(0);
   await expect(r.locator(".map-dial-crossoff")).toHaveCount(0);
   await expect(r.locator(".map-rose-fan.is-out")).toHaveCount(0);
   await expect(r.locator(".map-rose-fan.is-home")).toHaveCount(0);
