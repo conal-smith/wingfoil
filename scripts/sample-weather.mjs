@@ -976,8 +976,7 @@ function weatherBundle(model, spots, runMs, grid) {
   const hours = frameHours(model);
   const prefix = `${model.id}-${run}-${hours[hours.length - 1]}h-v1`;
   const names = Object.keys(WEATHER_VARIABLES);
-  // A frameless bundle (GFS weather) publishes its spot series alone.
-  const gridded = model.frameless ? [] : model.frameVariables;
+  const gridded = model.frameVariables;
   const series = Object.fromEntries(spots.map((spot) => [spot.id, []]));
   const frames = [];
   const files = [];
@@ -1056,15 +1055,13 @@ function weatherBundle(model, spots, runMs, grid) {
       ...fields,
     };
     const url = `weather/${prefix}/${pad(hour, 3)}.json`;
-    if (!model.frameless) {
-      files.push([url, payload]);
-      frames.push({
-        hour,
-        validTime: valid,
-        url,
-        precipIntervalHours: interval,
-      });
-    }
+    files.push([url, payload]);
+    frames.push({
+      hour,
+      validTime: valid,
+      url,
+      precipIntervalHours: interval,
+    });
     for (const spot of spots) {
       const x = spotX(grid, spot.lon);
       const y = spotY(grid, spot.lat);
@@ -1116,9 +1113,9 @@ function weatherBundle(model, spots, runMs, grid) {
         ];
       }),
     ),
-    ...(model.frameless
-      ? { horizonHours: hours[hours.length - 1] }
-      : { frameVariables: [...gridded] }),
+    // A run on a ladder of steps states how far it reaches, as GFS's does.
+    ...(model.stepRanges ? { horizonHours: hours[hours.length - 1] } : {}),
+    frameVariables: [...gridded],
     frames,
     spotSeries: series,
     precipitationNote:
@@ -1323,8 +1320,9 @@ const CATALOGUE = [
     siteRun: "2026-09-13T12:00:00Z",
   },
   {
-    // The dock's sky, air and rain past ICON-EU weather's three days, as far
-    // as the strip's fifteen; spot series only, as the adapter publishes it.
+    // The dock's sky, air and rain and the map's Weather field past ICON-EU
+    // weather's three days, as far as the strip's fifteen; frames of the rain
+    // and the cloud at every step, as the adapter publishes them.
     id: "gfs-weather",
     file: "gfs-weather.json",
     kind: "weather",
@@ -1335,7 +1333,7 @@ const CATALOGUE = [
     stepRanges: [{ throughHour: 6, stepHours: 1 }],
     horizonHours: 6,
     resolutionKm: 28,
-    frameless: true,
+    frameVariables: ["precip", "clct"],
     spacing: { fixtures: 0.25, live: 0.25 },
     live: {
       horizonHours: 360,

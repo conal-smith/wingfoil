@@ -458,8 +458,10 @@ the GFS wind importer (about 100 KB a step; `--source s3` reads the same message
 range from NOAA's bucket) on GFS's own ladder, **hourly to +120 h and three-hourly
 beyond**, declared as `stepRanges`: 209 steps and about 21 MB for the whole 384-hour run,
 against 129 steps and 13 MB three-hourly, so about 1 GB a month more. It publishes
-`weather/gfs-weather.json` with its spot squares and no frames, in ICON-EU weather's own
-variable names. It is what the dock's sky, air and rain rows read past ICON-EU weather's
+`weather/gfs-weather.json` with its spot squares and a rain and cloud frame at every
+step (`frameVariables: ["precip", "clct"]`, as ICON-EU's; 81 × 45 cells, some 25 KB of
+JSON each, about 5 MB a run), in ICON-EU weather's own variable names. It is what the
+dock's sky, air and rain rows and the map's Weather field read past ICON-EU weather's
 three days: the dock reads ICON-EU while it reaches the hour and GFS from its end on
 (`handedWeatherSource`, force5/src/surface.ts), as the waves go on in IBI and then
 GFS-Wave past MI SWAN's six days (`handedWaveSource`), and as the wind goes on in ECMWF past HARMONIE.
@@ -1521,7 +1523,7 @@ weather/mi-swan.json, weather/mi-swan-RUN-144h-v1-HASH8/    Irish Shelf SWAN: sq
 weather/ibi-wave.json, weather/ibi-wave-RUN-239h-v1-HASH8/  Copernicus Marine IBI waves: squares only
 weather/currents.json, weather/currents-RUN-72h-v1-HASH8/   ROMS surface currents: 73 JSON frames + squares
 weather/icon-eu-weather.json, weather/icon-eu-weather-RUN-72h-v1-HASH8/  surface weather: 73 rain and cloud frames + squares
-weather/gfs-weather.json, weather/gfs-weather-RUN-384h-v1-HASH8/  GFS surface weather: squares only
+weather/gfs-weather.json, weather/gfs-weather-RUN-384h-v1-HASH8/  GFS surface weather: rain and cloud frames + squares
 weather/gfs-wave.json, weather/gfs-wave-RUN-240h-v1-HASH8/  GFS-Wave: squares only
 weather/met-office-wave.json, weather/met-office-wave-RUN-60h-v1-HASH8/  Met Office NWS Wave: squares only
 weather/ecmwf-wave.json, weather/ecmwf-wave-RUN-360h-10v-v1-HASH8/  ECMWF Wave: squares only

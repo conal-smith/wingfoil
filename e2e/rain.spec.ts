@@ -109,6 +109,37 @@ test("turned on, it draws the hour shown under the chart's ink, and follows the 
   expect(errors).toEqual([]);
 });
 
+test("past ICON-EU's three days the sky and the rain go on from GFS", async ({
+  page,
+}) => {
+  // The e2e site's ICON-EU weather reaches 12 UTC on the 16th; its GFS
+  // weather runs from 18 UTC that day, with a frame of rain and cloud a step.
+  const gfsFrames: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (/\/weather\/gfs-weather-[^/]+\/frames\/\d{3}\.json$/.test(path))
+      gfsFrames.push(path);
+  });
+  await page.goto("/?spot=brandon");
+  await barReady(page);
+  await setField(page, "Weather", true);
+  const target = sampleStrip.findIndex(
+    (column) => column.time === Date.parse("2026-09-16T21:00:00Z"),
+  );
+  expect(target).toBeGreaterThan(0);
+  await slider(page).focus();
+  await page.keyboard.press("Home");
+  for (let at = 0; at < target; at++) await page.keyboard.press("ArrowRight");
+  await expect(slider(page)).toHaveValue(String(target));
+  await expect(map(page)).toHaveAttribute(
+    "data-rain-to",
+    "2026-09-16T21:00:00.000Z",
+    { timeout: 20000 },
+  );
+  await expect(map(page)).toHaveAttribute("data-sky", "cloud");
+  expect(gfsFrames.length).toBeGreaterThan(0);
+});
+
 test("its part of About the map says what the hour shows", async ({ page }) => {
   await page.addInitScript(
     (key) => localStorage.setItem(key, "weather"),
@@ -134,7 +165,8 @@ test("with no rain published the page still works, and says so", async ({
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.route("**/weather/icon-eu-weather.json", (route) =>
+  // Neither ICON-EU's pointer nor GFS's, the one past it.
+  await page.route(/\/weather\/(icon-eu|gfs)-weather\.json$/, (route) =>
     route.fulfill({ status: 404, body: "" }),
   );
   await page.addInitScript(

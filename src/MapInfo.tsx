@@ -513,14 +513,16 @@ function WeatherPart({ on, line }: { on: boolean; line: string | null }) {
       </p>
       <p>
         From DWD&rsquo;s ICON-EU model: about 6.5 km, its total cloud and its
-        rain in each hour, out to about three days from its run; past that the
-        map draws no sky, and the legend says how far it goes. Dry is left clear
-        of blue. At a three-hour column the sky and the rain are the mean of its
-        hours. A shower a few kilometres across can be missed or put in the
-        wrong place.
+        rain in each hour, out to about three days from its run; past that from
+        NOAA&rsquo;s GFS, on a coarser quarter-degree grid, hourly to five
+        days and in three-hour steps after. Past the last of them the map draws no sky, and
+        the legend says how far it goes. Dry is left clear of blue. At a
+        three-hour column the sky and the rain are the mean of its hours. A
+        shower a few kilometres across can be missed or put in the wrong place.
       </p>
       <p className="ip-small">
-        Weather data: Deutscher Wetterdienst (DWD) ICON-EU open data, CC BY 4.0.
+        Weather data: Deutscher Wetterdienst (DWD) ICON-EU open data, CC BY 4.0;
+        NOAA/NCEP GFS, public domain.
       </p>
     </>
   );
