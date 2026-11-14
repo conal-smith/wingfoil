@@ -241,9 +241,27 @@ class GfsWeatherTests(unittest.TestCase):
             main(["--hours", "6", "--run", run])
         manifest = read_whole(self.root / "public/weather/gfs-weather.json")
         self.assertEqual((manifest["kind"], manifest["model"], manifest["stepHours"],
-                          manifest["stepRanges"], manifest["horizonHours"], manifest["frames"]),
-                         ("weather", "gfs-weather", 1, [{"throughHour": 6, "stepHours": 1}], 6,
-                          []))
+                          manifest["stepRanges"], manifest["horizonHours"]),
+                         ("weather", "gfs-weather", 1, [{"throughHour": 6, "stepHours": 1}], 6))
+        # A map frame at every step, carrying the rain and the cloud as ICON-EU's do,
+        # so the map's Weather field goes on past ICON-EU's three days.
+        self.assertEqual(manifest["frameVariables"], ["precip", "clct"])
+        self.assertEqual([frame["hour"] for frame in manifest["frames"]], list(range(7)))
+        self.assertEqual([frame["precipIntervalHours"] for frame in manifest["frames"]],
+                         [None, [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6]])
+        first, second = self.frame(manifest, 0), self.frame(manifest, 1)
+        cells = manifest["grid"]["width"] * manifest["grid"]["height"]
+        # Initialization has no interval: nulls, never a field of zeros that reads as dry.
+        self.assertEqual(first["precip"], [None] * cells)
+        self.assertEqual(second["precip"], [4.0] * cells)
+        self.assertEqual((second["model"], second["run"], second["hour"],
+                          second["precipIntervalHours"]),
+                         ("gfs-weather", run, 1, [0, 1]))
+        self.assertEqual(len(second["clct"]), cells)
+        self.assertTrue(all(value % fetch_icon_weather.CLOUD_FRAME_STEP == 0
+                            for value in second["clct"]))
+        # The other variables are the series' alone.
+        self.assertEqual(set(second) & set(VARIABLES), {"precip", "clct"})
         series = manifest["spotSeries"]["brandon"]
         # Hourly: each step's rain is its own hour's.
         self.assertEqual([step["precipIntervalHours"] for step in series],
@@ -259,6 +277,10 @@ class GfsWeatherTests(unittest.TestCase):
         self.assertIn("derived", manifest["presentWeatherNote"])
         validate_bundle(self.root / "public", "gfs-weather",
                         max_age_hours=MODELS["gfs-weather"]["maxAgeHours"])
+
+    def frame(self, manifest, index):
+        info = manifest["frames"][index]
+        return json.loads((self.root / "public/weather" / manifest["base"] / info["url"]).read_text())
 
     def test_past_120_hours_the_steps_and_the_rain_are_three_hourly(self):
         spots = self.root / "spots.json"
@@ -295,6 +317,10 @@ class GfsWeatherTests(unittest.TestCase):
         self.assertEqual([step["values"]["precip"] for step in series[119:]], [0.5, 0.5, 1.5, 1.5])
         # And the chance of rain over the same three hours.
         self.assertEqual([step["values"]["pop"] for step in series[119:]], [100] * 4)
+        # The frames follow the same ladder, each with its own interval.
+        self.assertEqual([frame["precipIntervalHours"] for frame in manifest["frames"][119:]],
+                         [[118, 119], [119, 120], [120, 123], [123, 126]])
+        self.assertEqual(self.frame(manifest, 122)["precip"][0], 1.5)
         validate_bundle(self.root / "public", "gfs-weather",
                         max_age_hours=MODELS["gfs-weather"]["maxAgeHours"])
 

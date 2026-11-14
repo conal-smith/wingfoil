@@ -10,7 +10,10 @@ Open Data bucket through their `.idx` sidecar.
 It publishes a `kind: "weather"` bundle in ICON-EU weather's own names (t2m,
 td2m, rh2m, tp, precip, pop, clct, clcl, clcm, clch, pmsl, vis, cape, ww, tg), so
 the dock reads either the same way, with a precomputed series per riding
-location and no map frames (docs/TILING_DESIGN.md). Steps are GFS's own:
+location, and a map frame at every step carrying `precip` and `clct`, as
+ICON-EU's do: the map's Weather field draws ICON-EU's sky and rain for its
+three days and these past them (src/rainData.ts). On the 0.25° crop a frame is
+81 × 45 cells, some 25 KB of JSON and a few KB compressed. Steps are GFS's own:
 hourly to +120 h, so the dock's rain is each hour's own there, and
 three-hourly beyond, declared as a `stepRanges` ladder.
 
@@ -38,10 +41,11 @@ import numpy as np
 import fetch_gfs
 from fetch_gfs import discover, get, run_datetime
 from fetch_forecast import (BBOX, ROOT, decode_handle, load_spots, published_in_bucket, sample,
-                            spots_file)
+                            spots_file, write_json)
+from fetch_icon_weather import CLOUD_FRAME_STEP, FRAME_VARIABLES, frame_cloud
 import rain_chance
 from registry import MODELS, UNCHANGED_EXIT
-from rundir import write_run
+from rundir import frame_name, write_run
 import timing
 
 MODEL = "gfs-weather"
@@ -414,7 +418,18 @@ def parse_args(argv=None):
     return args
 
 
-def manifest_for(run, run_time, args, grid, series):
+def frame_payload(run, hour, valid, grid, interval, precip, clct):
+    """One step's map frame, as ICON-EU weather's: the rain in the step's interval
+    (nulls at initialization, which has none) and the total cloud at the hour in
+    per cent to the nearest CLOUD_FRAME_STEP."""
+    cells = grid["width"] * grid["height"]
+    return {"model": MODEL, "run": run, "hour": hour, "validTime": valid, "grid": grid,
+            "precipIntervalHours": interval,
+            "precip": [None] * cells if precip is None else precip,
+            "clct": frame_cloud(clct)}
+
+
+def manifest_for(run, run_time, args, grid, frames, series):
     return {
         "schemaVersion": 1, "kind": "weather", "model": MODEL,
         "modelName": "GFS weather", "provider": "NOAA NCEP",
@@ -426,9 +441,10 @@ def manifest_for(run, run_time, args, grid, series):
         "variables": {name: {key: entry[key] for key in ("units", "label", "description")}
                               | ({"kind": CODE} if entry.get("kind") == CODE else {})
                       for name, entry in VARIABLES.items()},
-        # No map frames: nothing reads a weather grid, and the spot series is the
-        # product (docs/TILING_DESIGN.md). The horizon is stated instead.
-        "frames": [], "horizonHours": args.hours, "spotSeries": series,
+        # The frames carry the rain and the total cloud, for the map's Weather
+        # field past ICON-EU's three days; the spot series carries every variable.
+        "frameVariables": list(FRAME_VARIABLES),
+        "frames": frames, "horizonHours": args.hours, "spotSeries": series,
         "rainChanceNote": rain_chance.NOTE,
         "precipitationNote": (
             "tp is GFS's own accumulation since initialization (APCP), which GFS does not publish at "
@@ -436,7 +452,7 @@ def manifest_for(run, run_time, args, grid, series):
             f"+{HOURLY_THROUGH} h and {LATER_STEP} hours beyond, obtained by "
             "differencing it (the first interval's is the first accumulation itself), clamped at zero "
             "and null at initialization, which has no interval. Each series step declares that "
-            "interval in precipIntervalHours."),
+            "interval in precipIntervalHours, as each frame does."),
         "seaTemperatureNote": (
             "tg is GFS's surface temperature. Over sea it is the model's own sea-surface temperature "
             "and a proxy for a measured SST, not an observation; over land it is the skin temperature "
@@ -454,7 +470,9 @@ def manifest_for(run, run_time, args, grid, series):
             "fails the run. precip is derived by differencing APCP, and ww from the precipitation "
             "rate and type, visibility and total cloud (see presentWeatherNote); neither the rate nor "
             "the types are published; pop is worked out from precip around each place (see "
-            "rainChanceNote). spotSeries carries every variable at every published hour, "
+            "rainChanceNote). Each frame carries precip and clct, on the whole crop, for the map, "
+            f"clct there rounded to the nearest {CLOUD_FRAME_STEP} %; "
+            "spotSeries carries every variable at every published hour, "
             "bilinearly sampled except ww, which is read from the containing cell, and pop. No hour is "
             "interpolated: only native forecast steps are published."),
         "sourceUrl": SOURCE_URL,
@@ -518,6 +536,7 @@ def main(argv=None):
     # The cells around each place, for its chance of rain: the crop never moves.
     around = {spot["id"]: rain_chance.neighbourhood(grid, spot["lon"], spot["lat"]) for spot in spots}
     previous_tp, previous_hour = None, None
+    frames = []
     for hour in hours:
         fields, layout = decoded[hour]
         if layout[0] != signature:
@@ -527,6 +546,11 @@ def main(argv=None):
         interval = None if previous_hour is None else [previous_hour, hour]
         previous_hour = hour
         valid = (run_time + timedelta(hours=hour)).isoformat().replace("+00:00", "Z")
+        name = frame_name(prefix, hour, "json")
+        write_json(output / name, frame_payload(run, hour, valid, grid, interval,
+                                                published["precip"], published["clct"]))
+        frames.append({"hour": hour, "validTime": valid, "url": f"weather/{name}",
+                       "precipIntervalHours": interval})
         precip = None if published["precip"] is None else np.asarray(published["precip"], dtype=float)
         for spot in spots:
             sampled = {name: None if values is None else sample_variable(
@@ -534,10 +558,11 @@ def main(argv=None):
             sampled["pop"] = rain_chance.chance(precip, around[spot["id"]])
             series[spot["id"]].append({"hour": hour, "validTime": valid,
                                        "precipIntervalHours": interval, "values": sampled})
-    manifest = manifest_for(run, run_time, args, grid, series)
+    manifest = manifest_for(run, run_time, args, grid, frames, series)
     # Only this final operation advances the published snapshot.
     write_run(output, f"{MODEL}.json", manifest, prefix, spots)
-    print(f"Published {len(hours)} GFS weather steps for {len(spots)} spots to "
+    print(f"Published {len(hours)} GFS weather steps and rain and cloud frames for "
+          f"{len(spots)} spots to "
           f"{output / (MODEL + '.json')}", flush=True)
 
 

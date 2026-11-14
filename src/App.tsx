@@ -2443,7 +2443,7 @@ export default function App() {
         {layers.rain && (
           <li>
             Rain: Deutscher Wetterdienst&rsquo;s ICON-EU model (CC BY 4.0), the
-            rain in each hour
+            rain in each hour, and NOAA&rsquo;s GFS past its three days
           </li>
         )}
         {layers.currents && (

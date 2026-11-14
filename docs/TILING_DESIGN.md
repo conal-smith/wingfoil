@@ -594,6 +594,15 @@ the run, the grid and the value bound; nothing in the format changed.
   rain, which is mostly dry zeros: a frame went from 7–10 KB gzip to 24–30 KB
   (412–428 KB of JSON; measured on the real 00 UTC run of 7 November 2026). Still
   JSON, which the publisher stores gzip-encoded.
+- **Past ICON-EU's three days, GFS (14 November 2026).** ICON-EU's run reaches
+  +72 h, so the Weather field drew nothing for the rest of the strip's week. GFS
+  weather now publishes the same frames (`precip` and `clct`, cloud to the nearest
+  5 %) at every step of its ladder, hourly to +120 h and three-hourly beyond, on its
+  0.25° crop: 81 × 45 cells, some 25 KB of JSON a frame. `src/rainData.ts` reads both
+  pointers and draws an hour from the first that reaches it, ICON-EU then GFS
+  (`rainSourceFor`, force5/src/rain.ts), as the dock's rows hand over
+  (`handedWeatherSource`). An hour inside one of GFS's three-hour steps shows that
+  step's rain per hour.
 
 ## As built: wave-height frames
 

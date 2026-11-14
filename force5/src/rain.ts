@@ -1,8 +1,10 @@
 // Rain: ICON-EU's hourly precipitation, as force5/ingest/fetch_icon_weather.py
 // publishes it (weather/icon-eu-weather.json, one frame an hour carrying
-// `precip` and the total cloud `clct`), and what the map's Weather field and
-// the dock's rain row make of it. The rain is drawn over the sky, which the
-// cloud colours (force5/src/sky.ts).
+// `precip` and the total cloud `clct`), then GFS's past ICON-EU's three days
+// (weather/gfs-weather.json, force5/ingest/fetch_gfs_weather.py, frames of the
+// same two on its coarser grid, hourly to +120 h and three-hourly beyond), and
+// what the map's Weather field and the dock's rain row make of it. The rain is
+// drawn over the sky, which the cloud colours (force5/src/sky.ts).
 //
 // A step's rain is the amount in the interval that ends at it, so it belongs
 // to that interval and to no other hour. Both readers say it per hour: the
@@ -21,6 +23,15 @@ import type { Grid } from "./weather";
 /** The weather run whose frames carry the rain. */
 export const RAIN_MODEL = "icon-eu-weather";
 export const RAIN_URL = "weather/icon-eu-weather.json";
+/**
+ * The runs whose frames the Weather field draws, finest first, as the dock
+ * reads their series (WEATHER_SOURCE_PREFERENCE, force5/src/surface.ts):
+ * ICON-EU's 6.5 km for its three days, then GFS's 0.25° as far as it goes.
+ */
+export const RAIN_URLS: readonly string[] = [
+  RAIN_URL,
+  "weather/gfs-weather.json",
+];
 /** The variable the frames carry for the rain the Weather field draws. */
 export const RAIN_VARIABLE = "precip";
 /** The total cloud the same frames carry, for the sky. */
@@ -222,9 +233,49 @@ export function rainFramesFor(
   return k === null ? [] : [frames[k]];
 }
 
-/** A frame's URL, beside its pointer. */
-export const rainFrameUrl = (base: string, frame: BundleFrame) =>
-  forecastUrl(runPath(RAIN_URL, base, frame.url));
+/**
+ * The last hour a run's rain reaches: the end of its last step with an
+ * interval. Null when it has none (a run of initialization alone).
+ */
+export function rainReach(frames: readonly BundleFrame[]): number | null {
+  const wet = rainIntervals(frames).filter(({ start, end }) => end > start);
+  return wet.length ? wet[wet.length - 1].end : null;
+}
+
+/** The first hour a run's rain is for: the end of its first step with an interval. */
+export function rainStart(frames: readonly BundleFrame[]): number | null {
+  const wet = rainIntervals(frames).find(({ start, end }) => end > start);
+  return wet ? wet.end : null;
+}
+
+/**
+ * Which run draws a column at `to` whose span starts at `from`, and its
+ * frames: the first of `runs` (finest first) that reaches the hour and has
+ * rain for it. Past one run's last step nothing of it is drawn, not even the
+ * part of a long column it still reaches: the next run draws the column
+ * whole, so ICON-EU's three days hand over to GFS without a gap. Null when no
+ * run has the hour.
+ */
+export function rainSourceFor<R extends { frames: readonly BundleFrame[] }>(
+  runs: readonly R[],
+  from: number,
+  to: number,
+): { run: R; frames: BundleFrame[] } | null {
+  for (const run of runs) {
+    const reach = rainReach(run.frames);
+    if (reach === null || to > reach + SLACK_MS) continue;
+    const frames = rainFramesFor(run.frames, from, to);
+    if (frames.length) return { run, frames };
+  }
+  return null;
+}
+
+/** A frame's URL, beside its pointer (ICON-EU's unless another is named). */
+export const rainFrameUrl = (
+  base: string,
+  frame: BundleFrame,
+  pointer: string = RAIN_URL,
+) => forecastUrl(runPath(pointer, base, frame.url));
 
 /** A frame as published, or an error: the right run, hour and size, amounts in range. */
 export function validateRainFrame(

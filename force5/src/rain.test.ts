@@ -5,6 +5,7 @@ import {
   DRY_MM_PER_HOUR,
   RAIN_KEY_MM,
   RAIN_STOPS,
+  RAIN_URLS,
   frameCloud,
   framesCarryCloud,
   rainColour,
@@ -15,6 +16,9 @@ import {
   rainIntervals,
   rainRamp,
   rainRates,
+  rainReach,
+  rainSourceFor,
+  rainStart,
   rainTint,
   stepCovering,
   stepsWithin,
@@ -93,6 +97,66 @@ describe("a step's rain belongs to its own interval", () => {
         (f) => f.hour,
       ),
     ).toEqual([6]);
+  });
+});
+
+describe("past ICON-EU's three days, the map goes on in GFS", () => {
+  /** A run's frames from `start` hours after RUN, at the hours of its ladder. */
+  const run = (name: string, start: number, hours: number[]) => ({
+    name,
+    frames: hours.map((hour, k) => ({
+      hour,
+      validTime: at(start + hour),
+      url: `frames/${String(hour).padStart(3, "0")}.json`,
+      precipIntervalHours: k
+        ? ([hours[k - 1], hour] as [number, number])
+        : null,
+    })),
+  });
+  const range = (from: number, to: number, step = 1) =>
+    Array.from({ length: (to - from) / step + 1 }, (_, k) => from + k * step);
+  // As production published them: ICON-EU's 00 UTC run to +72 h, GFS's
+  // 06 UTC run hourly to +120 h and three-hourly to +384 h.
+  const icon = run("icon", 0, range(0, 72));
+  const gfs = run("gfs", 6, [...range(0, 120), ...range(123, 384, 3)]);
+  const runs = [icon, gfs];
+  const source = (from: number, to: number) => {
+    const found = rainSourceFor(runs, RUN + from * HOUR, RUN + to * HOUR);
+    return found && [found.run.name, found.frames.map((f) => f.hour)];
+  };
+
+  it("reads ICON-EU first and GFS second, as the dock does", () => {
+    expect(RAIN_URLS).toEqual([
+      "weather/icon-eu-weather.json",
+      "weather/gfs-weather.json",
+    ]);
+  });
+
+  it("draws ICON-EU's hours for its three days", () => {
+    expect(source(13, 14)).toEqual(["icon", [14]]);
+    expect(source(71, 72)).toEqual(["icon", [72]]);
+    expect(rainReach(icon.frames)).toBe(RUN + 72 * HOUR);
+    expect(rainStart(icon.frames)).toBe(RUN + 1 * HOUR);
+  });
+
+  it("draws every hour after them from GFS, not nothing", () => {
+    // The first hour past ICON-EU's reach is GFS's, hour 67 of its run.
+    expect(source(72, 73)).toEqual(["gfs", [67]]);
+    // A column straddling the hand-over is drawn whole by GFS.
+    expect(source(70, 73)).toEqual(["gfs", [65, 66, 67]]);
+    // Day four, five and six at midday.
+    for (const day of [3, 4, 5]) {
+      const found = source(day * 24 + 11, day * 24 + 12);
+      expect(found?.[0]).toBe("gfs");
+    }
+    // Past GFS's +120 h an hour is inside a three-hour step, which holds it.
+    expect(source(6 + 121, 6 + 122)).toEqual(["gfs", [123]]);
+    expect(source(6 + 384, 6 + 385)).toBeNull();
+  });
+
+  it("with GFS's frames not yet published, stops at ICON-EU's reach", () => {
+    const found = rainSourceFor([icon], RUN + 72 * HOUR, RUN + 73 * HOUR);
+    expect(found).toBeNull();
   });
 });
 
