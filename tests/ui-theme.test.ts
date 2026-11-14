@@ -440,6 +440,12 @@ describe("ui/theme.css: the values", () => {
     const theme = readFileSync(resolve(ROOT, "ui/theme.css"), "utf8");
     const dark = theme.slice(theme.indexOf(':root[data-theme="dark"]'));
     expect(meta?.[1]).toBe(dark.match(/--color-ground: ([^;]+);/)?.[1]);
+    // And the manifest's, which colours a home-screen launch the same.
+    const manifest = JSON.parse(
+      readFileSync(resolve(ROOT, "public/manifest.webmanifest"), "utf8"),
+    );
+    expect(manifest.theme_color).toBe(meta?.[1]);
+    expect(manifest.background_color).toBe(meta?.[1]);
   });
 
   it.each(Object.entries(TYPE))(
