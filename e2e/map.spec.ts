@@ -132,15 +132,19 @@ test("the chart opens on paper: the head, the controls, the lights and a flush s
   expect(foot.width).toBe(800);
   expect(foot.y + foot.height).toBe(844);
   await expect(page.locator(".map-neat, .nl-t")).toHaveCount(0);
-  // The spot's week in a slim bar over the chart: its name, the strip and
-  // the days under it, the day in hand marked.
+  // The spot's forecast in a slim bar over the chart: its name, and the
+  // strip of hours, zoomed in to them, half a day or so across, never the
+  // week.
   const bar = (await scrubBar(page).boundingBox())!;
   expect(bar.height).toBeLessThan(844 / 3);
   await expect(barName(page)).toHaveText("Brandon Bay");
-  const days = await scrubBar(page).locator(".sb-days span").count();
-  expect(days).toBeGreaterThanOrEqual(4);
-  expect(days).toBeLessThanOrEqual(8);
-  await expect(scrubBar(page).locator(".sb-days span.is-on")).toHaveCount(1);
+  const across = Number(
+    await scrubBar(page)
+      .locator("[data-time-strip]")
+      .getAttribute("data-hours-across"),
+  );
+  expect(across).toBeGreaterThanOrEqual(6);
+  expect(across).toBeLessThanOrEqual(24);
   // Nothing else is on the chart: the rider's spots are in the menu.
   await expect(page.locator(".side")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Site menu" })).toBeVisible();

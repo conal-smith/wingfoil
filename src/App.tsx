@@ -98,7 +98,8 @@ import { MAP_ASK_EVENT } from "./PagesOverMap";
 import { saveChartCentre } from "./lastView";
 import { InfoPop } from "./InfoPop";
 import MapDock from "./MapDock";
-import HourBar from "./HourBar";
+import TimeStrip from "./TimeStrip";
+import { hourWords, nearestIndex } from "./stripHours";
 import useRunRefresh, {
   loadNewerRun,
   RunRecovery,
@@ -127,6 +128,7 @@ import {
 import {
   clock,
   dayShort,
+  irishDate,
   nearestColumn,
   openingColumn,
   stripColumns,
@@ -929,7 +931,7 @@ export default function App() {
 
   /* ---- the map's frame follows the time, a little behind a fast scrub ---- */
   // Beside the list, with a field on, the map is at the cards' hour, which the
-  // hour bar under it scrubs: its frames (and the rain) are that hour's. With
+  // strip of hours under it scrubs: its frames (and the rain) are that hour's. With
   // none on, nothing is drawn from them there, so no hour is read for it. On
   // the full chart, the chart's own.
   const finderTime = useMemo(
@@ -1070,10 +1072,11 @@ export default function App() {
       .then((data) => {
         if (!current()) return;
         setFrame(data);
-        if (requestedIndex + 1 < mapRun.frames.length)
-          void loadFrame(mapRun, requestedIndex + 1, { base: false }).catch(
-            () => {},
-          );
+        // The hours either side, read ahead: a scrub either way finds its
+        // next frame in hand.
+        for (const next of [requestedIndex + 1, requestedIndex - 1])
+          if (next >= 0 && next < mapRun.frames.length)
+            void loadFrame(mapRun, next, { base: false }).catch(() => {});
       })
       .catch(async (e) => {
         if (!current()) return;
@@ -2748,7 +2751,36 @@ export default function App() {
   );
   // The wind beside the list: the Wind field's colour, and no particles.
   const plainWind = useMemo(() => windWith(fieldShown, false), [fieldShown]);
-  /** The map's dock: its field's chips and legend, and beside the list the day's hours. */
+  /**
+   * The finder's hours on the map dock's strip: the strip's columns on the
+   * days the list steps through, one strip from today's first to the last
+   * day's end, past midnight straight on into the next day.
+   */
+  const finderDays = finderDates?.dates.join(",") ?? "";
+  const finderStops = useMemo(() => {
+    const dates = finderDays ? finderDays.split(",") : null;
+    return strip
+      .filter((column) => !dates || dates.includes(column.date))
+      .map((column) => column.time);
+  }, [strip, finderDays]);
+  const finderAt =
+    finderShown === null || !finderStops.length
+      ? -1
+      : nearestIndex(finderStops, finderShown);
+  /**
+   * An hour scrubbed to on the dock's strip: the list's day and hour both,
+   * so the cards and the map share it. Not urgent: the strip moves on its
+   * own, and the page draws the hour once it can.
+   */
+  const pickFinderStop = (at: number) => {
+    const time = finderStops[at];
+    if (time === undefined) return;
+    startTransition(() => {
+      setFinderDay(irishDate(time));
+      setFinderPicked(time);
+    });
+  };
+  /** The map's dock: its field's chips and legend, and the finder's hours. */
   const mapDock = (hours: boolean) => (
     <MapDock
       onRoom={setDockRoom}
@@ -2760,30 +2792,24 @@ export default function App() {
       phone={phone || !split}
       where={hours ? "finder" : "chart"}
     >
-      {hours && finderShown !== null && (
-        <HourBar
-          time={finderShown}
+      {hours && finderAt >= 0 && (
+        <TimeStrip
+          stops={finderStops}
+          at={finderAt}
           now={clockNow}
-          onTime={setFinderPicked}
-          onDay={split ? undefined : (dayStep ?? undefined)}
-          trackBelow={!split}
+          onPick={pickFinderStop}
+          readout={(time) =>
+            hourWords(Math.round(time / 3600000) * 3600000, clockNow)
+          }
+          slider={{
+            label: "Hour",
+            valueText: (time) => hourWords(time, clockNow),
+          }}
+          className="md-hours"
         />
       )}
     </MapDock>
   );
-  /** The phone's dock steps the finder's day as the list's head does. */
-  const dayStep = finderDates && {
-    back: finderDates.dates.indexOf(finderDates.day) > 0,
-    on:
-      finderDates.dates.indexOf(finderDates.day) < finderDates.dates.length - 1,
-    step: (by: -1 | 1) => {
-      const { dates, day } = finderDates;
-      const to = dates[dates.indexOf(day) + by];
-      if (!to) return;
-      setFinderDay(to);
-      setFinderPicked(null);
-    },
-  };
   /** Under the width for the list beside the map: the map, or the list. */
   const narrow = !onChart && !split;
   const listShown = !onChart && (split || narrowList);

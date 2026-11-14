@@ -16,9 +16,9 @@ const harmonie = readSample("harmonie");
  * a red line is ruled down the strip at the time now. Which hours are gone is
  * the clock's business, never the selection's.
  *
- * Read off the scrub bar's strip (src/ScrubBar.tsx), in its own pixels: the
- * faded past runs from the strip's left edge to now, the line stands at now,
- * and the playhead stands on the hour selected.
+ * Read off the scrub bar's strip (src/ScrubBar.tsx), in its drawing's own
+ * pixels: the faded past runs from the drawing's left edge to now, the line
+ * stands at now, and the playhead stands on the hour selected.
  */
 const strip = (page: Page) => page.locator(".scrub .sb-strip");
 
@@ -39,13 +39,14 @@ const nowAt = (page: Page) =>
     .locator(".sb-now-line[data-now]")
     .evaluate((line) => Number(line.getAttribute("x1")));
 
-/** Where the playhead stands. */
+/**
+ * Where the playhead stands along the strip's drawing: it stands still in
+ * the middle of the strip, and the drawing scrolls under it.
+ */
 const headAt = (page: Page) =>
   strip(page)
-    .locator(".sb-head")
-    .evaluate((head) =>
-      Number(head.getAttribute("transform")!.match(/translate\(([-\d.]+)/)![1]),
-    );
+    .locator(".ts-scroll")
+    .evaluate((el) => el.scrollLeft + el.clientWidth / 2);
 
 /** The playhead on a column of the strip, and where it stands there. */
 async function headOn(page: Page, at: number) {
@@ -84,9 +85,7 @@ test("the strip opens on now and fades the hours gone, whatever is selected", as
   };
   await fadedToNow();
   // Scrubbing moves the selection, not the past: on through the week, and
-  // back to the strip's first hour, the past still ends at now. (The week
-  // in view may slide as the playhead nears its edge; the past and the line
-  // slide with it.)
+  // back to the strip's first hour, the past still ends at now.
   const later = columns.findIndex((c) => c.time >= now + 3 * 86400000);
   await headOn(page, later);
   await fadedToNow();

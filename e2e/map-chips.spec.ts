@@ -12,6 +12,7 @@ import {
 } from "./fixtures";
 import { SAMPLE_CLOCK } from "./columns";
 import { readSample } from "./sample";
+import { irishDate } from "../src/strip";
 
 /**
  * The map's field, chosen with the lit chips in its dock (src/MapDock.tsx,
@@ -19,7 +20,7 @@ import { readSample } from "./sample";
  * lists frames for the map) and Weather, at most one on, the one on pressed again for none, which is
  * the plain map with the shallows glowing. The same choice on the finder's
  * map and on the full chart, kept on the device, none too. Beside the list
- * the dock has the day's hour bar, which shares the cards' hour.
+ * the dock has the strip of hours, which shares the cards' hour.
  */
 
 const harmonie = readSample("harmonie");
@@ -285,7 +286,7 @@ test("the choice is kept on the device, none too, and is the full chart's as wel
   );
 });
 
-test("beside the list the hour bar scrubs the list's day, sharing its hour with the cards, and with Wind on the map reads that hour's wind", async ({
+test("beside the list the strip of hours scrubs the list's hour, sharing it with the cards, and with Wind on the map reads that hour's wind", async ({
   page,
 }) => {
   await page.addInitScript(
@@ -295,17 +296,17 @@ test("beside the list the hour bar scrubs the list's day, sharing its hour with 
   const asked = windHoursAsked(page);
   await openFinder(page);
   const track = hourTrack(page);
-  await expect(track).toHaveAttribute("aria-valuemin", "6");
-  await expect(track).toHaveAttribute("aria-valuemax", "21");
+  await expect(track).toHaveAttribute("aria-valuemin", "0");
   await expect(track).toHaveAttribute("aria-valuetext", /^Today \d\d:00$/);
   await expect.poll(() => mapHour(page)).toMatch(/^\d\d:00$/);
-  const start = Number(await track.getAttribute("aria-valuenow"));
+  const start = Number(
+    /(\d\d):00$/.exec((await track.getAttribute("aria-valuetext"))!)![1],
+  );
   // The keys step it an hour, and the cards and the lights go with it.
   await track.focus();
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
   const hour = String(start + 2).padStart(2, "0");
-  await expect(track).toHaveAttribute("aria-valuenow", String(start + 2));
   await expect(track).toHaveAttribute("aria-valuetext", `Today ${hour}:00`);
   await expect(mapDock(page).locator("[data-hour-when]")).toHaveText(
     `Today ${hour}:00`,
@@ -313,16 +314,14 @@ test("beside the list the hour bar scrubs the list's day, sharing its hour with 
   await expect(cardHour(page)).toHaveText(`${hour}:00`);
   await expect.poll(() => mapHour(page)).toBe(`${hour}:00`);
   // The wind tiles of that hour (Irish summer time is an hour ahead).
-  const day = await mapDock(page)
-    .locator("[data-hour-bar]")
-    .getAttribute("data-day");
+  const day = irishDate(AFTERNOON.getTime());
   const lead =
     (Date.parse(`${day}T${String(start + 2 - 1).padStart(2, "0")}:00:00Z`) -
       Date.parse(harmonie.runTime)) /
     3600000;
   await expect.poll(() => asked.has(lead), { timeout: 20000 }).toBe(true);
 
-  // A press on a card's bars moves the bar too: one hour, both ways.
+  // A press on a card's bars moves the strip too: one hour, both ways.
   const bar = page
     .locator("[data-spot-card]")
     .nth(0)
@@ -333,14 +332,15 @@ test("beside the list the hour bar scrubs the list's day, sharing its hour with 
   const picked = await cardHour(page).textContent();
   await expect(track).toHaveAttribute("aria-valuetext", `Today ${picked}`);
 
-  // A drag along the track picks the hour under it, the last one at its end.
-  const t = (await track.boundingBox())!;
-  await page.mouse.click(t.x + t.width - 1, t.y + 8);
-  await expect(track).toHaveAttribute("aria-valuenow", "21");
-  await expect(track).toHaveAttribute("aria-valuetext", "Today 21:00");
+  // On past midnight, the strip carries on into the next day, and the
+  // list's day goes with it.
+  await track.focus();
+  await page.keyboard.press("PageUp");
+  await expect(track).toHaveAttribute("aria-valuetext", /^Tomorrow \d\d:00$/);
+  await expect(page.locator("[data-finder-day]")).toContainText("Tomorrow");
 });
 
-test("with no field on, a scrub of the hour bar reads no wind for the map", async ({
+test("with no field on, a scrub of the strip of hours reads no wind for the map", async ({
   page,
 }) => {
   const asked = windHoursAsked(page);

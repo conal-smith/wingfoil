@@ -70,14 +70,15 @@ test("the first frame the page asks for is the one it opens on", async ({
   await expect.poll(() => asked.length, { timeout: 20000 }).toBeGreaterThan(0);
   await page.waitForTimeout(1500);
   const hours = [...new Set(asked.map(([, , , hour]) => hour))];
-  // The opening hour first, then the next, prefetched; nothing else.
-  expect(hours).toHaveLength(2);
+  // The opening hour first, then the hours either side of it, read ahead
+  // for a scrub either way; nothing else.
+  expect(hours).toHaveLength(3);
   expect(hours[0]).toBeGreaterThan(0);
-  expect(hours[1]).toBe(
-    harmonie.frames[
-      harmonie.frames.findIndex(
-        (frame: { hour: number }) => frame.hour === hours[0],
-      ) + 1
-    ].hour,
+  const at = harmonie.frames.findIndex(
+    (frame: { hour: number }) => frame.hour === hours[0],
   );
+  expect(hours.slice(1).sort((a, b) => a - b)).toEqual([
+    harmonie.frames[at - 1].hour,
+    harmonie.frames[at + 1].hour,
+  ]);
 });
