@@ -438,7 +438,7 @@ test("a tap off the spot lets it go, leaving the plain timeline still moving the
   await expect(barName(page)).toHaveText("Brandon Bay");
 });
 
-test("the card beside the spot's pill opens its page at the hour in hand, and so does the keys' link", async ({
+test("the card beside the spot's ring opens its page at the hour in hand, and so does the keys' link", async ({
   page,
 }) => {
   await openBar(page);
@@ -451,20 +451,22 @@ test("the card beside the spot's pill opens its page at the hour in hand, and so
   await expect(link).toHaveAttribute("href", at(later));
   await link.focus();
   await expect(link).toBeInViewport();
-  // The card beside the chosen spot's light pill (2026-11-08): its pointer at
-  // the pill, never over it.
+  // The card beside the chosen spot's ring (2026-11-14): its pointer at the
+  // ring, never over it or its arrow.
   const card = page.locator('[data-spot-peek="brandon"]');
   await expect(card).toBeVisible();
-  const pill = (await page
-    .locator('.spot-marker.sel[data-spot-id="brandon"] .lt-pill')
-    .boundingBox())!;
+  const light = page.locator('.spot-marker.sel[data-spot-id="brandon"]');
+  await expect(light.locator(".lt-pill")).toBeHidden();
   const box = (await card.boundingBox())!;
-  expect(
-    box.x >= pill.x + pill.width ||
-      box.x + box.width <= pill.x ||
-      box.y >= pill.y + pill.height ||
-      box.y + box.height <= pill.y,
-  ).toBe(true);
+  for (const mark of [".lt-ring", ".lt-wind"]) {
+    const at = (await light.locator(mark).boundingBox())!;
+    expect(
+      box.x >= at.x + at.width ||
+        box.x + box.width <= at.x ||
+        box.y >= at.y + at.height ||
+        box.y + box.height <= at.y,
+    ).toBe(true);
+  }
   const open = card.locator("[data-peek-open]");
   await expect(open).toHaveAttribute("href", at(later));
   await open.click();

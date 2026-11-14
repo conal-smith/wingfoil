@@ -55,7 +55,7 @@ import { useCurrents } from "./useCurrents";
 import { useRain } from "./useRain";
 import { useWaves, useWavesPublished } from "./useWaves";
 import type { LightState, PillMode } from "../force5/src/lights";
-import { PHONE_GAP, WIDE_GAP } from "../force5/src/pillBest";
+import { PHONE_GAP } from "../force5/src/pillBest";
 import { placeCard, type CardPlace } from "../force5/src/cardPlace";
 import SpotPeek from "./SpotPeek";
 import {
@@ -2589,9 +2589,9 @@ export default function App() {
   }, [onChart]);
   /**
    * A spot picked in the top bar's search: the map flies to it and it is
-   * chosen there, its pill light. On the chart as a light pressed is; on the
-   * finder beside the list its card is outlined and brought into view; on a
-   * phone its peek opens over the map.
+   * chosen there. On the chart as a ring pressed is; on the finder its pill
+   * turns light, and beside the list its card is outlined and brought into
+   * view, or on a phone its peek opens over the map.
    */
   const pickFound = (spot: Spot) => {
     if (pageRef.current === "chart") return selectSpot(spot);
@@ -2735,16 +2735,15 @@ export default function App() {
     [layers],
   );
   // Which spots are pills: beside the list the cards in view; on the phone's
-  // map and the full chart the best few in view, closer on a narrow screen.
+  // map the best few in view, closer on a narrow screen. On the full chart
+  // none: every spot is its rated ring.
   const pills = useMemo<PillMode>(
     () =>
-      page === "finder" && split
-        ? { kind: "cards" }
-        : {
-            kind: "best",
-            gap: split ? WIDE_GAP : PHONE_GAP,
-            field: fieldShown,
-          },
+      page === "chart"
+        ? { kind: "rings" }
+        : split
+          ? { kind: "cards" }
+          : { kind: "best", gap: PHONE_GAP, field: fieldShown },
     [page, split, fieldShown],
   );
   // The wind beside the list: the Wind field's colour, and no particles.
@@ -2799,12 +2798,12 @@ export default function App() {
         : "map";
   const skip = !onChart ? SKIP.list : dockOpen ? SKIP.dock : SKIP.search;
   /**
-   * The full chart's card for the spot open on it, beside its light pill,
-   * a small pointer at it (force5/src/cardPlace.ts). Placed where the camera
+   * The full chart's card for the spot open on it, beside its ring and the
+   * ring's arrow, a small pointer at them (force5/src/cardPlace.ts). Placed where the camera
    * rests, out of sight through a move.
    */
   const chartCard = useRef<HTMLDivElement>(null);
-  // Not on a phone: the card has no room beside a pill there, and the dock
+  // Not on a phone: the card has no room beside a ring there, and the dock
   // under the map already says the spot's wind, waves and tide.
   const cardSpot =
     onChart && !phone && !picked && point && focusId === point.id
@@ -2827,12 +2826,24 @@ export default function App() {
     const place = () => {
       const card = chartCard.current;
       const box = map.getContainer();
-      const pill = box.querySelector(
-        `.spot-marker[data-spot-id="${CSS.escape(cardSpot.id)}"] .lt-pill`,
+      const light = box.querySelector(
+        `.spot-marker[data-spot-id="${CSS.escape(cardSpot.id)}"]`,
       );
-      const r = pill?.getBoundingClientRect();
-      if (!card || !r?.width) return setCardAt(null);
+      // The ring and its arrow: the card stands clear of both.
+      const marks = [
+        ...(light?.querySelectorAll(":scope > svg :is(.lt-ring, .lt-wind)") ??
+          []),
+      ]
+        .map((el) => el.getBoundingClientRect())
+        .filter((q) => q.width || q.height);
+      if (!card || !marks.length) return setCardAt(null);
       const f = box.getBoundingClientRect();
+      const mark = {
+        l: Math.min(...marks.map((q) => q.left)) - f.left,
+        t: Math.min(...marks.map((q) => q.top)) - f.top,
+        r: Math.max(...marks.map((q) => q.right)) - f.left,
+        b: Math.max(...marks.map((q) => q.bottom)) - f.top,
+      };
       const local = (q: DOMRect) => ({
         l: q.left - f.left,
         t: q.top - f.top,
@@ -2849,7 +2860,7 @@ export default function App() {
         .map(local);
       setCardAt(
         placeCard(
-          local(r),
+          mark,
           card.offsetWidth,
           card.offsetHeight,
           {
@@ -2864,7 +2875,7 @@ export default function App() {
       );
     };
     const hide = () => setCardAt(null);
-    // Once the pill stands where the camera rests, and its look is light.
+    // Once the ring stands where the camera rests, a size up as the open one.
     const soon = window.setTimeout(place, 80);
     map.on("movestart", hide);
     map.on("moveend", place);

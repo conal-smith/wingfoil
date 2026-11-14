@@ -1,4 +1,5 @@
 import { expect, steadyFrames, test, type Page } from "./fixtures";
+import { SAMPLE_CLOCK } from "./columns";
 
 /**
  * Through a camera move the lights are drawn on one canvas, and their
@@ -89,4 +90,88 @@ test("through a move the lights are drawn on a canvas, and the buttons come back
   expect(Math.abs(shift.y - by.y)).toBeLessThan(40);
   expect(await painted(page, after)).toBe(0);
   expect(errors).toEqual([]);
+});
+
+test("on the full chart every spot is its rated ring with its wind's arrow, and the finder's map keeps its pills", async ({
+  page,
+}) => {
+  // An afternoon, when the stars are out.
+  await page.clock.setFixedTime(
+    new Date(SAMPLE_CLOCK.getTime() - 7.5 * 3600000),
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/?map");
+  const lights = page.locator(".spot-marker");
+  await expect(lights).toHaveCount(149, { timeout: 30000 });
+  await expect(page.locator(".spot-marker.pending")).toHaveCount(0, {
+    timeout: 30000,
+  });
+  await steadyFrames(page);
+  // No pill and no bead on the chart (2026-11-14).
+  await expect(page.locator(".spot-marker.lt-pilled")).toHaveCount(0);
+  await expect(page.locator(".spot-marker.lt-bead")).toHaveCount(0);
+  await expect(page.locator(".spot-marker .lt-pill:visible")).toHaveCount(0);
+
+  // A rated ring: filled in its stars' colour, its figure the stars, its
+  // arrow the wind, even from the national zoom; and no two full rings stand
+  // on each other there.
+  const rings = await lights.evaluateAll((els) =>
+    els
+      .filter((el) => /\bs[1-5]\b/.test(el.className))
+      .filter((el) => !el.classList.contains("lt-thin"))
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        const ring = el.querySelector(".lt-ring")!;
+        return {
+          id: el.getAttribute("data-spot-id")!,
+          stars: Number(/\bs([1-5])\b/.exec(el.className)![1]),
+          figure: el.querySelector(".lt-n")!.textContent,
+          fill: getComputedStyle(ring).fill,
+          arrow: getComputedStyle(el.querySelector(".lt-wind")!).display,
+          label: el.getAttribute("aria-label") ?? "",
+          x: r.left + r.width / 2,
+          y: r.top + r.height / 2,
+        };
+      }),
+  );
+  expect(rings.length).toBeGreaterThan(10);
+  await expect(page.locator(".map-canvas.z-lo")).toHaveCount(1);
+  const fills = new Map<number, string>();
+  for (const ring of rings) {
+    expect(ring.figure).toBe(String(ring.stars));
+    expect(ring.label).toContain(
+      `${ring.stars} star${ring.stars === 1 ? "" : "s"}`,
+    );
+    expect(ring.arrow).not.toBe("none");
+    if (fills.has(ring.stars)) expect(ring.fill).toBe(fills.get(ring.stars));
+    else fills.set(ring.stars, ring.fill);
+  }
+  // A colour for each number of stars.
+  expect(new Set(fills.values()).size).toBe(fills.size);
+  for (const [i, a] of rings.entries())
+    for (const b of rings.slice(i + 1))
+      expect(
+        Math.abs(a.x - b.x) >= 20 || Math.abs(a.y - b.y) >= 20,
+        `${a.id} and ${b.id} stand on each other`,
+      ).toBe(true);
+
+  // Under the mouse a ring grows and says its name; no name stands otherwise.
+  await expect(page.locator(".spot-marker .lt-lab:visible")).toHaveCount(0);
+  const one = rings.find(
+    (r) => r.x > 400 && r.x < 1100 && r.y > 150 && r.y < 650,
+  )!;
+  await page.mouse.move(one.x, one.y);
+  const lab = page.locator(`.spot-marker[data-spot-id="${one.id}"] .lt-lab`);
+  await expect(lab).toBeVisible();
+  await expect(page.locator(".spot-marker .lt-lab:visible")).toHaveCount(1);
+
+  // The finder's map beside the list keeps its pills and beads, and no ring.
+  await page.goto("/");
+  await expect
+    .poll(() => page.locator(".spot-marker.lt-pilled").count(), {
+      timeout: 30000,
+    })
+    .toBeGreaterThan(0);
+  await expect(page.locator(".spot-marker.lt-bead").first()).toBeAttached();
+  await expect(page.locator(".spot-marker .lt-ring:visible")).toHaveCount(0);
 });

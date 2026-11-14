@@ -227,7 +227,10 @@ type Props = {
   onHoverSpot?: (spot: Spot | null) => void;
   /** The spots the best few pills went to, as they are chosen. */
   onBestPills?: (ids: readonly string[]) => void;
-  /** Which spots have a pill (./lights.ts): the cards in view, or the best few. */
+  /**
+   * Which spots have a pill (./lights.ts): the cards in view, or the best few;
+   * on the full chart none, every spot its rated ring.
+   */
   pills: PillMode;
   /**
    * The name beside the chosen spot, or beside the point tapped, is pressed:
@@ -237,8 +240,8 @@ type Props = {
   /** Where the rider is, drawn as a blue dot, or null where it is not known. */
   you?: { lon: number; lat: number } | null;
   /**
-   * The plain map beside the Spot finder's list: the cards in view as pills,
-   * every other spot a bead (./lights.ts), not rings.
+   * The finder's plain map: pills and beads (./lights.ts), not the full
+   * chart's rings.
    */
   plain?: boolean;
   /**

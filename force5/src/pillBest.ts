@@ -1,8 +1,8 @@
 /**
  * Which spots get a pill where no list stands beside the map: the phone's map
- * and the full chart (./lights.ts). There the map has room for a few pills
- * only, so it gives them to the best spots in view, at most `most` of them,
- * and every other spot is a bead.
+ * (./lights.ts); the full chart has none, every spot there its ring. The map
+ * has room for a few pills only, so it gives them to the best spots in view,
+ * at most `most` of them, and every other spot is a bead.
  *
  * The best first: the most stars at the hour, then the rider's favourites,
  * then the figure the map shows (the wind, the waves or the sky), then the
@@ -53,9 +53,8 @@ export interface BestOptions {
   keep?: string | null;
 }
 
-/** On the phone the pills may stand closer; the chart's spread wider. */
+/** The least distance between two pills' spots on the phone's map. */
 export const PHONE_GAP = 90;
-export const WIDE_GAP = 140;
 /** The most pills where no list stands beside the map. */
 export const BEST_PILLS = 5;
 
