@@ -1396,8 +1396,8 @@
   color: var(--color-warn);
 }
 /* The map's dock (src/MapDock.tsx), centred on its foot: the field's lit
-   chips with the legend at their right, and under them the day's hours
-   (src/HourBar.tsx) beside the list. A floating box: opaque, its corner a
+   chips with the legend at their right, and under them the finder's strip
+   of hours (src/TimeStrip.tsx). A floating box: opaque, its corner a
    card's, a faint edge. On the full chart it stands above the scrub bar. */
 .map-dock {
   position: absolute;
@@ -1478,74 +1478,10 @@
 .ml-marks span:last-child {
   transform: translateX(-100%);
 }
-/* The day's hours: play, the hour in words, and the track from 06 to 21. */
-.hour-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.hb-when {
-  min-width: 92px;
-  font: 600 var(--text-label) / 1.2 var(--font-body);
-  color: var(--color-ink);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.hb-track {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  height: 32px;
-  cursor: pointer;
-  touch-action: none;
-  border-radius: var(--radius-control);
-}
-.hb-track:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-.hb-rail {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 7px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--color-line);
-}
-.hb-fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  border-radius: 2px;
-  background: var(--color-ink);
-}
-.hb-thumb {
-  position: absolute;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  margin: -7px 0 0 -7px;
-  border-radius: 50%;
-  background: var(--color-ground);
-  border: 3px solid var(--color-ink);
-  box-shadow: var(--shadow-control);
-}
-.hb-marks span {
-  position: absolute;
-  top: 18px;
-  transform: translateX(-50%);
-  font: 500 var(--text-caption) / 13px var(--font-body);
-  color: var(--color-ink-muted);
-  font-variant-numeric: tabular-nums;
-}
-.hb-marks span:first-child {
-  transform: none;
-}
-.hb-marks span:last-child {
-  transform: translateX(-100%);
+/* The finder's hours under the chips (src/TimeStrip.tsx): the hour over
+   the playhead, and the strip of hours under it. */
+.md-hours {
+  margin: 2px 0 0 6px;
 }
 @media (max-width: 720px) {
   /* On a phone the dock is the screen's width, its chips sharing it. */
@@ -1564,6 +1500,9 @@
   .md-chips > * {
     flex: 1 1 0;
     justify-content: center;
+  }
+  .md-hours {
+    margin-left: 0;
   }
 }
 /* Where the dock over the scrub bar leaves no room at its side, the small
@@ -1815,11 +1754,8 @@
   transform: none;
   padding: 6px;
 }
-.narrow-foot .hour-bar {
-  order: 1;
-}
-.narrow-foot .md-what {
-  order: 2;
+.narrow-foot .md-hours {
+  margin-left: 0;
 }
 .narrow-foot .md-chips {
   display: flex;
@@ -1894,33 +1830,6 @@
   right: 12px;
   bottom: calc(var(--nf-room, 62px) + 10px);
 }
-.hb-day {
-  flex: none;
-}
-/* On the narrow dock the hour's words say the hour: no figures under the track. */
-.narrow-foot .hb-marks {
-  display: none;
-}
-.narrow-foot .hb-when {
-  flex: 1;
-  text-align: center;
-}
-/* Clear of the dock's edge by the thumb's half, less the dock's padding. */
-.narrow-foot .hb-track {
-  order: 3;
-  flex: none;
-  height: 44px;
-  margin: 0 5px;
-}
-.narrow-foot .hb-rail {
-  top: 20px;
-}
-.narrow-foot .hb-thumb {
-  width: 22px;
-  height: 22px;
-  margin: -11px 0 0 -11px;
-}
-
 /* ---------- a spot's peek and card ---------- */
 /* Its name, its wind, waves, weather and tide, and its stars at the hour
    (src/SpotPeek.tsx): over the phone's map a small peek at the left above

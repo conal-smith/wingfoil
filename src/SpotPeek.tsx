@@ -11,7 +11,7 @@ import type { Spot } from "../force5/src/weather";
 import { Button } from "../ui/Button";
 import { Link } from "../ui/Link";
 import { StarGlyphs } from "../ui/StarGlyphs";
-import { hourWords } from "./HourBar";
+import { hourWords } from "./stripHours";
 import type { PlaceHour } from "./ratings";
 import { clock } from "./strip";
 

@@ -135,21 +135,26 @@
 }
 
 /* ---- the strip ---- */
+/* The strip of hours (src/TimeStrip.tsx) with the forecast drawn along it,
+   the bands' names in a column beside it. */
 .sb-strip {
   --sb-bands: 56px;
   position: relative;
   margin-top: 8px;
   margin-left: var(--sb-bands);
-  padding-bottom: 18px;
-  box-sizing: content-box;
-  cursor: ew-resize;
-  touch-action: none;
 }
 .sb-strip svg {
-  position: absolute;
-  inset: 0 0 auto;
   display: block;
   overflow: visible;
+}
+/* Over the playhead, which stands in the strip's middle: its knob and the
+   moment's dots on the curves. */
+.sb-head {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 2;
+  pointer-events: none;
 }
 /* The slider is out of sight: its focus ring is drawn on the strip. */
 .scrub:has(.sb-time:focus-visible) .sb-strip {
@@ -163,7 +168,6 @@
   top: 0;
   right: 100%;
   width: var(--sb-bands);
-  height: 100%;
   pointer-events: none;
 }
 .sb-band,
@@ -242,10 +246,6 @@
   stroke: var(--color-ink-2);
   stroke-width: 1.5;
 }
-.sb-head line {
-  stroke: var(--color-ink);
-  stroke-width: 1.5;
-}
 .sb-knob {
   fill: var(--color-ink);
   filter: drop-shadow(0 1px 2px #00000080);
@@ -254,26 +254,6 @@
   fill: var(--color-ground);
   stroke: var(--color-ink);
   stroke-width: 1.5;
-}
-
-/* The days under the strip, each at the middle of its stretch. */
-.sb-days {
-  position: absolute;
-  inset: auto 0 0;
-  height: 16px;
-  pointer-events: none;
-}
-.sb-days span {
-  position: absolute;
-  bottom: 0;
-  transform: translateX(-50%);
-  font: 500 var(--text-label) / 16px var(--font-body);
-  color: var(--color-ink-muted);
-  white-space: nowrap;
-}
-.sb-days span.is-on {
-  color: var(--color-ink);
-  font-weight: 600;
 }
 
 /* "Show ECMWF on the map": a chip over the bar's right end, where an hour
@@ -339,4 +319,152 @@
   .sb-strip {
     --sb-bands: 44px;
   }
+}
+
+/* ---- the strip of hours (src/TimeStrip.tsx) ----
+   The map dock's time and the scrub bar's alike: about eight hours across
+   a phone, a notch for each, the browser's own scroll under a playhead that
+   stands still in the middle, coming to rest on an hour. */
+.time-strip {
+  position: relative;
+  min-width: 0;
+}
+/* The hour in words over the playhead, on the strip itself, so a finger
+   can take hold of the strip there too. */
+.ts-when {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  height: 20px;
+  pointer-events: none;
+  font: 600 var(--text-body) / 20px var(--font-body);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+  text-align: center;
+  white-space: nowrap;
+}
+.ts-view {
+  position: relative;
+}
+.ts-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  cursor: grab;
+  border-radius: var(--radius-control);
+}
+.ts-scroll::-webkit-scrollbar {
+  display: none;
+}
+/* Pixel by pixel under a mouse or a wheel; it snaps again once they let go. */
+.ts-scroll.is-free {
+  scroll-snap-type: none;
+}
+.ts-scroll.is-free:active {
+  cursor: grabbing;
+}
+.ts-scroll:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.has-when .ts-scroll {
+  padding-top: 22px;
+}
+.ts-content {
+  position: relative;
+}
+.ts-draw {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+}
+.ts-notches {
+  position: absolute;
+  left: 0;
+  display: block;
+  overflow: visible;
+}
+.ts-notch {
+  stroke: color-mix(in srgb, var(--color-ink) 50%, transparent);
+  stroke-width: 1;
+}
+.ts-notch.is-label {
+  stroke: color-mix(in srgb, var(--color-ink) 80%, transparent);
+}
+.ts-notch.is-day {
+  stroke: var(--color-ink-2);
+}
+.ts-notch.is-past {
+  opacity: 0.45;
+}
+.ts-now {
+  fill: var(--color-ink-2);
+}
+.ts-figures {
+  position: absolute;
+  left: 0;
+  width: 100%;
+}
+.ts-figures span {
+  position: absolute;
+  top: 1px;
+  transform: translateX(-50%);
+  font: 500 var(--text-caption) / 13px var(--font-body);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+.ts-figures span.is-day {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.ts-figures span.is-past {
+  opacity: 0.6;
+}
+/* Where it comes to rest: each of the forecast's hours. */
+.ts-stop {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 1px;
+  margin-left: -1px;
+  scroll-snap-align: center;
+  pointer-events: none;
+}
+/* The playhead: still, in the middle, over the drawing and the notches,
+   standing a little proud of them. */
+.ts-head {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--color-ink);
+  pointer-events: none;
+}
+.has-when .ts-head {
+  top: 19px;
+}
+/* The hours fade out at the strip's ends rather than stopping at an edge. */
+.ts-view::before,
+.ts-view::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 28px;
+  pointer-events: none;
+}
+.ts-view::before {
+  left: 0;
+  background: linear-gradient(to right, var(--color-ground), transparent);
+}
+.ts-view::after {
+  right: 0;
+  background: linear-gradient(to left, var(--color-ground), transparent);
 }

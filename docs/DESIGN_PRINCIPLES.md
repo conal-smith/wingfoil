@@ -19,8 +19,8 @@ space and soft cards (ruling of 2026-11-01).
 ## The accent rule
 
 **One filled button per view.** `bg-accent` is the filled action, and a view
-gets one at most: Play in the dock, Sell in the marketplace's bar, Retry in an
-error state, never two at once. A second filled button does not add emphasis,
+gets one at most: Sell in the marketplace's bar, Retry in an error state,
+never two at once. A second filled button does not add emphasis,
 it removes it. In the kit it is `<Button variant="primary">`, filled in ink
 (white in the dark theme), and the kit writes the accent fill nowhere else.
 
@@ -717,8 +717,7 @@ changes". The dock is gone, and with it the Blend view, the fold of rows under
 it and the phone's sheet. In its place a bar the full width of the map
 (`src/ScrubBar.tsx`): the controls in one row (the spot, Full forecast, the
 close, play and step, Wind | Waves | Tide, the key, Now), and under them the
-strip, a week at a time, sliding on through the fortnight. A playhead is
-dragged smoothly, not hour by hour; the column nearest it is the map's. Under
+strip of the forecast's hours (zoomed in to the hours since 2026-11-14). Under
 the curve one thin row is the stars as colour, and a pill over the playhead
 reads the moment. With no spot chosen it is a plain timeline that still moves
 the map. Everything the dock's rows held (the gust factor, the waves' period
@@ -1247,11 +1246,10 @@ metre is the same colour on the map as on a card.
 The legend stands at the dock's right: "Shallow water" with its swatch with no
 field on, else the field's ramp with its unit and a few figures under it,
 evenly spaced and never touching (src/MapScales.tsx). It names no source, and
-on a phone there is none. Under the chips beside the list is a slim hour bar
-for the list's day (src/HourBar.tsx): play, "Today 13:00", and 06 to 21. It
-and the cards share one hour both ways, and with a field on the map beside the
-list draws that hour. The full chart keeps its week bar with the stars, the
-dock standing over it with the chips and the legend alone. The chart's rail
+on a phone there is none. Under the chips on the finder's map is the strip of
+hours (2026-11-14). It and the cards share one hour both ways, and with a
+field on the map draws that hour. The full chart keeps its scrub bar with the
+stars, the dock standing over it with the chips and the legend alone. The chart's rail
 loses Coloured wind, Tidal depth and Rain, and their exclusion of each other
 (2026-11-06) with them; it keeps the particles, live wind, currents, the
 depths, the satellite and the loupe.
@@ -1322,8 +1320,8 @@ Weather field as the rain alone and Waves as a chip to come.
 stands beside the map, and no range ring.** The owner's design. Under 1100
 pixels the finder is the map or the list, the map first: the top bar, the map
 the screen's height, a Map | List switch (a small dark pill) over the dock, a
-locate button, and the dock at the foot, the day and its hours on one row and
-the three chips the screen's width under it, with no legend and no zoom
+locate button, and the dock at the foot, the three chips the screen's width
+and the strip of hours under them (2026-11-14), with no legend and no zoom
 buttons. The list is its one-row head and its cards, the switch and the chips
 staying where they stood on a solid strip; the hours go, the cards having them.
 With the heart off the list is the spots the map showed. "Use my location"
@@ -1415,3 +1413,33 @@ The finder's map, beside the list and the phone's Map, keeps its pills and
 beads unchanged. This replaces, for the full chart, the best five pills and
 the beads of 2026-11-08, and the ring with no arrow from the national zoom of
 2026-11-06.
+
+**2026-11-14 — A strip of hours under the finger, about eight across a
+phone.** The owner, from the site on a phone: the map's time was a play
+button, a day's arrows, the chips and a plain slider with no hour marks, and
+scrubbing it lagged, the map stepping an hour at a time behind the finger;
+the chart's strip squeezed the whole week into the screen's width, about two
+pixels an hour, "far too zoomed out". Both are now one strip of hours
+(`src/TimeStrip.tsx`, `src/stripHours.ts`): about eight hours across a phone
+(an hour 40 to 60 px wide, so a day or so across a desk's screen, never a
+week), a notch for every hour, every third hour's figure, and the day's name
+where a day begins ("Mon 14"), past midnight straight on into the next day.
+A playhead stands still in the middle and the hours slide under it: the
+browser's own scroll, which a finger drags one to one and flings on with the
+platform's momentum, coming to rest on one of the forecast's hours (scroll
+snapping); a mouse drags it, a wheel turns it, a tap or a click glides to an
+hour, and the keys step hours and days. The motion is never the page's: the
+words over the playhead are written on each frame without a render, the page
+is told the hour only as the playhead crosses into another, as an update
+that waits on nothing, and the map reads the frames either side of its hour
+ahead. On the finder's map the dock is the Wind, Waves and Weather chips and
+the strip under them, the hour in words over its playhead ("Today 16:00",
+"Sun 09:00"): no play, no day arrows, no tide and no spot. The days step in
+the list's head alone. On the chart the scrub bar keeps its readout and its
+drawing (the wind and gusts, the stars, the waves and the tide, or with no
+spot the spots with stars), drawn along the same strip and scrolled under the
+same playhead, its wind scale the whole forecast's so the curve never
+stretches under the finger. This replaces the hour bar of 2026-11-07 (play,
+the words, and 06 to 21), the phone's day arrows on it (2026-11-08), and the
+scrub bar's week in view sliding on through the fortnight with a playhead
+dragged across it (2026-11-01).

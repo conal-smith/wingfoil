@@ -52,19 +52,19 @@ test("the map opens first, then the list, which has no dock", async ({
   await expect(switchTo(page, "List")).toBeVisible();
   await expect(switchTo(page, "Map")).toHaveCount(0);
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
-  // The dock: the day, then the chips the screen's width, then the hours'
-  // track as wide as the dock; no legend, no zoom buttons, and the map's own
-  // locate button.
-  const hours = foot(page).locator("[data-hour-bar]");
+  // The dock: the chips the screen's width, then the strip of hours as wide
+  // as the dock, the hour in words over its playhead; no play, no day
+  // arrows (the list's head steps the days), no legend, no zoom buttons, and
+  // the map's own locate button.
+  const hours = foot(page).locator("[data-time-strip]");
   await expect(hours).toBeVisible();
-  await expect(
-    hours.getByRole("button", { name: "The day after" }),
-  ).toBeVisible();
+  await expect(hours.getByRole("button")).toHaveCount(0);
+  await expect(foot(page).getByRole("button", { name: /^Play/ })).toHaveCount(
+    0,
+  );
   const chips = foot(page).locator("[data-map-field]");
   expect(await chips.count()).toBeGreaterThanOrEqual(2);
   const chipBox = (await chips.first().boundingBox())!;
-  const hourBox = (await hours.boundingBox())!;
-  expect(hourBox.y).toBeLessThan(chipBox.y);
   const trackBox = (await foot(page)
     .locator("[data-hour-track]")
     .boundingBox())!;
@@ -101,7 +101,7 @@ test("the map opens first, then the list, which has no dock", async ({
     timeout: 30000,
   });
   await expect(page.locator("[data-finder-heart]")).toBeVisible();
-  await expect(foot(page).locator("[data-hour-bar]")).toHaveCount(0);
+  await expect(foot(page).locator("[data-time-strip]")).toHaveCount(0);
   await expect(foot(page).locator("[data-map-field]")).toHaveCount(0);
   // The day by its name alone, whole.
   await page.getByRole("button", { name: "Next day" }).tap();
@@ -245,7 +245,7 @@ test("a pill tapped turns light and peeks; tapped again it opens its spot", asyn
   expect((await peek(page).boundingBox())!.width).toBeLessThanOrEqual(256);
   // Above the dock, and on the screen.
   const box = (await peek(page).boundingBox())!;
-  const dockBox = (await foot(page).locator("[data-hour-bar]").boundingBox())!;
+  const dockBox = (await foot(page).locator(".map-dock").boundingBox())!;
   expect(box.y + box.height).toBeLessThanOrEqual(dockBox.y);
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(390);

@@ -27,8 +27,8 @@ const ICONS: Record<FieldId, ReactNode> = {
  * The map's dock, centred on its foot: what the map is coloured with, and
  * when. Its top row is the fields' lit chips (ui/Chip.tsx `lit`), at most one
  * on, and the legend at its right (src/MapScales.tsx); under them, where the
- * page has one, the day's hour bar (src/HourBar.tsx); on a narrow screen the
- * day's words over the chips and the hours' track under them. With no field
+ * page has one, the finder's strip of hours (src/TimeStrip.tsx): the hour in
+ * words over a playhead, and the hours a finger scrubs under it. With no field
  * on, the map is plain and the shallows glow round the coast; pressing the
  * chip that is on turns it off, back to that.
  *
@@ -64,7 +64,7 @@ export default function MapDock({
    * it stands in, as it changes: the map keeps what it fits clear of it.
    */
   onRoom?: (px: number) => void;
-  /** The hour bar, where the page has one. */
+  /** The strip of hours, where the page has one. */
   children?: ReactNode;
 }) {
   const dock = useRef<HTMLDivElement>(null);

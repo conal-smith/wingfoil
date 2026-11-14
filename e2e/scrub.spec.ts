@@ -159,11 +159,37 @@ async function tapOff(page: Page) {
   await page.mouse.click(at!.x, at!.y);
 }
 
+/** One hour's width on the strip, in pixels. */
+const hourWidth = (page: Page) =>
+  scrubBar(page)
+    .locator("[data-time-strip]")
+    .evaluate((el) =>
+      parseFloat(getComputedStyle(el).getPropertyValue("--ts-hour")),
+    );
+
+/** The notches and the figures under the strip that are in its view. */
+const inView = (page: Page) =>
+  scrubBar(page)
+    .locator(".ts-scroll")
+    .evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const seen = (r: DOMRect) =>
+        r.left + r.width / 2 >= box.left && r.left + r.width / 2 <= box.right;
+      return {
+        notches: [...el.querySelectorAll(".ts-notch")].filter((n) =>
+          seen(n.getBoundingClientRect()),
+        ).length,
+        figures: [...el.querySelectorAll<HTMLElement>("[data-strip-figure]")]
+          .filter((f) => seen(f.getBoundingClientRect()))
+          .map((f) => f.textContent ?? ""),
+      };
+    });
+
 /** The slider's value, as a number. */
 const sliderAt = async (page: Page) =>
   Number(await timeSlider(page).inputValue());
 
-test("the scrub bar draws the spot's week: its wind and gusts, its stars, the night, now and the playhead", async ({
+test("the scrub bar draws the spot's forecast: its wind and gusts, its stars, the night, now and the playhead", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -204,11 +230,28 @@ test("the scrub bar draws the spot's week: its wind and gusts, its stars, the ni
   await expect(strip.locator(".sb-past")).toHaveCount(1);
   await expect(strip.locator(".sb-now-line[data-now]")).toHaveCount(1);
   await expect(strip.locator(".sb-head")).toHaveCount(1);
-  // A week of day names under it, the playhead's own marked.
-  const days = strip.locator(".sb-days span");
-  expect(await days.count()).toBeGreaterThanOrEqual(7);
-  expect(await days.count()).toBeLessThanOrEqual(8);
-  await expect(strip.locator(".sb-days span.is-on")).toHaveText("Sun 13");
+  await expect(strip.locator(".ts-head")).toHaveCount(1);
+  // Zoomed in to the hours: a day or so across a desk's screen, never the
+  // week, a notch every hour, every third hour's figure, and the next day's
+  // name where it begins.
+  const across = Number(
+    await strip.locator("[data-time-strip]").getAttribute("data-hours-across"),
+  );
+  expect(across).toBeGreaterThan(18);
+  expect(across).toBeLessThan(36);
+  const shown = await inView(page);
+  expect(shown.notches).toBeGreaterThan(18);
+  expect(shown.notches).toBeLessThan(37);
+  expect(shown.figures).toContain("Mon 14");
+  expect(shown.figures.filter((f) => /^\d\d$/.test(f)).length).toBeGreaterThan(
+    4,
+  );
+  // The playhead stands in the strip's middle.
+  const view = (await strip.locator(".ts-scroll").boundingBox())!;
+  const head = (await strip.locator(".ts-head").boundingBox())!;
+  expect(
+    Math.abs(head.x + head.width / 2 - (view.x + view.width / 2)),
+  ).toBeLessThan(2);
   // The time is a slider still, out of sight, for the keys and a screen
   // reader: a step a column of the strip, named by its day and hour.
   const slider = timeSlider(page);
@@ -242,128 +285,75 @@ test("the scrub bar draws the spot's week: its wind and gusts, its stars, the ni
   expect(errors).toEqual([]);
 });
 
-test("a drag across the strip moves the time smoothly, and the map's hour is the column nearest it", async ({
+test("a drag across the strip moves the hours under the playhead with the pointer, and it rests on the hour nearest", async ({
   page,
 }) => {
   await openBar(page);
-  const strip = scrubBar(page).locator(".sb-strip");
-  const box = (await strip.boundingBox())!;
+  const scroller = scrubBar(page).locator(".ts-scroll");
+  const box = (await scroller.boundingBox())!;
+  const hour = await hourWidth(page);
   const y = box.y + box.height / 2;
-  // The middle of the week in view, clear of the edges it slides on at.
   const x = box.x + box.width / 2;
+  const start = await pillTime(page);
+  // A drag of an hour and a third to the left: the hours go with the
+  // pointer, and the playhead reads a time between the hours.
   await page.mouse.move(x, y);
   await page.mouse.down();
-  await expect.poll(() => sliderAt(page)).not.toBe(opening());
-  const pressed = await pillTime(page);
-  // A drag of about a third of an hour: the playhead goes with the pointer,
-  // between the hours, not from one hour to the next.
-  const hour = box.width / (7 * 24);
-  await page.mouse.move(x + hour / 3, y, { steps: 3 });
-  await expect.poll(() => pillTime(page)).not.toBe(pressed);
-  const moved = (await pillTime(page)) - pressed;
-  expect(moved).toBeGreaterThan(0);
-  expect(moved).toBeLessThan(3600000);
+  await page.mouse.move(x - hour * 0.66, y, { steps: 4 });
+  await expect.poll(() => pillTime(page)).toBeGreaterThan(start);
+  const half = (await pillTime(page)) - start;
+  expect(half).toBeGreaterThan(0.4 * 3600000);
+  expect(half).toBeLessThan(0.9 * 3600000);
+  await page.mouse.move(x - hour * 1.33, y, { steps: 4 });
   await page.mouse.up();
-  // The map's hour is the column nearest the playhead (the pill is to ten
-  // minutes, so it may be that far either way).
-  const at = await pillTime(page);
-  const off = (i: number) => Math.abs(sampleStrip[i].time - at);
-  const nearest = Math.min(...sampleStrip.map((_, i) => off(i)));
-  expect(off(await sliderAt(page))).toBeLessThanOrEqual(nearest + 5 * 60000);
-  // And a press further along takes the time there at once.
-  const before = await sliderAt(page);
-  await page.mouse.click(x + box.width / 4, y);
-  await expect.poll(() => sliderAt(page)).toBeGreaterThan(before);
+  // Let go, it comes to rest on the hour nearest, the map's.
+  await expect.poll(() => pillTime(page)).toBe(start + 3600000);
+  await expect(timeSlider(page)).toHaveValue(String(opening() + 1));
+  // And a click further along glides there.
+  await page.mouse.click(x + hour * 3, y);
+  await expect.poll(() => pillTime(page)).toBe(start + 4 * 3600000);
+  await expect(timeSlider(page)).toHaveValue(String(opening() + 4));
 });
 
-test("a wheel or a trackpad across the strip moves the playhead, and the week slides on under it", async ({
+test("a wheel or a trackpad across the strip turns the hours, on through the forecast", async ({
   page,
 }) => {
   await openBar(page);
-  const strip = scrubBar(page).locator(".sb-strip");
-  const box = (await strip.boundingBox())!;
+  const scroller = scrubBar(page).locator(".ts-scroll");
+  const box = (await scroller.boundingBox())!;
+  const hour = await hourWidth(page);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   const start = await pillTime(page);
-  const days = scrubBar(page).locator(".sb-days span");
-  const firstDay = await days.first().textContent();
-  // A trackpad's sideways scroll of a few hours: the playhead goes with it,
-  // between the hours, and the readout with it.
-  const hour = box.width / (7 * 24);
-  await page.mouse.wheel(hour * 3.5, 0);
-  await expect.poll(() => pillTime(page)).not.toBe(start);
-  const moved = (await pillTime(page)) - start;
-  expect(moved).toBeGreaterThan(3 * 3600000 - 600000);
-  expect(moved).toBeLessThan(4 * 3600000 + 600000);
-  await expect.poll(() => sliderAt(page)).toBeGreaterThan(opening());
+  // A trackpad's sideways scroll of a few hours: the strip goes with it,
+  // and comes to rest on an hour.
+  await page.mouse.wheel(hour * 3.2, 0);
+  await expect.poll(() => sliderAt(page)).toBe(opening() + 3);
+  await expect.poll(() => pillTime(page)).toBe(start + 3 * 3600000);
   // Back the other way: earlier.
-  const back = await pillTime(page);
   await page.mouse.wheel(-hour * 2, 0);
-  await expect.poll(() => pillTime(page)).toBeLessThan(back);
-  // A mouse's wheel, up and down, moves it as well.
-  const wheeled = await pillTime(page);
+  await expect.poll(() => sliderAt(page)).toBe(opening() + 1);
+  // A mouse's wheel, up and down, turns it as well.
   await page.mouse.wheel(0, hour * 2);
-  await expect.poll(() => pillTime(page)).toBeGreaterThan(wheeled);
-  // Scrolled on and on, the playhead nears the edge and the week slides on
-  // under it, the playhead staying in view.
-  for (let i = 0; i < 12; i++) await page.mouse.wheel(box.width / 4, 0);
-  await expect(days.first()).not.toHaveText(firstDay ?? "");
-  const head = (await scrubBar(page).locator(".sb-head line").boundingBox())!;
-  expect(head.x).toBeGreaterThanOrEqual(box.x);
-  expect(head.x).toBeLessThanOrEqual(box.x + box.width + 1);
+  await expect.poll(() => sliderAt(page)).toBe(opening() + 3);
+  // Turned on and on, it carries on through the days.
+  for (let i = 0; i < 8; i++) await page.mouse.wheel(0, box.width);
+  await expect
+    .poll(async () => (await pillTime(page)) - start)
+    .toBeGreaterThan(48 * 3600000);
 });
 
-test("a finger swiped across the strip carries the playhead as far as it travels, and a tap takes the time there", async ({
-  page,
-}) => {
+test("a tap on an hour glides the strip there", async ({ page }) => {
   await openBar(page);
-  const strip = scrubBar(page).locator(".sb-strip");
-  const box = (await strip.boundingBox())!;
-  const hour = box.width / (7 * 24);
-  const y = box.y + box.height / 2;
-  /** A finger on the strip, from `from` to `to` in pixels. */
-  const swipe = (from: number, to: number) =>
-    strip.evaluate(
-      (el, { from, to, y }) => {
-        const touch = (type: string, x: number) =>
-          el.dispatchEvent(
-            new PointerEvent(type, {
-              bubbles: true,
-              cancelable: true,
-              pointerId: 7,
-              pointerType: "touch",
-              isPrimary: true,
-              button: type === "pointermove" ? -1 : 0,
-              buttons: type === "pointerup" ? 0 : 1,
-              clientX: x,
-              clientY: y,
-            }),
-          );
-        touch("pointerdown", from);
-        for (let i = 1; i <= 6; i++)
-          touch("pointermove", from + ((to - from) * i) / 6);
-        touch("pointerup", to);
-      },
-      { from, to, y },
-    );
+  const scroller = scrubBar(page).locator(".ts-scroll");
+  const box = (await scroller.boundingBox())!;
+  const hour = await hourWidth(page);
   const start = await pillTime(page);
-  const slider = await sliderAt(page);
-  // A swipe that starts far from the playhead does not take it to the
-  // finger: it moves the playhead by the six hours the finger travelled.
-  const far = box.x + box.width * 0.8;
-  await swipe(far, far + hour * 6);
-  await expect.poll(() => pillTime(page)).not.toBe(start);
-  const moved = (await pillTime(page)) - start;
-  expect(moved).toBeGreaterThan(5.5 * 3600000);
-  expect(moved).toBeLessThan(6.5 * 3600000);
-  expect(await sliderAt(page)).toBeLessThan(slider + 12);
-  // Back the other way.
-  const swiped = await pillTime(page);
-  await swipe(far, far - hour * 3);
-  await expect.poll(() => pillTime(page)).toBeLessThan(swiped);
-  // A tap that does not travel takes the time where it lands.
-  const before = await sliderAt(page);
-  await swipe(box.x + box.width * 0.75, box.x + box.width * 0.75);
-  await expect.poll(() => sliderAt(page)).toBeGreaterThan(before + 24);
+  await page.mouse.click(
+    box.x + box.width / 2 - hour * 2,
+    box.y + box.height / 2,
+  );
+  await expect.poll(() => pillTime(page)).toBe(start - 2 * 3600000);
+  await expect(timeSlider(page)).toHaveValue(String(opening() - 2));
 });
 
 test("the waves and the tide have lanes of their own under the wind, and none where nothing reaches", async ({
@@ -536,35 +526,39 @@ test("the keys step the slider by the hour, to either end, and a day at a time",
   await expect(slider).toHaveValue("0");
 });
 
-test("the strip runs fifteen days, a week in view, and slides on as the playhead nears its edge", async ({
+test("the strip runs fifteen days, and the keys carry it to the last of them", async ({
   page,
 }) => {
   await openBar(page);
   const dates = [...new Set(sampleStrip.map((c) => c.date))];
   expect(dates).toHaveLength(15);
-  const days = scrubBar(page).locator(".sb-days span");
-  const first = `${dayShort(sampleStrip[0].time)} ${Number(dates[0].slice(8))}`;
+  const name = (date: string) =>
+    `${dayShort(Date.parse(`${date}T12:00:00Z`))} ${Number(date.slice(8))}`;
+  // Every day after the first is named where it begins.
+  const figures = scrubBar(page).locator('[data-strip-figure="day"]');
+  await expect(figures).toHaveText(dates.slice(1).map(name));
+  // The first day's hours in view, the last day's not.
+  expect((await inView(page)).figures).not.toContain(name(dates.at(-1)!));
   const lastColumn = sampleStrip.at(-1)!;
-  const last = `${dayShort(lastColumn.time)} ${Number(dates.at(-1)!.slice(8))}`;
-  // The first week in view: the first day named, the last not.
-  await expect(days.first()).toHaveText(first);
-  await expect(days.filter({ hasText: last })).toHaveCount(0);
   await timeSlider(page).press("End");
   await expect(timeSlider(page)).toHaveAttribute(
     "aria-valuetext",
     new RegExp(`^\\w+ \\d{1,2} \\w+, ${clock(lastColumn.time)}$`),
   );
-  // The last week: the last day named, and the playhead's, and the first gone.
-  await expect(days.last()).toHaveText(last);
-  await expect(scrubBar(page).locator(".sb-days span.is-on")).toHaveText(last);
-  await expect(days.filter({ hasText: new RegExp(`^${first}$`) })).toHaveCount(
-    0,
-  );
-  // The playhead is in the strip, not past its end.
-  const strip = (await scrubBar(page).locator(".sb-strip").boundingBox())!;
-  const head = (await scrubBar(page).locator(".sb-head line").boundingBox())!;
-  expect(head.x).toBeGreaterThanOrEqual(strip.x);
-  expect(head.x).toBeLessThanOrEqual(strip.x + strip.width + 1);
+  // The strip glides on to the last hour, the playhead still in its middle.
+  await expect.poll(() => pillTime(page)).toBe(lastColumn.time);
+  await expect
+    .poll(() =>
+      scrubBar(page)
+        .locator(".ts-scroll")
+        .evaluate((el) => el.scrollWidth - el.clientWidth - el.scrollLeft),
+    )
+    .toBeLessThan(2);
+  const view = (await scrubBar(page).locator(".ts-scroll").boundingBox())!;
+  const head = (await scrubBar(page).locator(".ts-head").boundingBox())!;
+  expect(
+    Math.abs(head.x + head.width / 2 - (view.x + view.width / 2)),
+  ).toBeLessThan(2);
 });
 
 test("the hours after dark can be left out, from last light to first, and stay so", async ({

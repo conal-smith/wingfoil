@@ -17,36 +17,37 @@
  * beside it on the map; a tap off it on the map lets it go, and the card with
  * it.
  *
- * The strip shows a week at a time, the full width of the bar, and slides on
- * through the forecast's fifteen days as the playhead nears its edge: dragged
- * there, or carried there by a wheel, a trackpad or a finger swiped across
- * the strip, each of which moves the playhead by as far as it goes.
- *
- * The time stays the strip's columns underneath, as the map's frames are: the
- * playhead stops anywhere between two hours, and the column nearest it is the
- * one the map draws. The keys step whole hours (Left and Right) and days
- * (with Shift, or Page Up and Page Down), and snap the playhead to the hour.
+ * The strip is the shared strip of hours (src/TimeStrip.tsx): about eight
+ * hours across a phone and a day or so across a desk's screen, never a week
+ * squeezed in, a notch for every hour, every third hour's figure and the
+ * day's name where a day begins. A finger drags the whole forecast under a
+ * playhead that stands still in the middle, one to one and on with the
+ * platform's own momentum, and it comes to rest on one of the forecast's
+ * hours: the one the map draws. A mouse drags it too, a wheel or a trackpad
+ * turns it, and a tap or a click on an hour glides there. The keys step whole
+ * hours (Left and Right) and days (with Shift, or Page Up and Page Down).
  *
  * With the hours after dark hidden (Settings, shared/web/afterDark.ts) the
  * strip is the days' lit hours alone, from first light to last, the days
- * side by side with the line between them: the playhead, the keys and a
- * wheel move from one day's last light straight to the next one's first.
+ * side by side with the line between them: the strip, the keys and a wheel
+ * move from one day's last light straight to the next one's first.
  */
 import {
+  startTransition,
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Layers3 } from "lucide-react";
 import { StarGlyphs } from "../ui/StarGlyphs";
 import { WindArrow } from "./glyphs";
 import { arrowsFree, hourStep } from "./hourKeys";
 import { daylightOn, type PlaceHour } from "./ratings";
-import { afterDark, fold, keptShares, unfolded } from "../shared/web/afterDark";
+import { afterDark, fold, keptShares } from "../shared/web/afterDark";
 import {
   clock,
   dayShort,
@@ -59,6 +60,7 @@ import {
   timeSpoken,
   type StripColumn,
 } from "./strip";
+import TimeStrip, { type StripGeometry } from "./TimeStrip";
 import { useSpotSquares } from "./useSpotSquares";
 import { useSpotWaves } from "./useBlend";
 import type { ModelAvailability } from "../force5/src/manifests";
@@ -87,12 +89,6 @@ import {
 const IRELAND_MIDDLE = { lat: 53.4, lon: -7.9 };
 
 const HOUR = 3600000;
-/** What the strip shows at once: a week. */
-const WINDOW = 7 * 24 * HOUR;
-/** How near the edge the playhead comes before the week slides on. */
-const EDGE = 0.08;
-/** How far a finger travels on the strip before it is a swipe, not a tap. */
-const SWIPE_SLOP = 6;
 const NO_MODELS: readonly ModelAvailability[] = [];
 
 /**
@@ -111,9 +107,9 @@ const STARS_H = 7;
 const LANE_H = 14;
 const LANE_GAP = 6;
 /** With no spot: the days, the night and the lane of spots with stars. */
-const BARE_HEIGHT = 44;
-/** What the bare strip keeps under its drawing, clear of the playhead's foot. */
-const BARE_FOOT = 12;
+const BARE_HEIGHT = 24;
+/** What the bare strip keeps under its drawing, over the notches. */
+const BARE_FOOT = 2;
 
 /** A lane under the wind: what it draws, and where it stands. */
 interface Lane {
@@ -242,11 +238,9 @@ export default function ScrubBar({
       onSelectStrip(shown[selected]);
   }, [shown, selected, stripSelected]);
 
-  // The strip's own timeline: the forecast's time, with the night taken
-  // out where it is hidden. Everything that slides or is dragged along the
-  // strip is measured on it; the playhead's time (`pos`) stays a real time.
-  const first = strip[0]?.time ?? now;
-  const last = strip[strip.length - 1]?.time ?? now + HOUR;
+  // The strip's own timeline where the night is hidden: the forecast's
+  // time with the night taken out, the days joined side by side. Round the
+  // clock the strip's time is the clock's.
   const line = useMemo(
     () =>
       shown && hidden
@@ -256,74 +250,29 @@ export default function ScrubBar({
               hidden,
             ),
           )
-        : unfolded(first, last),
-    [shown, hidden, strip, first, last],
+        : undefined,
+    [shown, hidden, strip],
   );
-  const t0 = line.at(first);
-  const t1 = line.at(last);
   const column = strip[stripSelected];
-  /** The week in view: where it starts, and how long it is. */
-  const span = Math.max(
-    HOUR,
-    Math.min(line.at(first + WINDOW) - line.at(first), t1 - t0),
-  );
-  const [w0, setW0] = useState(t0);
-  const view0 = Math.max(t0, Math.min(t1 - span, w0));
-  const w0Ref = useRef(view0);
-  w0Ref.current = view0;
-  /** Slide the week so that `time` is in view, clear of its edges. */
-  const reveal = (real: number) => {
-    const time = line.at(real);
-    const from = w0Ref.current;
-    const margin = span * EDGE;
-    let next = from;
-    if (time < from + margin) next = time - margin;
-    else if (time > from + span - margin) next = time - span + margin;
-    next = Math.max(t0, Math.min(t1 - span, next));
-    if (next !== from) {
-      w0Ref.current = next;
-      setW0(next);
-    }
-  };
+  /** The times the strip comes to rest on: the columns shown. */
+  const stopTimes = useMemo(() => stops.map((c) => c.time), [stops]);
 
-  /* ---- the playhead: a time, anywhere between two hours ---- */
+  /* ---- the playhead: the time under it, on every frame the strip moves ---- */
 
   const [pos, setPos] = useState(() => column?.time ?? now);
-  const posRef = useRef(pos);
-  posRef.current = pos;
-  /** The column the playhead last asked for, to tell its own change from another's. */
-  const asked = useRef(stripSelected);
-  // The time moved by anything but the playhead (a key, a model's
-  // hand-over, a tab coming back): the playhead goes to that hour.
-  useEffect(() => {
-    if (stripSelected === asked.current || !column) return;
-    asked.current = stripSelected;
-    setPos(column.time);
-    reveal(column.time);
-  }, [stripSelected, column?.time]);
+  const shownRef = useRef({ shown, onSelectStrip });
+  shownRef.current = { shown, onSelectStrip };
   /**
-   * Move the playhead to a place along the strip's timeline (`line`); the
-   * nearest column it may stop on is the map's. With the night hidden the
-   * place is never in it: the timeline has none.
+   * The strip has come to another stop: the map's hour. Not urgent: the
+   * strip moves on its own, and the page draws the hour once it can.
    */
-  const moveTo = (along: number) => {
-    const t = line.time(Math.max(t0, Math.min(t1, along)));
-    reveal(t);
-    const at = nearestColumn(stops, t);
+  const pick = useCallback((at: number) => {
+    const { shown, onSelectStrip } = shownRef.current;
     const to = shown ? shown[at] : at;
-    const head = t;
-    // Held at once, so wheel events that come faster than the frames add up.
-    posRef.current = head;
-    setPos(head);
-    if (to !== asked.current) {
-      asked.current = to;
-      onSelectStrip(to);
-    }
-  };
-  const moveRef = useRef(moveTo);
-  moveRef.current = moveTo;
+    if (to !== undefined) startTransition(() => onSelectStrip(to));
+  }, []);
 
-  /* ---- the strip's size, and its scale ---- */
+  /* ---- the strip's size ---- */
 
   const track = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -336,111 +285,6 @@ export default function ScrubBar({
     watch.observe(el);
     return () => watch.disconnect();
   }, []);
-  const x = (time: number) => ((line.at(time) - view0) / span) * width;
-  const timeAt = (px: number) => view0 + (px / Math.max(1, width)) * span;
-
-  // A drag held past either edge of the strip runs on through the forecast,
-  // the week sliding with it, until the pointer comes back or lets go.
-  const dragging = useRef<number | null>(null);
-  const pushing = useRef(0);
-  useEffect(() => {
-    let frame = 0;
-    const run = () => {
-      if (pushing.current && dragging.current !== null)
-        moveRef.current(
-          line.at(posRef.current) + pushing.current * span * 0.012,
-        );
-      frame = requestAnimationFrame(run);
-    };
-    frame = requestAnimationFrame(run);
-    return () => cancelAnimationFrame(frame);
-  }, [span, line]);
-  const pointerTo = (clientX: number) => {
-    if (!track.current) return;
-    const box = track.current.getBoundingClientRect();
-    const px = clientX - box.left;
-    pushing.current = px < 0 ? -1 : px > box.width ? 1 : 0;
-    if (!pushing.current) moveTo(timeAt(px));
-  };
-  /**
-   * A finger on the strip: where it went down, the playhead's place then, and
-   * whether it has travelled yet. A swipe carries the playhead by the
-   * distance the finger travels, as a wheel does, so it never leaps to
-   * wherever the finger first touched; a tap that does not travel takes the
-   * time there, as a click does.
-   */
-  const finger = useRef<{ x: number; pos: number; swiping: boolean } | null>(
-    null,
-  );
-  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || !track.current) return;
-    event.preventDefault();
-    dragging.current = event.pointerId;
-    try {
-      track.current.setPointerCapture(event.pointerId);
-    } catch {
-      // A pointer the browser no longer knows: the drag goes on without.
-    }
-    if (event.pointerType === "touch") {
-      finger.current = {
-        x: event.clientX,
-        pos: line.at(posRef.current),
-        swiping: false,
-      };
-      return;
-    }
-    finger.current = null;
-    pointerTo(event.clientX);
-  };
-  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (dragging.current !== event.pointerId) return;
-    const swipe = finger.current;
-    if (!swipe) {
-      pointerTo(event.clientX);
-      return;
-    }
-    const dx = event.clientX - swipe.x;
-    if (!swipe.swiping && Math.abs(dx) < SWIPE_SLOP) return;
-    swipe.swiping = true;
-    moveTo(swipe.pos + (dx / Math.max(1, width)) * span);
-  };
-  const onPointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (dragging.current !== event.pointerId) return;
-    const swipe = finger.current;
-    if (swipe && !swipe.swiping && event.type === "pointerup")
-      pointerTo(event.clientX);
-    dragging.current = null;
-    pushing.current = 0;
-    finger.current = null;
-  };
-  // A wheel or a trackpad across the strip moves the playhead by as much as
-  // it scrolls, between the hours as a drag does; the week slides on under
-  // it as it nears an edge (`moveTo`, `reveal`). A mouse's plain wheel, up
-  // and down, moves it too: on the strip there is nothing else to scroll.
-  useEffect(() => {
-    const el = track.current;
-    if (!el) return;
-    const wheel = (event: WheelEvent) => {
-      const delta =
-        Math.abs(event.deltaX) > Math.abs(event.deltaY)
-          ? event.deltaX
-          : event.deltaY;
-      if (!delta) return;
-      event.preventDefault();
-      // Lines and pages, from a mouse's wheel, as pixels.
-      const px =
-        event.deltaMode === 1
-          ? delta * 16
-          : event.deltaMode === 2
-            ? delta * el.clientWidth
-            : delta;
-      moveRef.current(
-        line.at(posRef.current) + (px / Math.max(1, el.clientWidth)) * span,
-      );
-    };
-    el.addEventListener("wheel", wheel, { passive: false });
-    return () => el.removeEventListener("wheel", wheel);
-  }, [span, line]);
 
   // Left and Right step the hour wherever the focus is, unless it is in a
   // control whose own keys they are (src/hourKeys.ts); with Shift, a day.
@@ -521,23 +365,23 @@ export default function ScrubBar({
   }, [named, strip, stripHours, waves, tide]);
 
   /**
-   * The wind's scale: from calm to just over the strongest gust in the week
-   * in view, so a week's shape fills the strip whatever a later week does. It
-   * moves only as the week slides on.
+   * The wind's scale: from calm to just over the strongest gust in the
+   * forecast, the same wherever the strip is scrolled, so the curve never
+   * stretches under the rider's finger.
    */
   const windHigh = useMemo(() => {
-    const seen = (series ?? []).flatMap((s, at) => {
-      const along = line.at(strip[at].time);
-      return along < view0 || along > view0 + span
-        ? []
-        : [s.wind, s.gust].filter((v): v is number => v !== null);
-    });
+    const seen = (series ?? []).flatMap((s) =>
+      [s.wind, s.gust].filter((v): v is number => v !== null),
+    );
     return Math.max(25, ...seen) * 1.08;
-  }, [series, strip, line, view0, span]);
+  }, [series]);
   const curveBottom = width && width < NARROW ? CURVE_SHORT : CURVE_TALL;
   const starsY = curveBottom + STARS_GAP;
-  const y = (value: number) =>
-    curveBottom - (value / windHigh) * (curveBottom - CURVE_TOP);
+  const y = useCallback(
+    (value: number) =>
+      curveBottom - (value / windHigh) * (curveBottom - CURVE_TOP),
+    [curveBottom, windHigh],
+  );
   /** The scale beside the curve: a line and a figure, ten knots apart or twenty. */
   const windTicks = useMemo(() => {
     const step = windHigh > 45 ? 20 : 10;
@@ -545,7 +389,7 @@ export default function ScrubBar({
     // None so near the top that it runs into the band's name.
     for (let kn = step; y(kn) > CURVE_TOP + 16; kn += step) out.push(kn);
     return out;
-  }, [windHigh, curveBottom]);
+  }, [windHigh, y]);
 
   // The lanes under the wind: the waves where a riding place lends them,
   // the tide where a station reaches the place. Each is there from the
@@ -571,10 +415,10 @@ export default function ScrubBar({
   const bareBottom = BARE_HEIGHT - BARE_FOOT;
   /** The bare strip's bars: each column's share of the most spots at any hour. */
   const spotBars = useMemo(() => {
-    if (named || !rated || !width) return [];
+    if (named || !rated) return [];
     const most = Math.max(1, ...rated.columns.map((c) => c.spots));
     return rated.columns.flatMap((c, at) => {
-      if (!c.spots || hidden?.[at]) return [];
+      if (!c.spots || hidden?.[at] || !strip[at]) return [];
       const before =
         at > 0 ? (strip[at - 1].time + strip[at].time) / 2 : strip[at].time;
       const after =
@@ -591,7 +435,7 @@ export default function ScrubBar({
         },
       ];
     });
-  }, [named, rated, width, strip, hidden, bareBottom]);
+  }, [named, rated, strip, hidden, bareBottom]);
   /** A lane's own scale: the waves from flat, the tide from its lowest. */
   const laneY = useMemo(() => {
     const out = new Map<Lane["kind"], (v: number) => number>();
@@ -610,11 +454,6 @@ export default function ScrubBar({
     return out;
   }, [lanes, series]);
 
-  /** The stars of each column; a warning or a notice that takes them away has none. */
-  const starsOf = (hour: PlaceHour | undefined) =>
-    hour?.warning?.replacesRating || hour?.water?.replacesRating
-      ? 0
-      : (hour?.rating?.stars ?? 0);
   const starRuns = useMemo<StarRun[]>(() => {
     if (!named || isPoint || !stripHours) return [];
     const runs: StarRun[] = [];
@@ -660,52 +499,56 @@ export default function ScrubBar({
 
   const days = useMemo(() => stripDays(strip), [strip]);
 
-  /** A line through the columns, smoothed, and the area under it to `bottom`. */
-  const shape = (
-    pick: (s: NonNullable<typeof series>[number]) => number | null,
-    to: (v: number) => number,
-    bottom: number,
-  ) => {
-    if (!series || !width) return null;
-    // A stretch with no value (a source that ends, or has a gap) breaks the
-    // curve rather than drawing a line across it.
-    const runs: (readonly [number, number])[][] = [];
-    let run: (readonly [number, number])[] = [];
-    series.forEach((s, at) => {
-      const v = pick(s);
-      // A column after dark, hidden, breaks it too: the days either side of
-      // a night are not one curve.
-      if (v === null || hidden?.[at]) {
-        if (run.length) runs.push(run);
-        run = [];
-      } else run.push([x(strip[at].time), to(v)] as const);
-    });
-    if (run.length) runs.push(run);
-    const lines = runs.filter((r) => r.length > 1);
-    if (!lines.length) return null;
-    return {
-      line: lines.map((points) => smooth(points, bottom)).join(" "),
-      area: lines
-        .map(
-          (points) =>
-            `${smooth(points, bottom)} L${points[points.length - 1][0].toFixed(1)},${bottom} L${points[0][0].toFixed(1)},${bottom} Z`,
-        )
-        .join(" "),
-    };
-  };
-  const curve = useMemo(() => {
-    const wind = shape((s) => s.wind, y, curveBottom);
-    if (!wind) return null;
-    const gust = shape((s) => s.gust, y, curveBottom);
-    return { ...wind, gust: gust?.line ?? null };
-  }, [series, width, windHigh, view0, span, line, hidden, curveBottom]);
-  const laneShapes = useMemo(
-    () =>
-      lanes.map((lane) => ({
-        lane,
-        shape: shape((s) => s[lane.kind], laneY.get(lane.kind)!, lane.bottom),
-      })),
-    [lanes, laneY, series, width, view0, span, line, hidden],
+  /**
+   * The drawing that scrolls with the hours: the whole forecast, drawn once
+   * for the strip's size and the place's hours, never as the strip moves.
+   */
+  const draw = useCallback(
+    (g: StripGeometry) => (
+      <StripDrawing
+        g={g}
+        id={id}
+        strip={strip}
+        series={series}
+        hidden={hidden}
+        named={named}
+        isPoint={isPoint}
+        height={height}
+        bareBottom={bareBottom}
+        curveBottom={curveBottom}
+        starsY={starsY}
+        y={y}
+        windTicks={windTicks}
+        lanes={lanes}
+        laneY={laneY}
+        starRuns={starRuns}
+        spotBars={spotBars}
+        nights={nights}
+        days={days}
+        now={now}
+      />
+    ),
+    [
+      id,
+      strip,
+      series,
+      hidden,
+      named,
+      isPoint,
+      height,
+      bareBottom,
+      curveBottom,
+      starsY,
+      y,
+      windTicks,
+      lanes,
+      laneY,
+      starRuns,
+      spotBars,
+      nights,
+      days,
+      now,
+    ],
   );
 
   /* ---- the moment the playhead is at ---- */
@@ -747,8 +590,6 @@ export default function ScrubBar({
     const r = readingAt(measured.station, pos);
     return r && { paired: measured, reading: r };
   }, [measured, pos, now]);
-
-  const playX = x(pos);
 
   const label = spot
     ? `Forecast for ${spot.name}`
@@ -819,261 +660,45 @@ export default function ScrubBar({
         }
       />
 
-      <div
-        ref={track}
-        className="sb-strip"
-        style={{ height }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerEnd}
-        onPointerCancel={onPointerEnd}
-      >
-        {width > 0 && (
-          <svg width={width} height={height} aria-hidden="true">
-            <defs>
-              <pattern
-                id={`${id}hatch`}
-                width="5"
-                height="5"
-                patternUnits="userSpaceOnUse"
-                patternTransform="rotate(45)"
-              >
-                <line x1="0" y1="0" x2="0" y2="5" className="sb-hatch" />
-              </pattern>
-              {curve && (
-                <linearGradient
-                  id={`${id}wind`}
-                  gradientUnits="userSpaceOnUse"
-                  x1={0}
-                  x2={width}
-                  y1={0}
-                  y2={0}
-                >
-                  {series!.map((s, at) =>
-                    s.wind === null || hidden?.[at] ? null : (
-                      <stop
-                        key={at}
-                        offset={Math.max(
-                          0,
-                          Math.min(1, x(strip[at].time) / width),
-                        )}
-                        stopColor={windCss(s.wind)}
-                      />
-                    ),
-                  )}
-                </linearGradient>
-              )}
-              {starRuns.map((run, i) => (
-                <linearGradient
-                  key={i}
-                  id={`${id}stars${i}`}
-                  gradientUnits="userSpaceOnUse"
-                  x1={x(run.from)}
-                  x2={x(run.to)}
-                  y1={0}
-                  y2={0}
-                >
-                  {run.stops.map((stop) => (
-                    <stop
-                      key={stop.at}
-                      offset={
-                        (stop.at - run.from) / Math.max(1, run.to - run.from)
-                      }
-                      style={{
-                        stopColor: `var(--color-stars-${Math.min(5, stop.stars)})`,
-                      }}
-                    />
-                  ))}
-                </linearGradient>
-              ))}
-              <clipPath id={`${id}week`}>
-                <rect x={0} y={-2} width={width} height={height + 4} />
-              </clipPath>
-            </defs>
-
-            {/* The week in view: the forecast either side of it is clipped
-                at the strip's edges, the playhead's knob alone allowed past. */}
-            <g clipPath={`url(#${id}week)`}>
-              {nights.map((n) => (
-                <rect
-                  key={n.from}
-                  className="sb-night"
-                  x={x(n.from)}
-                  y={0}
-                  width={Math.max(0, x(n.to) - x(n.from))}
-                  height={named ? height : bareBottom}
-                  fill={`url(#${id}hatch)`}
-                />
-              ))}
-              {days.slice(1).map((d) => {
-                const at = x(
-                  strip[d.start].time -
-                    (strip[d.start].time - strip[d.start - 1].time) / 2,
-                );
-                return (
-                  <line
-                    key={d.date}
-                    className="sb-day"
-                    x1={at}
-                    x2={at}
-                    y1={0}
-                    y2={named ? height : bareBottom}
-                  />
-                );
-              })}
-              {curve &&
-                windTicks.map((kn) => (
-                  <line
-                    key={kn}
-                    className="sb-grid"
-                    x1={0}
-                    x2={width}
-                    y1={y(kn)}
-                    y2={y(kn)}
-                  />
-                ))}
-              {spotBars.length > 0 && (
-                <g className="sb-spots" data-spot-bars>
-                  {spotBars.map((bar) => (
-                    <rect
-                      key={bar.at}
-                      x={x(bar.from)}
-                      y={bareBottom - bar.height}
-                      width={Math.max(1, x(bar.to) - x(bar.from))}
-                      height={bar.height}
-                      style={{ fill: `var(--color-stars-${bar.best})` }}
-                    />
-                  ))}
-                </g>
-              )}
-
-              {curve && (
-                <g data-curve="wind">
-                  <path
-                    className="sb-area is-wind"
-                    d={curve.area}
-                    fill={`url(#${id}wind)`}
-                  />
-                  <path className="sb-line is-wind" d={curve.line} />
-                  {curve.gust && <path className="sb-gust" d={curve.gust} />}
-                </g>
-              )}
-              {laneShapes.map(({ lane, shape }) => (
-                <g key={lane.kind} data-lane={lane.kind}>
-                  <rect
-                    className="sb-lane"
-                    x={0}
-                    y={lane.top}
-                    width={width}
-                    height={LANE_H}
-                    rx={3}
-                  />
-                  {shape && (
-                    <>
-                      <path
-                        className={`sb-area is-${lane.kind}`}
-                        d={shape.area}
-                      />
-                      <path
-                        className={`sb-line is-${lane.kind}`}
-                        d={shape.line}
-                      />
-                    </>
-                  )}
-                </g>
-              ))}
-
-              {named && !isPoint && (
-                <g className="sb-stars" data-stars>
-                  <rect
-                    className="sb-stars-track"
-                    x={0}
-                    y={starsY}
-                    width={width}
-                    height={STARS_H}
-                    rx={STARS_H / 2}
-                  />
-                  {starRuns.map((run, i) => (
-                    <rect
-                      key={i}
-                      x={x(run.from)}
-                      y={starsY}
-                      width={Math.max(STARS_H, x(run.to) - x(run.from))}
-                      height={STARS_H}
-                      rx={STARS_H / 2}
-                      fill={`url(#${id}stars${i})`}
-                    />
-                  ))}
-                </g>
-              )}
-
-              {/* The hours gone, faded, and the line at now. */}
-              {line.at(now) > view0 && (
-                <rect
-                  className="sb-past"
-                  x={0}
-                  y={0}
-                  width={Math.max(0, Math.min(width, x(now)))}
-                  height={height}
-                />
-              )}
-              {line.at(now) >= view0 && line.at(now) <= view0 + span && (
-                <line
-                  className="sb-now-line"
-                  data-now
-                  x1={x(now)}
-                  x2={x(now)}
-                  y1={0}
-                  y2={named ? height : bareBottom}
-                />
-              )}
-            </g>
-
-            <g
-              className="sb-head"
-              transform={`translate(${playX.toFixed(1)} 0)`}
-            >
-              <line x1={0} x2={0} y1={2} y2={named ? height : bareBottom + 2} />
-              {reading?.wind != null && curve && (
-                <circle
-                  className="sb-dot"
-                  cx={0}
-                  cy={y(reading.wind)}
-                  r={3.5}
-                />
-              )}
-              {laneShapes.map(({ lane, shape }) => {
-                const v = reading?.[lane.kind];
-                return v != null && shape ? (
-                  <circle
-                    key={lane.kind}
-                    className="sb-dot"
-                    cx={0}
-                    cy={laneY.get(lane.kind)!(v)}
-                    r={2.5}
-                  />
-                ) : null;
-              })}
-              <circle className="sb-knob" cx={0} cy={4} r={6.5} />
-            </g>
-          </svg>
-        )}
-        <DayLabels
-          days={days}
-          strip={strip}
-          x={x}
-          width={width}
-          selectedDate={column?.date}
+      <div ref={track} className="sb-strip">
+        <TimeStrip
+          stops={stopTimes}
+          line={line}
+          at={selected}
+          now={now}
+          onPick={pick}
+          onMove={setPos}
+          draw={draw}
+          drawHeight={height}
         />
+        {/* Over the playhead: its knob, and a dot on each curve at the moment. */}
+        <svg className="sb-head" width={1} height={height} aria-hidden="true">
+          {reading?.wind != null && series && (
+            <circle className="sb-dot" cx={0} cy={y(reading.wind)} r={3.5} />
+          )}
+          {lanes.map((lane) => {
+            const v = reading?.[lane.kind];
+            return v != null ? (
+              <circle
+                key={lane.kind}
+                className="sb-dot"
+                cx={0}
+                cy={laneY.get(lane.kind)!(v)}
+                r={2.5}
+              />
+            ) : null;
+          })}
+          <circle className="sb-knob" cx={0} cy={4} r={5} />
+        </svg>
         {/* The bands' names and the wind's scale, in a column of their own
             beside the hours: no figure is ever under one. */}
-        <div className="sb-bands" aria-hidden="true">
+        <div className="sb-bands" style={{ height }} aria-hidden="true">
           {named ? (
             <>
               <span className="sb-band" style={{ top: CURVE_TOP }}>
                 Wind{units === "bft" ? "" : ` ${unitLabel(units)}`}
               </span>
-              {curve &&
+              {series &&
                 windTicks.map((kn) => (
                   <span key={kn} className="sb-tick" style={{ top: y(kn) }}>
                     {speedShort(kn, units)}
@@ -1129,60 +754,317 @@ export default function ScrubBar({
   );
 }
 
+/** The stars of an hour; a warning or a notice that takes them away has none. */
+function starsOf(hour: PlaceHour | undefined): number {
+  return hour?.warning?.replacesRating || hour?.water?.replacesRating
+    ? 0
+    : (hour?.rating?.stars ?? 0);
+}
+
+/** One column's wind and gust, wave height and tide. */
+interface SeriesPoint {
+  wind: number | null;
+  gust: number | null;
+  waves: number | null;
+  tide: number | null;
+}
+
+/**
+ * The forecast drawn along the strip, under its notches: the night hatched,
+ * the days' lines, the wind's curve with the gusts dashed over it, the row of
+ * stars, a lane each for the waves and the tide, or with no place chosen the
+ * spots with stars at each hour; the hours gone faded and the line at now.
+ */
+function StripDrawing({
+  g,
+  id,
+  strip,
+  series,
+  hidden,
+  named,
+  isPoint,
+  height,
+  bareBottom,
+  curveBottom,
+  starsY,
+  y,
+  windTicks,
+  lanes,
+  laneY,
+  starRuns,
+  spotBars,
+  nights,
+  days,
+  now,
+}: {
+  g: StripGeometry;
+  id: string;
+  strip: readonly StripColumn[];
+  series: readonly SeriesPoint[] | null;
+  hidden: readonly boolean[] | null;
+  named: boolean;
+  isPoint: boolean;
+  height: number;
+  bareBottom: number;
+  curveBottom: number;
+  starsY: number;
+  y: (value: number) => number;
+  windTicks: readonly number[];
+  lanes: readonly Lane[];
+  laneY: ReadonlyMap<Lane["kind"], (v: number) => number>;
+  starRuns: readonly StarRun[];
+  spotBars: readonly {
+    at: number;
+    from: number;
+    to: number;
+    height: number;
+    best: number;
+  }[];
+  nights: readonly { from: number; to: number }[];
+  days: ReturnType<typeof stripDays>;
+  now: number;
+}) {
+  const { x, width } = g;
+  const first = strip[0]?.time ?? now;
+  const last = strip[strip.length - 1]?.time ?? now;
+  /** A line through the columns, smoothed, and the area under it to `bottom`. */
+  const shape = (
+    pick: (s: SeriesPoint) => number | null,
+    to: (v: number) => number,
+    bottom: number,
+  ) => {
+    if (!series) return null;
+    // A stretch with no value (a source that ends, or has a gap) breaks the
+    // curve rather than drawing a line across it.
+    const runs: (readonly [number, number])[][] = [];
+    let run: (readonly [number, number])[] = [];
+    series.forEach((s, at) => {
+      const v = pick(s);
+      // A column after dark, hidden, breaks it too: the days either side of
+      // a night are not one curve.
+      if (v === null || hidden?.[at]) {
+        if (run.length) runs.push(run);
+        run = [];
+      } else run.push([x(strip[at].time), to(v)] as const);
+    });
+    if (run.length) runs.push(run);
+    const lines = runs.filter((r) => r.length > 1);
+    if (!lines.length) return null;
+    return {
+      line: lines.map((points) => smooth(points, bottom)).join(" "),
+      area: lines
+        .map(
+          (points) =>
+            `${smooth(points, bottom)} L${points[points.length - 1][0].toFixed(1)},${bottom} L${points[0][0].toFixed(1)},${bottom} Z`,
+        )
+        .join(" "),
+    };
+  };
+  const wind = shape((s) => s.wind, y, curveBottom);
+  const gust = wind ? shape((s) => s.gust, y, curveBottom) : null;
+  const laneShapes = lanes.map((lane) => ({
+    lane,
+    shape: shape((s) => s[lane.kind], laneY.get(lane.kind)!, lane.bottom),
+  }));
+  const foot = named ? height : bareBottom;
+  const nowX = x(Math.max(first, Math.min(last, now)));
+  return (
+    <svg width={width} height={height} aria-hidden="true">
+      <defs>
+        <pattern
+          id={`${id}hatch`}
+          width="5"
+          height="5"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <line x1="0" y1="0" x2="0" y2="5" className="sb-hatch" />
+        </pattern>
+        {wind && series && (
+          <linearGradient
+            id={`${id}wind`}
+            gradientUnits="userSpaceOnUse"
+            x1={0}
+            x2={width}
+            y1={0}
+            y2={0}
+          >
+            {series.map((s, at) =>
+              s.wind === null || hidden?.[at] ? null : (
+                <stop
+                  key={at}
+                  offset={Math.max(0, Math.min(1, x(strip[at].time) / width))}
+                  stopColor={windCss(s.wind)}
+                />
+              ),
+            )}
+          </linearGradient>
+        )}
+        {starRuns.map((run, i) => (
+          <linearGradient
+            key={i}
+            id={`${id}stars${i}`}
+            gradientUnits="userSpaceOnUse"
+            x1={x(run.from)}
+            x2={x(run.to)}
+            y1={0}
+            y2={0}
+          >
+            {run.stops.map((stop) => (
+              <stop
+                key={stop.at}
+                offset={(stop.at - run.from) / Math.max(1, run.to - run.from)}
+                style={{
+                  stopColor: `var(--color-stars-${Math.min(5, stop.stars)})`,
+                }}
+              />
+            ))}
+          </linearGradient>
+        ))}
+      </defs>
+
+      {nights.map((n) => (
+        <rect
+          key={n.from}
+          className="sb-night"
+          x={x(n.from)}
+          y={0}
+          width={Math.max(0, x(n.to) - x(n.from))}
+          height={foot}
+          fill={`url(#${id}hatch)`}
+        />
+      ))}
+      {days.slice(1).map((d) => {
+        const at = x(
+          strip[d.start].time -
+            (strip[d.start].time - strip[d.start - 1].time) / 2,
+        );
+        return (
+          <line
+            key={d.date}
+            className="sb-day"
+            x1={at}
+            x2={at}
+            y1={0}
+            y2={foot}
+          />
+        );
+      })}
+      {wind &&
+        windTicks.map((kn) => (
+          <line
+            key={kn}
+            className="sb-grid"
+            x1={x(first)}
+            x2={x(last)}
+            y1={y(kn)}
+            y2={y(kn)}
+          />
+        ))}
+      {spotBars.length > 0 && (
+        <g className="sb-spots" data-spot-bars>
+          {spotBars.map((bar) => {
+            // A bar an hour apart from the next, a little gap between.
+            const from = x(bar.from);
+            const wide = Math.max(1, x(bar.to) - from);
+            const inset = Math.min(4, wide * 0.12);
+            return (
+              <rect
+                key={bar.at}
+                x={from + inset}
+                y={bareBottom - bar.height}
+                width={Math.max(1, wide - 2 * inset)}
+                height={bar.height}
+                rx={2}
+                style={{ fill: `var(--color-stars-${bar.best})` }}
+              />
+            );
+          })}
+        </g>
+      )}
+
+      {wind && (
+        <g data-curve="wind">
+          <path
+            className="sb-area is-wind"
+            d={wind.area}
+            fill={`url(#${id}wind)`}
+          />
+          <path className="sb-line is-wind" d={wind.line} />
+          {gust && <path className="sb-gust" d={gust.line} />}
+        </g>
+      )}
+      {laneShapes.map(({ lane, shape }) => (
+        <g key={lane.kind} data-lane={lane.kind}>
+          <rect
+            className="sb-lane"
+            x={x(first)}
+            y={lane.top}
+            width={Math.max(0, x(last) - x(first))}
+            height={LANE_H}
+            rx={3}
+          />
+          {shape && (
+            <>
+              <path className={`sb-area is-${lane.kind}`} d={shape.area} />
+              <path className={`sb-line is-${lane.kind}`} d={shape.line} />
+            </>
+          )}
+        </g>
+      ))}
+
+      {named && !isPoint && (
+        <g className="sb-stars" data-stars>
+          <rect
+            className="sb-stars-track"
+            x={x(first)}
+            y={starsY}
+            width={Math.max(0, x(last) - x(first))}
+            height={STARS_H}
+            rx={STARS_H / 2}
+          />
+          {starRuns.map((run, i) => (
+            <rect
+              key={i}
+              x={x(run.from)}
+              y={starsY}
+              width={Math.max(STARS_H, x(run.to) - x(run.from))}
+              height={STARS_H}
+              rx={STARS_H / 2}
+              fill={`url(#${id}stars${i})`}
+            />
+          ))}
+        </g>
+      )}
+
+      {/* The hours gone, faded, and the line at now. */}
+      {now > first && (
+        <rect
+          className="sb-past"
+          x={0}
+          y={0}
+          width={Math.max(0, nowX)}
+          height={height}
+        />
+      )}
+      {now >= first && now <= last && (
+        <line
+          className="sb-now-line"
+          data-now
+          x1={nowX}
+          x2={nowX}
+          y1={0}
+          y2={foot}
+        />
+      )}
+    </svg>
+  );
+}
+
 /** "Wed 4 13:40": the playhead's moment, to the nearest ten minutes. */
 export function momentWords(time: number): string {
   const rounded = Math.round(time / 600000) * 600000;
   return `${dayShort(rounded)} ${Number(irishDate(rounded).slice(8))} ${clock(rounded)}`;
-}
-
-/**
- * The days under the strip, one name each at the middle of its stretch:
- * "Sun 1", or "Sun" where the days are narrow, or every other one where even
- * that will not fit, so no two ever run into each other.
- */
-function DayLabels({
-  days,
-  strip,
-  x,
-  width,
-  selectedDate,
-}: {
-  days: ReturnType<typeof stripDays>;
-  strip: readonly StripColumn[];
-  x: (time: number) => number;
-  width: number;
-  selectedDate: string | undefined;
-}) {
-  if (!width || !days.length) return <div className="sb-days" />;
-  // Each day's name at the middle of the part of it in view; a day mostly
-  // out of view goes unnamed.
-  const placed = days.flatMap((d) => {
-    const first = strip[d.start].time;
-    const last = strip[d.start + d.count - 1].time;
-    const from = Math.max(0, x(first));
-    const to = Math.min(width, x(last));
-    return to - from > 24 ? [{ d, at: (from + to) / 2, room: to - from }] : [];
-  });
-  const each = placed.length ? Math.min(...placed.map((p) => p.room)) : width;
-  const words = each >= 48 ? "long" : "short";
-  const every = each >= 30 ? 1 : 2;
-  return (
-    <div className="sb-days" aria-hidden="true">
-      {placed.map(({ d, at }, i) =>
-        i % every ? null : (
-          <span
-            key={d.date}
-            className={d.date === selectedDate ? "is-on" : undefined}
-            style={{ left: `${Math.max(14, Math.min(width - 14, at))}px` }}
-          >
-            {words === "long"
-              ? `${dayShort(strip[d.start].time)} ${Number(d.date.slice(8))}`
-              : dayShort(strip[d.start].time)}
-          </span>
-        ),
-      )}
-    </div>
-  );
 }
 
 /**
