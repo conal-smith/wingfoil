@@ -107,20 +107,3 @@ export function bestPills(
   }
   return chosen.map((c) => c.id);
 }
-
-/**
- * The spots within `reach` of a tap, the nearest first: two or more there and
- * the tap is ambiguous, so the page offers them by name.
- */
-export function spotsNear(
-  spots: readonly { id: string; x: number; y: number }[],
-  x: number,
-  y: number,
-  reach: number,
-): string[] {
-  return spots
-    .map((s) => ({ id: s.id, d: Math.hypot(s.x - x, s.y - y) }))
-    .filter((s) => s.d <= reach)
-    .sort((a, b) => a.d - b.d || (a.id < b.id ? -1 : 1))
-    .map((s) => s.id);
-}

@@ -6,8 +6,8 @@ import { SAMPLE_CLOCK } from "./columns";
  * `narrow`): Map | List, the map first. On the map the best five spots in
  * view are pills and the rest beads; a pill tapped turns light and opens its
  * peek above the dock, a second tap opens the spot; a tap among close spots
- * asks which ("Spots here"); a spot found by the search is flown to and
- * peeked.
+ * peeks the nearest, with no list to choose from; a spot found by the search
+ * is flown to and peeked.
  */
 test.use({
   viewport: { width: 390, height: 844 },
@@ -245,7 +245,7 @@ test("a pill tapped turns light and peeks; tapped again it opens its spot", asyn
   await expect(page).toHaveURL(new RegExp(`/spot/${id}`), { timeout: 30000 });
 });
 
-test("a tap among close spots asks which: Spots here, 44 px rows", async ({
+test("a tap among close spots peeks the nearest, with no list", async ({
   page,
 }) => {
   await openMap(page);
@@ -266,21 +266,19 @@ test("a tap among close spots asks which: Spots here, 44 px rows", async ({
       .filter((b) => b.y > 80 && b.y < 560 && b.x > 20 && b.x < 370);
     for (const a of beads)
       for (const b of beads)
+        // A quarter of the way from one to the other: the first is nearest.
         if (a !== b && Math.hypot(a.x - b.x, a.y - b.y) < 14)
-          return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+          return {
+            id: a.id,
+            x: a.x + (b.x - a.x) / 4,
+            y: a.y + (b.y - a.y) / 4,
+          };
     return null;
   });
   expect(at).not.toBeNull();
   await page.touchscreen.tap(at!.x, at!.y);
-  const here = page.getByRole("dialog", { name: "Spots here" });
-  await expect(here).toBeVisible();
-  const rows = here.locator("[data-spots-here-row]");
-  expect(await rows.count()).toBeGreaterThanOrEqual(2);
-  expect((await rows.first().boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  const chosen = (await rows.first().getAttribute("data-spots-here-row"))!;
-  await rows.first().tap();
-  await expect(here).toHaveCount(0);
-  await expect(peek(page)).toHaveAttribute("data-spot-peek", chosen);
+  await expect(peek(page)).toHaveAttribute("data-spot-peek", at!.id);
+  await expect(page.locator("[data-spots-here]")).toHaveCount(0);
 });
 
 test("a spot found by the search is flown to, its pill light, its peek open", async ({

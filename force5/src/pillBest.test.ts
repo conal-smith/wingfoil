@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   bestPills,
   byBest,
-  spotsNear,
   type BestCandidate,
   type BestOptions,
 } from "./pillBest";
@@ -130,22 +129,5 @@ describe("bestPills", () => {
     expect(bestPills(list, options())).toEqual(
       bestPills([...list].reverse(), options()),
     );
-  });
-});
-
-describe("spotsNear", () => {
-  it("lists the spots within reach, the nearest first", () => {
-    expect(
-      spotsNear(
-        [
-          { id: "a", x: 0, y: 0 },
-          { id: "b", x: 10, y: 0 },
-          { id: "c", x: 30, y: 0 },
-        ],
-        8,
-        0,
-        22,
-      ),
-    ).toEqual(["b", "a", "c"]);
   });
 });

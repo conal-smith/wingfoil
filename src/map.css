@@ -1787,13 +1787,12 @@
   margin: -11px 0 0 -11px;
 }
 
-/* ---------- a spot's peek and card, and "Spots here" ---------- */
+/* ---------- a spot's peek and card ---------- */
 /* Its name, its wind, waves, weather and tide, and its stars at the hour
    (src/SpotPeek.tsx): over the phone's map a small peek at the left above
    the dock, clear of the locate button; on the full chart a card beside the
    pill tapped, a small pointer on its edge at the pill. */
-.spot-peek,
-.spots-here {
+.spot-peek {
   position: absolute;
   z-index: 26;
   padding: 10px 12px;
@@ -1824,11 +1823,6 @@
 }
 .spot-peek.is-peek .sp-foot {
   margin-top: 4px;
-}
-.narrow-foot .spots-here {
-  left: 8px;
-  right: 8px;
-  bottom: calc(var(--nf-room, 62px) + 72px);
 }
 .spot-peek.is-card {
   left: 0;
@@ -1945,44 +1939,6 @@
   font-style: normal;
   color: var(--color-ink-muted);
   font-size: var(--text-caption);
-}
-.spots-here {
-  padding: 6px;
-}
-.map-panel .spots-here {
-  left: 50%;
-  bottom: 160px;
-  width: min(320px, calc(100% - 24px));
-  transform: translateX(-50%);
-}
-.sh-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 0 0 8px;
-}
-.sh-head p {
-  margin: 0;
-  font-size: var(--text-caption);
-  color: var(--color-ink-muted);
-}
-.sh-row {
-  display: flex;
-  width: 100%;
-  min-height: 44px;
-  justify-content: flex-start;
-  align-items: baseline;
-  gap: 8px;
-  padding: 0 10px;
-  text-align: left;
-}
-.sh-row b {
-  font-weight: 600;
-}
-.sh-row span {
-  margin-left: auto;
-  color: var(--color-ink-muted);
-  white-space: nowrap;
 }
 /* The card a search found on the finder, outlined as a lit one is. */
 [data-spot-card][data-found] {
