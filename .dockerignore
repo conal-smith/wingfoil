@@ -22,6 +22,10 @@
 !public/
 !public/*.json
 !public/favicon.svg
+!public/favicon.ico
+!public/apple-touch-icon.png
+!public/icon-*.png
+!public/manifest.webmanifest
 !public/weather/**
 !package.json
 !package-lock.json

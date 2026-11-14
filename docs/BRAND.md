@@ -293,6 +293,19 @@ sits on a soft grey pill in semibold with "You're here" at its end, and the
 same pill is the hover of the other rows. Light, Dark or Auto is at its foot,
 on every width. A section switched off in the build is not drawn at all.
 
+## The icon
+
+The site's icon is a photograph: a carbon wing's tip, its weave lit magenta,
+sweeping down to the leading edge at the lower right, on a dark ground. A
+browser tab shows it round (`favicon.ico`, `icon-192.png`, `icon-512.png`,
+clear outside the circle). A home screen gets it square
+(`apple-touch-icon.png`, and `icon-maskable-512.png` in
+`manifest.webmanifest`), and the phone rounds or circles it itself, so the tip
+stands inside the middle 80 %, which every phone's mask keeps. The ground was
+widened at the right and foot to bring the tip in from the corner. The page
+never shows the icon: the top bar's mark is the wordmark. The native app's
+icons are still cut from `public/favicon.svg` (mobile/scripts/brand-icons.mjs).
+
 ## Do
 
 - Lead with a figure, then the short label that names it.
