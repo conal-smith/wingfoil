@@ -66,7 +66,7 @@ import {
 } from "./lightHit";
 import { drawLights, lookOf, type Drawn, type Look } from "./lightsCanvas";
 import { pillHtml, pillKey, type PillParts } from "./pillContent";
-import { BEST_PILLS, bestPills, spotsNear } from "./pillBest";
+import { BEST_PILLS, bestPills } from "./pillBest";
 import { placePills, type Box as PillBox, type PillItem } from "./pillPlace";
 import type { Wedge } from "./rideWedge";
 import { speedShort, type Units } from "./units";
@@ -182,8 +182,6 @@ const PLACE_LAYERS = ["places", "places-near", "water-names"];
 
 /** A bead (src/map.css), not a pill. */
 const isBead = (el: HTMLElement) => el.classList.contains("lt-bead");
-/** How near a tap two spots stand for it to be either's: a bead's reach. */
-const CROWD_REACH = 22;
 
 /** The plain map's pill (written by `update`) and bead (src/map.css). */
 const PILL_HTML = `<span class="lt-pill" aria-hidden="true"></span><span class="lt-bead-dot" aria-hidden="true"></span>`;
@@ -242,12 +240,6 @@ export function createLights(
   onSelect: (spot: Spot, bead: boolean) => void,
   /** A mouse comes onto a light (its place), or leaves it (null). */
   onHover?: (spot: Spot | null) => void,
-  /**
-   * A tap where two spots or more stand within a bead's reach, off any pill:
-   * the spots there, the nearest first, for the page to offer by name.
-   * Without it, the nearest is chosen.
-   */
-  onCrowd?: (spots: Spot[]) => void,
   /** The best few chosen anew: their spots, for the page to read for them. */
   onBest?: (ids: readonly string[]) => void,
 ): Lights {
@@ -863,31 +855,6 @@ export function createLights(
     };
     el.addEventListener("click", (event) => {
       event.stopPropagation();
-      // Where no list stands beside the map, a finger's tap off any pill with
-      // two spots or more within a bead's reach is the page's to ask which. A
-      // mouse is precise enough to mean the one it is on.
-      const finger =
-        (event as PointerEvent).pointerType === "touch" ||
-        window.matchMedia("(pointer: coarse)").matches;
-      if (
-        onCrowd &&
-        event.detail &&
-        finger &&
-        pillMode.kind === "best" &&
-        !el.classList.contains("lt-pilled")
-      ) {
-        const frame = map.getContainer().getBoundingClientRect();
-        const near = spotsNear(
-          [...entries.values()]
-            .filter((e) => !e.el.classList.contains("lt-under"))
-            .map((e) => ({ id: e.spot.id, x: e.x, y: e.y })),
-          event.clientX - frame.left,
-          event.clientY - frame.top,
-          CROWD_REACH,
-        );
-        if (near.length >= 2)
-          return onCrowd(near.flatMap((id) => byId.get(id) ?? []));
-      }
       press(meant(spot, el, event));
     });
     // A pill is the one under the pointer; over a bead's reach, the nearest

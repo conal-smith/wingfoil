@@ -441,8 +441,6 @@ export default function App() {
    * on the finder, whose pill is light and whose card is outlined.
    */
   const [peekId, setPeekId] = useState<string | null>(null);
-  /** A crowded tap's spots, offered by name ("Spots here"), or null. */
-  const [crowd, setCrowd] = useState<readonly Spot[] | null>(null);
   /** The finder's day, stepped from the phone's dock as well as the list's head. */
   const [finderDay, setFinderDay] = useState<string | null>(null);
   const [finderDates, setFinderDates] = useState<{
@@ -1693,10 +1691,8 @@ export default function App() {
     if (pageRef.current !== "chart") {
       // On the finder's map a tap away from the spots shuts the peek.
       setPeekId(null);
-      setCrowd(null);
       return;
     }
-    setCrowd(null);
     if (focusId || point || picked) closeDock();
     else pickPoint(at);
   };
@@ -2119,21 +2115,13 @@ export default function App() {
    * dock, the second opens the spot.
    */
   const pressOnPhoneMap = (spot: Spot) => {
-    setCrowd(null);
     if (peekId === spot.id) return window.location.assign(lightLink(spot));
     setPeekId(spot.id);
   };
   const pressLight = (spot: Spot, bead: boolean) => {
-    setCrowd(null);
     if (pageRef.current === "chart") return openLight(spot);
     if (splitRef.current) return pressBesideList(spot, bead);
     pressOnPhoneMap(spot);
-  };
-  /** A spot chosen in "Spots here": as if its pill had been tapped once. */
-  const chooseFromCrowd = (spot: Spot) => {
-    setCrowd(null);
-    if (pageRef.current === "chart") openLight(spot);
-    else setPeekId(spot.id);
   };
   // The wind's particles hold still while the list scrolls beside them, so
   // the page's frames are the list's, and run again once it stops.
@@ -2606,7 +2594,6 @@ export default function App() {
    * phone its peek opens over the map.
    */
   const pickFound = (spot: Spot) => {
-    setCrowd(null);
     if (pageRef.current === "chart") return selectSpot(spot);
     setNarrowList(false);
     setPeekId(spot.id);
@@ -2641,7 +2628,6 @@ export default function App() {
     if (splitWas.current && !split) setNarrowList(true);
     splitWas.current = split;
     setPeekId(null);
-    setCrowd(null);
     document
       .querySelectorAll("[data-spot-card][data-found]")
       .forEach((el) => el.removeAttribute("data-found"));
@@ -2686,7 +2672,6 @@ export default function App() {
             openList();
             setNarrowList(true);
             setPeekId(null);
-            setCrowd(null);
           }
         }}
         data-view={toMap ? "map" : "list"}
@@ -2928,40 +2913,6 @@ export default function App() {
     );
   };
   const peekSpot = narrow && peekId ? spotById.get(peekId) : undefined;
-  /** "Spots here": a crowded tap's spots by name, 44 px a row. */
-  const chooser = crowd && (
-    <div
-      className="spots-here"
-      role="dialog"
-      aria-label="Spots here"
-      data-spots-here
-    >
-      <div className="sh-head">
-        <p>Spots here</p>
-        <Button
-          variant="quiet"
-          size="sm"
-          icon
-          aria-label="Close"
-          onClick={() => setCrowd(null)}
-        >
-          <X size={16} strokeWidth={1.75} aria-hidden="true" />
-        </Button>
-      </div>
-      {crowd.slice(0, 6).map((spot) => (
-        <Button
-          key={spot.id}
-          variant="quiet"
-          className="sh-row"
-          onClick={() => chooseFromCrowd(spot)}
-          data-spots-here-row={spot.id}
-        >
-          <b>{spot.name}</b>
-          {spot.county && <span>Co. {spot.county}</span>}
-        </Button>
-      ))}
-    </div>
-  );
   const skipTo = (event: React.MouseEvent) => {
     event.preventDefault();
     const to = document.querySelector<HTMLElement>(skip.to);
@@ -3225,7 +3176,6 @@ export default function App() {
                     }
                     phone={phone}
                     onSelect={pressLight}
-                    onCrowd={setCrowd}
                     onBestPills={setBestPillIds}
                     pills={pills}
                     onHoverSpot={hoverLight}
@@ -3250,7 +3200,6 @@ export default function App() {
               {onChart &&
                 cardSpot &&
                 peekOf(cardSpot, "card", closeDock, cardAt)}
-              {onChart && chooser}
               {onChart && (status || (loading && frame)) && (
                 <div
                   className={`frame-status chart-box${modelError || frameError ? " is-error" : ""}`}
@@ -3416,7 +3365,6 @@ export default function App() {
               {!narrowList &&
                 peekSpot &&
                 peekOf(peekSpot, "peek", () => setPeekId(null))}
-              {!narrowList && chooser}
               {!phone && viewSwitch(false)}
               {!narrowList && mapDock(true)}
             </div>

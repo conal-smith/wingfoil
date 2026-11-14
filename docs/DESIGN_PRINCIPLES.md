@@ -1340,8 +1340,8 @@ A pill tapped turns light and stays a pill: on the phone a peek opens over the
 dock with the spot's wind, waves, weather, tide and stars, and a second tap
 opens the spot; on the chart a card stands beside the pill, a small pointer at
 it and never over it, as the scrub bar opens below (force5/src/cardPlace.ts).
-A finger's tap with two spots or more within about 22 px of it asks which, in
-"Spots here", rows of 44 px; a mouse means the spot it is on. A spot chosen in the search is flown to, given its light
+A tap among close spots means the nearest of them, finger or mouse: there is
+no "Spots here" list to choose from. A spot chosen in the search is flown to, given its light
 pill and chosen: beside the list its card is outlined and brought into view,
 on the phone its peek opens; it no longer opens the spot's page from the
 finder. The finder's map shows no station's tag: at the country's zoom they

@@ -225,11 +225,6 @@ type Props = {
   onSelect: (spot: Spot, bead: boolean) => void;
   /** A mouse comes onto a light (its place), or leaves it (null). */
   onHoverSpot?: (spot: Spot | null) => void;
-  /**
-   * A tap with two spots or more within a bead's reach of it, where no list
-   * stands beside the map: the spots there, the nearest first.
-   */
-  onCrowd?: (spots: Spot[]) => void;
   /** The spots the best few pills went to, as they are chosen. */
   onBestPills?: (ids: readonly string[]) => void;
   /** Which spots have a pill (./lights.ts): the cards in view, or the best few. */
@@ -1085,7 +1080,6 @@ export default function WindMap(props: Props) {
       spots,
       (spot, bead) => latest.current.onSelect(spot, bead),
       (spot) => latest.current.onHoverSpot?.(spot),
-      (spots) => latest.current.onCrowd?.(spots),
       (ids) => latest.current.onBestPills?.(ids),
     );
     lightsRef.current.light(lit.current);
