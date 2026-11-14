@@ -54,9 +54,9 @@ function Figures({ html }: { html: string }) {
  * its name, a link to its page, then its wind, waves, weather and tide, and
  * its stars. On the phone it is a small peek above the dock, opened by a tap
  * on a pill, whose second tap opens the spot (`peek`); on the full chart,
- * wider than a phone, a card beside the pill tapped, a small pointer at it
+ * wider than a phone, a card beside the ring tapped, a small pointer at it
  * (`card`, placed by force5/src/cardPlace.ts), never over it. The figures are
- * the pills' own, so the card and the pill read alike.
+ * the pills' own, so the card and the finder's pills read alike.
  */
 const SpotPeek = forwardRef<
   HTMLDivElement,

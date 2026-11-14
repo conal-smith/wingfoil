@@ -88,12 +88,13 @@ the ramp by hand is how the legend and the map drifted apart before.
 
 On the map, **shape carries kind and colour carries the reading.** A spot
 marker says riding spot, operator, club or area by its shape (round, squared,
-dashed); colour on a marker only ever means wind. On every map a spot with a
-pill (beside the list, its card in view; on the phone's map and the full
-chart, one of the best five in view) is a round-ended pill, neutral (dark,
-with light words, in either theme) and saying what the map shows, its arrow
-alone red offshore; every other spot is a bead, a small off-white dot
-(2026-11-08). A
+dashed); colour on a marker only ever means wind. On the full chart every
+spot is its ring, filled in its stars' colour, its figure the stars and its
+arrow the wind (2026-11-14). On the finder's map a spot with a pill (beside
+the list, its card in view; on the phone's map, one of the best five in view)
+is a round-ended pill, neutral (dark, with light words, in either theme) and
+saying what the map shows, its arrow alone red offshore; every other spot is a
+bead, a small off-white dot (2026-11-08). A
 weather station or buoy is a squarer, smaller tag in the buoy's gold, its wind
 as it was measured. A forecast is never gold.
 
@@ -1388,3 +1389,29 @@ it was. On the chart the top bar's switch says List and goes back to the
 finder's list; there is no Chart or Spots button in the bar. A link to a spot
 on the chart from elsewhere (`/?spot=keel`) still opens the spot's own page on
 a phone, and the tour stays off the phone's menu.
+
+**2026-11-14 — A rated ring for every spot on the chart again; the pills stay
+on the finder's map.** The owner: on the chart "we used to have a little
+circle for every spot, which showed the wind direction, and it was coloured by
+the wind conditions and showed how many stars it got"; "it was very simple to
+look at the whole area on the chart and see which spots were good and which
+weren't". The pills work better on the finder's simple map, and the chart
+should have the more detailed version. So on the full chart (`/?map`) every
+spot is its ring again (force5/src/lights.ts, src/map.css): filled in the
+stars' pink to purple from one star to five, dashed at none, grey in the dark,
+struck in red offshore, its figure the stars at the hour and a short arrow
+blowing downwind, red where it is offshore or cross-offshore. The open spot's
+ring is a size up, with its riding wedge behind it. From the national zoom a
+rated spot's ring is a size up and keeps its arrow, a spot with no stars is a
+small dot in its own colour, and a ring that would stand on a better one steps
+down to a dot; closer in a dashed ring with no stars gives way to a rated one
+beside it (`thinRings`). Every spot stays on the chart. No spot's name stands
+there: under the mouse or the keys a ring grows and says its name and wind on
+an ink label beside it. A ring tapped opens the spot on the chart as a pill
+did, with its card beside the ring and its arrow on a wide screen and the
+scrub bar below.
+
+The finder's map, beside the list and the phone's Map, keeps its pills and
+beads unchanged. This replaces, for the full chart, the best five pills and
+the beads of 2026-11-08, and the ring with no arrow from the national zoom of
+2026-11-06.

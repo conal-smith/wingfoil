@@ -148,6 +148,16 @@ test("a phone's full chart is the menu's alone, and List leads back to the finde
   const controls = page.getByRole("group", { name: "Map controls" });
   for (const name of ["Zoom in", "Zoom out", "Layers"])
     await expect(controls.getByRole("button", { name })).toBeVisible();
+  // The chart's spots are rings, not the map's pills and beads (2026-11-14).
+  await expect(page.locator(".spot-marker")).toHaveCount(149);
+  await expect(page.locator(".spot-marker.pending")).toHaveCount(0, {
+    timeout: 30000,
+  });
+  await expect(
+    page.locator(".spot-marker .lt-ring:visible").first(),
+  ).toBeVisible();
+  await expect(page.locator(".spot-marker.lt-pilled")).toHaveCount(0);
+  await expect(page.locator(".spot-marker.lt-bead")).toHaveCount(0);
   // On the chart the switch says List, and takes the rider to the finder's.
   await expect(bar.locator('a[data-view-switch="spots"]')).toHaveCount(0);
   await switchTo(page, "List").tap();

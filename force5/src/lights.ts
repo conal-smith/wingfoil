@@ -25,11 +25,20 @@
  * pitch, so a move takes every light by one scale and shift. A light the
  * rider is at (open, pointed at, on the keys) stays a button and is moved.
  *
- * On every map a spot is a pill or a bead, and no spot's name stands on the
- * map. Beside the Spot finder's list (`mode` "cards") a pill is a card the
+ * On the full chart (`mode` "rings") every spot is its ring, coloured by its
+ * stars, its figure the stars, its arrow the wind: the whole coast read at a
+ * glance, which spots are good and which are not. A ring that would stand on
+ * a better one steps down to a dot of its own colour (`thinRings`, laid out
+ * once the camera rests); from the national zoom a spot with no stars at the
+ * hour is a dot too (src/map.css `.z-lo`), and a rated one a ring a size up,
+ * with its arrow. Every spot stays on the chart. No spot's name stands there:
+ * a ring under the mouse or the keys says its name beside it.
+ *
+ * On the finder's map a spot is a pill or a bead, and no spot's name stands on
+ * the map. Beside the Spot finder's list (`mode` "cards") a pill is a card the
  * rider can see: each card at least half in the list's view has its pill
  * (`order`, its place among them), always. Where no list stands beside the
- * map, on the phone's map and the full chart (`mode` "best"), the best few
+ * map, on the phone's map (`mode` "best"), the best few
  * spots in view have one (./pillBest.ts): the most stars, then the
  * favourites, then the map's own figure, kept apart and never two alike side
  * by side, chosen again only when the camera rests somewhere new, so a scrub
@@ -62,6 +71,7 @@ import {
   nextLight,
   pressedLight,
   tappedLight,
+  thinLights,
   type Way,
 } from "./lightHit";
 import { drawLights, lookOf, type Drawn, type Look } from "./lightsCanvas";
@@ -108,10 +118,13 @@ export interface LightState {
 /**
  * Which spots have a pill: beside the list, the cards in view (`order`); where
  * no list stands beside the map, the best few in view, at least `gap` pixels
- * apart. `field` is what the pills say, so a new field chooses them again.
+ * apart. `field` is what the pills say, so a new field chooses them again. On
+ * the full chart, none: every spot is its ring.
  */
 export type PillMode =
-  { kind: "cards" } | { kind: "best"; gap: number; field: string };
+  | { kind: "cards" }
+  | { kind: "best"; gap: number; field: string }
+  | { kind: "rings" };
 
 interface Entry {
   spot: Spot;
@@ -167,8 +180,15 @@ const MANAGED = [
   "active",
   "named",
   "w-over",
+  "lt-thin",
 ];
 
+/**
+ * Half what a full ring takes on the chart, a little clear: from the national
+ * zoom, where it is a size up (src/map.css), and closer in.
+ */
+const FAR_REACH = 12;
+const NEAR_REACH = 10;
 /** How long a frame of a move may spend making the lights' pictures. */
 const BUDGET_MS = 4;
 
@@ -182,6 +202,17 @@ const PLACE_LAYERS = ["places", "places-near", "water-names"];
 
 /** A bead (src/map.css), not a pill. */
 const isBead = (el: HTMLElement) => el.classList.contains("lt-bead");
+/** A ring stepped down to a dot (`thinRings`): drawn under the full rings. */
+const isThin = (el: HTMLElement) => el.classList.contains("lt-thin");
+
+/** Ranks a ring for keeping its full mark: the open spot, then the starred, then by stars. */
+function ringRank(el: HTMLElement): number {
+  if (el.classList.contains("sel")) return 200;
+  const named = el.classList.contains("named") ? 50 : 0;
+  for (let n = 5; n >= 0; n--)
+    if (el.classList.contains(`s${n}`)) return named + n;
+  return named - 1;
+}
 
 /** The plain map's pill (written by `update`) and bead (src/map.css). */
 const PILL_HTML = `<span class="lt-pill" aria-hidden="true"></span><span class="lt-bead-dot" aria-hidden="true"></span>`;
@@ -434,7 +465,8 @@ export function createLights(
   const thinReadings = () => {
     const box = map.getContainer();
     const frame = box.getBoundingClientRect();
-    // On the full chart a reading gives way to a pill only.
+    // Away from the list a reading gives way to a pill only: on the full
+    // chart, with no pills, to nothing but another reading.
     const beside = pillMode.kind === "cards";
     const taken = beside ? [...pillBoxes, ...names()] : [...pillBoxes];
     for (const reading of box.querySelectorAll<HTMLElement>(".obs-mark")) {
@@ -462,7 +494,62 @@ export function createLights(
       if (!under) taken.push(at);
     }
   };
-  /** The pills where the camera rests. */
+  /** On the full chart: no pill, no bead, nothing moved off its spot. */
+  const clearPills = () => {
+    for (const entry of entries.values()) {
+      const { el, pill } = entry;
+      if (
+        !el.matches(".lt-pilled, .lt-bead, .lt-under") &&
+        !entry.dx &&
+        !entry.dy &&
+        !entry.notch
+      )
+        continue;
+      el.classList.remove("lt-pilled", "lt-bead", "lt-under");
+      entry.dx = entry.dy = 0;
+      entry.notch = "";
+      moveTo(el, entry.x, entry.y);
+      delete pill.dataset.n;
+      entry.rev++;
+    }
+    pillBoxes = [];
+  };
+  /**
+   * A crowded coast on the full chart: a ring that would stand on a better one
+   * steps down to a dot of its own colour (./lightHit `thinLights`), the open
+   * spot's never. From the national zoom only the rated have a full ring to
+   * lose: the rest are dots already (src/map.css). Closer in, every spot has
+   * one, and a dashed ring with no stars gives way to a rated one beside it.
+   */
+  const thinRings = () => {
+    const far = map.getContainer().classList.contains("z-lo");
+    const reach = far ? FAR_REACH : NEAR_REACH;
+    const thin =
+      pillMode.kind === "rings"
+        ? thinLights(
+            [...entries]
+              .filter(
+                ([, { el }]) =>
+                  !far || el.matches(".s1, .s2, .s3, .s4, .s5, .sel"),
+              )
+              .map(([id, { el, x, y }]) => ({
+                id,
+                x,
+                y,
+                halfW: reach,
+                halfH: reach,
+                rank: ringRank(el),
+              })),
+          )
+        : new Set<string>();
+    for (const [id, entry] of entries) {
+      const on = thin.has(id);
+      if (isThin(entry.el) === on) continue;
+      entry.el.classList.toggle("lt-thin", on);
+      entry.rev++;
+    }
+  };
+  /** The pills, or on the full chart the rings, where the camera rests. */
   const layout = () => {
     const camera = `${map.getZoom().toFixed(3)}|${map.getCenter().toArray().join(",")}`;
     if (!dirty && camera === laid) {
@@ -471,7 +558,9 @@ export function createLights(
     }
     laid = camera;
     dirty = false;
-    placeAllPills(camera);
+    if (pillMode.kind === "rings") clearPills();
+    else placeAllPills(camera);
+    thinRings();
     thinReadings();
   };
   let queued = 0;
@@ -637,9 +726,10 @@ export function createLights(
     const all = [...looks.keys()].filter(
       (e) => !e.el.classList.contains("lt-under"),
     );
-    const marks = all.filter((e) => !isBead(e.el));
+    const low = (e: Entry) => isBead(e.el) || isThin(e.el);
+    const marks = all.filter((e) => !low(e));
     drawn = [
-      ...all.filter((e) => isBead(e.el)),
+      ...all.filter(low),
       ...marks.filter((e) => !named(e)),
       ...marks.filter(named),
     ].map((e) => ({ x: e.x, y: e.y, dx: e.dx, dy: e.dy, look: looks.get(e)! }));
@@ -1039,6 +1129,11 @@ export function createLights(
     mode(next) {
       if (JSON.stringify(next) === JSON.stringify(pillMode)) return;
       pillMode = next;
+      // On the full chart no pill is chosen: none needs reading for.
+      if (next.kind !== "best" && best.ids.length) {
+        best = { key: "", ids: [] };
+        onBest?.([]);
+      }
       dirty = true;
       queue();
     },

@@ -1,7 +1,8 @@
 /**
- * Where a spot's card stands beside its pill on the full chart: on the side
+ * Where a spot's card stands beside its ring on the full chart (`pill`, the
+ * ring's box, as the mark it must not cover): on the side
  * with room, the sea side first and beside it rather than above or below, a
- * small pointer on the card's edge at the pill, and never over the pill. The
+ * small pointer on the card's edge at the ring, and never over it. The
  * card stays inside the map, above its dock, and off the map's controls; with
  * no side that holds it there is no card.
  *

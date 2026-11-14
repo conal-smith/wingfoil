@@ -114,11 +114,13 @@ test("the arrows walk the lights, Enter opens one, and Escape leaves them", asyn
   expect(
     await page.locator(`.spot-marker[data-spot-id="${from}"]`).boundingBox(),
   ).toEqual(box);
-  // The light the keys are on shows as its light pill: no name stands on
-  // the map (2026-11-08).
-  await expect(
-    page.locator(`.spot-marker[data-spot-id="${to}"] .lt-pill`),
-  ).toBeVisible();
+  // The ring the keys are on says its name beside it, on the chart's rings
+  // (2026-11-14): no other name stands on the map, and no pill.
+  const on = page.locator(`.spot-marker[data-spot-id="${to}"]`);
+  await expect(on.locator(".lt-ring")).toBeVisible();
+  await expect(on.locator(".lt-lab")).toBeVisible();
+  await expect(on.locator(".lt-pill")).toBeHidden();
+  await expect(page.locator(".spot-marker .lt-lab:visible")).toHaveCount(1);
 
   // Tab leaves the lights in one press, and Shift+Tab comes back to that one.
   await page.keyboard.press("Tab");
